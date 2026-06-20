@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Jaronite News — Employee Portal</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <div id="login-screen">
+    <h1>Employee Login</h1>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="error-msg" style="color:red;"></p>
+  </div>
+
+  <div id="portal-screen" style="display:none;">
+    <h1>Welcome, <span id="user-display"></span></h1>
+    <button onclick="logout()">Logout</button>
+
+    <h2>Post New Article</h2>
+    <input type="text" id="title" placeholder="Article Title">
+    <select id="category">
+      <option value="mayoral-election">Mayoral Election</option>
+      <option value="city-projects">City Projects</option>
+      <option value="crime-justice">Crime & Justice</option>
+      <option value="business-economy">Business & Economy</option>
+    </select>
+    <textarea id="content" placeholder="Write your article here..." rows="10"></textarea>
+    <button onclick="postArticle()">Publish Article</button>
+    <p id="post-msg"></p>
+  </div>
+
+  <script>
+    let currentUser = null;
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        currentUser = data.user;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('portal-screen').style.display = 'block';
+        document.getElementById('user-display').textContent = data.user.username;
+      } else {
+        document.getElementById('error-msg').textContent = 'Invalid username or password.';
+      }
+    }
+
+    async function postArticle() {
+      const title = document.getElementById('title').value;
+      const category = document.getElementById('category').value;
+      const content = document.getElementById('content').value;
+
+      const res = await fetch('/api/articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, category, content, author: currentUser.username })
+      });
+
+      const data = await res.json();
+      document.getElementById('post-msg').textContent = data.success ? 'Article published!' : 'Failed to publish.';
+    }
+
+    function logout() {
+      currentUser = null;
+      document.getElementById('login-screen').style.display = 'block';
+      document.getElementById('portal-screen').style.display = 'none';
+    }
+  </script>
+
+</body>
+</html>
