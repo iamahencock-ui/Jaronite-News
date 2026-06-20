@@ -163,6 +163,28 @@ export default {
       return Response.json(results.results);
     }
 
+    // ---------------- SHARED: article detail (powers the click-to-expand overlay) ----------------
+
+    // Any authenticated user: fetch one article's full detail. Writers may only
+    // view their own articles this way; editors/admins may view any article.
+    // This route itself grants no new permissions — every action button the
+    // frontend shows still re-validates against its own route exactly as before.
+    if (url.pathname === "/api/article-detail" && request.method === "POST") {
+      const user = await getSessionUser(env, request);
+      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const { id } = await request.json();
+      const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
+      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+
+      const isPrivileged = user.role === "editor" || user.role === "admin";
+      if (!isPrivileged && article.author !== user.username) {
+        return Response.json({ error: "Unauthorized" }, { status: 403 });
+      }
+
+      return Response.json(article);
+    }
+
     // ---------------- WRITER: "My Articles" ----------------
 
     // WRITER: list the logged-in user's own submissions + status.
