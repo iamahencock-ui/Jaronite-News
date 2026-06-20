@@ -1,4 +1,4 @@
-name = "your-worker-name"
+name = "jaronite-news"
 main = "index.js"
 compatibility_date = "2030-01-01"
 
