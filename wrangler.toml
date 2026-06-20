@@ -4,3 +4,8 @@ compatibility_date = "2026-06-19"
 
 [site]
 bucket = "./"
+
+[[d1_databases]]
+binding = "jaronite_news_db"
+database_name = "jaronite-news-db"
+database_id = "bd77a83b-8cb6-4f8c-9db8-cc68db69d93d"
