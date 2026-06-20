@@ -86,7 +86,7 @@ export default {
 
       if (ok) {
         const token = newSessionToken();
-        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString(); // 12h session
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 20).toISOString(); // 20min session
         await env.DB.prepare(
           "INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)"
         ).bind(token, user.username, expiresAt).run();
