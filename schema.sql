@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS articles (
   -- username of the editor/admin who has this article claimed for review.
   -- NULL when nobody has claimed it (i.e. status = 'pending_review').
   claimed_by TEXT,
+  -- username of the editor/admin who approved this article for publication.
+  -- NULL means it was published via instapublish (self-published, no reviewer) —
+  -- distinguish that from "claimed_by was never set" by checking status/author.
+  reviewed_by TEXT,
   -- instructions on return, or reason on denial. Shown to the writer.
   review_notes TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

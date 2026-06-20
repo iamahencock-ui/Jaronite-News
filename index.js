@@ -317,8 +317,8 @@ export default {
       }
 
       await env.DB.prepare(
-        "UPDATE articles SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      ).bind(id).run();
+        "UPDATE articles SET status = 'published', reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      ).bind(reviewer.username, id).run();
       await log(env, reviewer.username, "APPROVE_ARTICLE", `Approved and published article "${article.title}" (ID ${id}) by ${article.author}`);
       return Response.json({ success: true });
     }

@@ -3,7 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <title>Business & Economy — Jaronite News</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    .byline {
+      color: #888;
+      font-size: 0.85rem;
+      margin: 4px 0 16px;
+    }
+    .byline .reviewer { color: #c9a84c; }
+    .byline .self-published {
+      color: #888;
+      font-style: italic;
+    }
+  </style>
 </head>
 <body>
 
@@ -17,21 +30,45 @@
 </section>
 
 <script>
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Converts plain-text article content into safe HTML paragraphs/line breaks
+  // without ever interpreting the content itself as markup.
+  function renderContent(content) {
+    return escapeHtml(content).replace(/\n/g, '<br>');
+  }
+
+  function renderByline(article) {
+    const authorPart = `By ${escapeHtml(article.author)}`;
+    const datePart = new Date(article.created_at).toLocaleDateString();
+
+    let reviewPart;
+    if (article.reviewed_by) {
+      reviewPart = `Reviewed by <span class="reviewer">${escapeHtml(article.reviewed_by)}</span>`;
+    } else {
+      reviewPart = `<span class="self-published">Self-Published</span>`;
+    }
+
+    return `${authorPart} · ${reviewPart} — ${datePart}`;
+  }
+
   async function loadArticles() {
     const res = await fetch('/api/articles?category=business-economy');
     const articles = await res.json();
     const container = document.getElementById('articles-container');
 
-    if (articles.length === 0) {
+    if (!Array.isArray(articles) || articles.length === 0) {
       container.innerHTML = '<p>No articles yet.</p>';
       return;
     }
 
     container.innerHTML = articles.map(article => `
       <div class="article">
-        <h2>${article.title}</h2>
-        <p><small>By ${article.author} — ${new Date(article.created_at).toLocaleDateString()}</small></p>
-        <p>${article.content}</p>
+        <h2>${escapeHtml(article.title)}</h2>
+        <p class="byline"><small>${renderByline(article)}</small></p>
+        <p>${renderContent(article.content)}</p>
       </div>
     `).join('');
   }
