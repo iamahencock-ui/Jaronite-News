@@ -58,6 +58,12 @@ async function getSessionUser(env, request) {
   ).bind(session.username).first();
   if (!user || user.status !== "active") return null;
 
+  // Sliding expiry: every valid authenticated request pushes the session's
+  // expiry 20 minutes further out, so active users stay logged in and only
+  // truly idle sessions (20 min with no requests) expire.
+  const newExpiresAt = new Date(Date.now() + 1000 * 60 * 20).toISOString();
+  await env.DB.prepare("UPDATE sessions SET expires_at = ? WHERE token = ?").bind(newExpiresAt, token).run();
+
   return user;
 }
 
