@@ -8,6 +8,10 @@ async function isAdmin(env, username) {
   return user && user.role === 'admin';
 }
 
+async function log(env, username, action, details = '') {
+  await env.DB.prepare('INSERT INTO logs (username, action, details) VALUES (?, ?, ?)').bind(username, action, details).run();
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -20,8 +24,10 @@ export default {
       ).bind(username, password).first();
 
       if (result) {
+        await log(env, username, 'LOGIN', 'Logged into employee portal');
         return Response.json({ success: true, user: { username: result.username, role: result.role } });
       }
+      await log(env, username, 'FAILED_LOGIN', 'Failed login attempt');
       return Response.json({ success: false });
     }
 
@@ -31,6 +37,7 @@ export default {
       await env.DB.prepare(
         'INSERT INTO articles (title, category, content, author) VALUES (?, ?, ?, ?)'
       ).bind(title, category, content, author).run();
+      await log(env, author, 'POST_ARTICLE', `Posted article "${title}" in category "${category}"`);
       return Response.json({ success: true });
     }
 
@@ -61,6 +68,7 @@ export default {
       if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
 
       await env.DB.prepare('UPDATE articles SET title = ?, content = ? WHERE id = ?').bind(title, content, id).run();
+      await log(env, username, 'EDIT_ARTICLE', `Edited article ID ${id} — new title: "${title}"`);
       return Response.json({ success: true });
     }
 
@@ -72,6 +80,7 @@ export default {
       const article = await env.DB.prepare('SELECT status FROM articles WHERE id = ?').bind(id).first();
       const newStatus = article.status === 'censored' ? 'published' : 'censored';
       await env.DB.prepare('UPDATE articles SET status = ? WHERE id = ?').bind(newStatus, id).run();
+      await log(env, username, newStatus === 'censored' ? 'CENSOR_ARTICLE' : 'UNCENSOR_ARTICLE', `Article ID ${id} set to ${newStatus}`);
       return Response.json({ success: true });
     }
 
@@ -80,7 +89,9 @@ export default {
       const { username, id } = await request.json();
       if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
 
+      const article = await env.DB.prepare('SELECT title FROM articles WHERE id = ?').bind(id).first();
       await env.DB.prepare('DELETE FROM articles WHERE id = ?').bind(id).run();
+      await log(env, username, 'DELETE_ARTICLE', `Deleted article ID ${id} — "${article?.title}"`);
       return Response.json({ success: true });
     }
 
@@ -102,6 +113,7 @@ export default {
       if (existing) return Response.json({ error: 'Username already exists' });
 
       await env.DB.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').bind(newUsername, newPassword, role).run();
+      await log(env, username, 'CREATE_USER', `Created user "${newUsername}" with role "${role}"`);
       return Response.json({ success: true });
     }
 
@@ -110,7 +122,9 @@ export default {
       const { username, targetId, role } = await request.json();
       if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
 
+      const target = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(targetId).first();
       await env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, targetId).run();
+      await log(env, username, 'CHANGE_ROLE', `Changed role of "${target?.username}" to "${role}"`);
       return Response.json({ success: true });
     }
 
@@ -119,8 +133,19 @@ export default {
       const { username, targetId } = await request.json();
       if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
 
+      const target = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(targetId).first();
       await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
+      await log(env, username, 'DELETE_USER', `Deleted user "${target?.username}"`);
       return Response.json({ success: true });
+    }
+
+    // ADMIN: Get logs
+    if (url.pathname === '/api/admin/logs' && request.method === 'POST') {
+      const { username } = await request.json();
+      if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
+
+      const results = await env.DB.prepare('SELECT * FROM logs ORDER BY created_at DESC LIMIT 500').all();
+      return Response.json(results.results);
     }
 
     // Serve static files

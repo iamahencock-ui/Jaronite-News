@@ -4,10 +4,6 @@
   <meta charset="UTF-8">
   <title>Jaronite News — Employee Portal</title>
   <link rel="stylesheet" href="/styles.css">
-  <head>
-  <meta charset="UTF-8">
-  <title>Jaronite News — Employee Portal</title>
-  <link rel="stylesheet" href="/styles.css">
   <style>
     body {
       background: #0d0d0d !important;
@@ -43,10 +39,61 @@
     }
 
     button:hover { background: #e0bc6a !important; }
+
+    /* LOGS */
+    .log-item {
+      border: 1px solid #2e2e2e;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      background: #111;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .log-left { flex: 1; }
+    .log-action { font-weight: bold; color: #c9a84c; font-size: 0.85rem; margin-bottom: 4px; }
+    .log-details { color: #ccc; font-size: 0.9rem; }
+    .log-user { color: #888; font-size: 0.8rem; margin-top: 4px; }
+    .log-time { color: #555; font-size: 0.78rem; white-space: nowrap; }
+
+    .log-action.LOGIN { color: #2ecc71; }
+    .log-action.FAILED_LOGIN { color: #e74c3c; }
+    .log-action.POST_ARTICLE { color: #3498db; }
+    .log-action.DELETE_ARTICLE { color: #e74c3c; }
+    .log-action.CENSOR_ARTICLE { color: #e67e22; }
+    .log-action.UNCENSOR_ARTICLE { color: #f1c40f; }
+    .log-action.EDIT_ARTICLE { color: #9b59b6; }
+    .log-action.CREATE_USER { color: #2ecc71; }
+    .log-action.DELETE_USER { color: #e74c3c; }
+    .log-action.CHANGE_ROLE { color: #1abc9c; }
+
+    .log-filters {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .log-filter-btn {
+      padding: 6px 14px !important;
+      width: auto !important;
+      font-size: 0.8rem !important;
+      background: #1a1a1a !important;
+      color: #aaa !important;
+      border: 1px solid #333 !important;
+    }
+
+    .log-filter-btn.active {
+      background: #c9a84c !important;
+      color: #000 !important;
+      border-color: #c9a84c !important;
+    }
   </style>
 </head>
-</head>
-<body>
+<body class="portal">
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -94,12 +141,13 @@
       <h2>Admin Controls</h2>
 
       <div class="tab-bar">
-        <button class="tab active" onclick="switchTab('all')">All Articles</button>
-        <button class="tab" onclick="switchTab('censored')">Censored</button>
-        <button class="tab" onclick="switchTab('users')">Users</button>
+        <button class="tab active" onclick="switchTab('all', this)">All Articles</button>
+        <button class="tab" onclick="switchTab('censored', this)">Censored</button>
+        <button class="tab" onclick="switchTab('users', this)">Users</button>
+        <button class="tab" onclick="switchTab('logs', this)">Logs</button>
       </div>
 
-      <div id="admin-articles-list">Loading...</div>
+      <div id="admin-articles-list"></div>
 
       <!-- USER MANAGEMENT -->
       <div id="user-management-section" style="display:none;">
@@ -115,10 +163,27 @@
           <button onclick="createUser()" style="width:auto;padding:10px 20px;">Create User</button>
           <p id="create-user-msg"></p>
         </div>
-
         <h3 style="color:#c9a84c; margin-bottom:16px;">Existing Users</h3>
         <div id="users-list">Loading...</div>
       </div>
+
+      <!-- LOGS -->
+      <div id="logs-section" style="display:none;">
+        <div class="log-filters">
+          <button class="log-filter-btn active" onclick="filterLogs('ALL', this)">All</button>
+          <button class="log-filter-btn" onclick="filterLogs('LOGIN', this)">Logins</button>
+          <button class="log-filter-btn" onclick="filterLogs('FAILED_LOGIN', this)">Failed Logins</button>
+          <button class="log-filter-btn" onclick="filterLogs('POST_ARTICLE', this)">Posts</button>
+          <button class="log-filter-btn" onclick="filterLogs('DELETE_ARTICLE', this)">Deletions</button>
+          <button class="log-filter-btn" onclick="filterLogs('CENSOR_ARTICLE', this)">Censors</button>
+          <button class="log-filter-btn" onclick="filterLogs('EDIT_ARTICLE', this)">Edits</button>
+          <button class="log-filter-btn" onclick="filterLogs('CREATE_USER', this)">User Created</button>
+          <button class="log-filter-btn" onclick="filterLogs('DELETE_USER', this)">User Deleted</button>
+          <button class="log-filter-btn" onclick="filterLogs('CHANGE_ROLE', this)">Role Changes</button>
+        </div>
+        <div id="logs-list">Loading...</div>
+      </div>
+
     </div>
 
   </div>
@@ -126,6 +191,7 @@
 
 <script>
   let currentUser = null;
+  let allLogs = [];
 
   async function login() {
     const username = document.getElementById('username').value;
@@ -205,7 +271,7 @@
         <div class="meta">By ${a.author} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
         <div class="preview">${a.content.substring(0, 150)}...</div>
         <div class="article-actions">
-          <button class="btn-edit" onclick="toggleEdit(${a.id}, \`${escapeJs(a.title)}\`, \`${escapeJs(a.content)}\`)">Edit</button>
+          <button class="btn-edit" onclick="toggleEdit(${a.id})">Edit</button>
           <button class="btn-censor" onclick="censorArticle(${a.id})">${a.status === 'censored' ? 'Uncensor' : 'Censor'}</button>
           <button class="btn-danger" onclick="deleteArticle(${a.id})">Delete</button>
         </div>
@@ -255,17 +321,65 @@
     loadAdminArticles('all');
   }
 
-  function switchTab(filter) {
+  function switchTab(filter, btn) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    event.target.classList.add('active');
+    btn.classList.add('active');
 
-    document.getElementById('admin-articles-list').style.display = filter === 'users' ? 'none' : 'block';
-    document.getElementById('user-management-section').style.display = filter === 'users' ? 'block' : 'none';
+    document.getElementById('admin-articles-list').style.display = 'none';
+    document.getElementById('user-management-section').style.display = 'none';
+    document.getElementById('logs-section').style.display = 'none';
 
     if (filter === 'users') {
+      document.getElementById('user-management-section').style.display = 'block';
       loadUsers();
+    } else if (filter === 'logs') {
+      document.getElementById('logs-section').style.display = 'block';
+      loadLogs();
     } else {
+      document.getElementById('admin-articles-list').style.display = 'block';
       loadAdminArticles(filter);
+    }
+  }
+
+  async function loadLogs() {
+    const res = await fetch('/api/admin/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username })
+    });
+
+    allLogs = await res.json();
+    renderLogs(allLogs);
+  }
+
+  function renderLogs(logs) {
+    const container = document.getElementById('logs-list');
+
+    if (!logs.length) {
+      container.innerHTML = '<p style="color:#666">No logs found.</p>';
+      return;
+    }
+
+    container.innerHTML = logs.map(l => `
+      <div class="log-item">
+        <div class="log-left">
+          <div class="log-action ${l.action}">${l.action.replace(/_/g, ' ')}</div>
+          <div class="log-details">${l.details}</div>
+          <div class="log-user">by ${l.username}</div>
+        </div>
+        <div class="log-time">${new Date(l.created_at).toLocaleString()}</div>
+      </div>
+    `).join('');
+  }
+
+  function filterLogs(type, btn) {
+    document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (type === 'ALL') {
+      renderLogs(allLogs);
+    } else {
+      renderLogs(allLogs.filter(l => l.action === type));
     }
   }
 
