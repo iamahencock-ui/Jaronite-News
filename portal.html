@@ -71,6 +71,11 @@
     .log-action.CHANGE_ROLE { color: #1abc9c; }
     .log-action.SET_USER_STATUS { color: #f1c40f; }
     .log-action.RESET_PASSWORD { color: #9b59b6; }
+    .log-action.CLAIM_ARTICLE { color: #3498db; }
+    .log-action.APPROVE_ARTICLE { color: #2ecc71; }
+    .log-action.RETURN_ARTICLE { color: #e67e22; }
+    .log-action.DENY_ARTICLE { color: #e74c3c; }
+    .log-action.RESUBMIT_ARTICLE { color: #9b59b6; }
 
     .log-filters {
       display: flex;
@@ -199,6 +204,98 @@
       border: 1px solid #333 !important;
       float: right;
     }
+
+    /* ---------- WRITER / EDITOR / ADMIN REVIEW WORKFLOW ---------- */
+
+    .status-pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 2px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+    .status-pill.pending_review { background: #2a2410; color: #f1c40f; }
+    .status-pill.claimed { background: #14223a; color: #3498db; }
+    .status-pill.returned { background: #3a2a14; color: #e67e22; }
+    .status-pill.denied { background: #3a1f1f; color: #e74c3c; }
+    .status-pill.published { background: #14331f; color: #2ecc71; }
+    .status-pill.censored { background: #2a2a2a; color: #888; }
+
+    .review-tag {
+      font-size: 0.78rem;
+      color: #888;
+      margin-top: 4px;
+    }
+    .review-tag strong { color: #c9a84c; }
+
+    .review-notes-box {
+      background: #1a1410;
+      border: 1px solid #4a3a1a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-top: 10px;
+      color: #e0bc6a;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+    }
+
+    .resubmit-form {
+      display: none;
+      margin-top: 12px;
+      gap: 10px;
+      flex-direction: column;
+    }
+    .resubmit-form.open { display: flex; }
+
+    .claim-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .claim-bar button {
+      width: auto !important;
+      padding: 8px 16px !important;
+      font-size: 0.85rem !important;
+    }
+    .btn-approve { background: #2ecc71 !important; color: #042e14 !important; }
+    .btn-return { background: #e67e22 !important; color: #2a1500 !important; }
+    .btn-deny { background: #e74c3c !important; color: #2a0a0a !important; }
+    .btn-claim { background: #3498db !important; color: #04203a !important; }
+
+    /* Return / Deny modal */
+    .review-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 60;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .review-modal-overlay.open { display: flex; }
+    .review-modal {
+      background: #111;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 520px;
+      width: 100%;
+    }
+    .review-modal h3 { color: #c9a84c; margin-top: 0; }
+    .review-modal textarea { min-height: 120px; margin: 14px 0; }
+    .review-modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .review-modal-actions button {
+      width: auto !important;
+      padding: 10px 18px !important;
+    }
   </style>
 </head>
 <body class="portal">
@@ -230,6 +327,7 @@
     <!-- POST ARTICLE -->
     <div class="card">
       <h2>Post New Article</h2>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">All submissions go to an editor for review before publishing.</p>
       <div class="form-group">
         <input type="text" id="title" placeholder="Article Title">
         <select id="category">
@@ -239,9 +337,29 @@
           <option value="business-economy">Business & Economy</option>
         </select>
         <textarea id="content" placeholder="Write your article here..."></textarea>
-        <button onclick="postArticle()">Publish Article</button>
+        <button onclick="postArticle()">Submit for Review</button>
         <p id="post-msg"></p>
       </div>
+    </div>
+
+    <!-- WRITER: MY ARTICLES -->
+    <div class="card" id="my-articles-section" style="display:none;">
+      <h2>My Articles</h2>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Track the review status of everything you've submitted.</p>
+      <div id="my-articles-list">Loading...</div>
+    </div>
+
+    <!-- EDITOR (and admin): REVIEW QUEUE + REVIEW BOX -->
+    <div class="card" id="editor-section" style="display:none;">
+      <h2>Editorial Review</h2>
+
+      <h3 style="color:#c9a84c; margin-bottom:12px;">Pending Review</h3>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Unclaimed articles waiting for an editor. Claiming one moves it into your review box and removes it from other editors' view.</p>
+      <div id="pending-queue-list" style="margin-bottom: 30px;">Loading...</div>
+
+      <h3 style="color:#c9a84c; margin-bottom:12px;">My Review Box</h3>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Articles you've claimed. Approve, return with instructions, or deny.</p>
+      <div id="my-claims-list">Loading...</div>
     </div>
 
     <!-- ADMIN SECTION -->
@@ -251,11 +369,18 @@
       <div class="tab-bar">
         <button class="tab active" onclick="switchTab('all', this)">All Articles</button>
         <button class="tab" onclick="switchTab('censored', this)">Censored</button>
+        <button class="tab" onclick="switchTab('in-review', this)">In Review</button>
         <button class="tab" onclick="switchTab('users', this)">Users</button>
         <button class="tab" onclick="switchTab('logs', this)">Logs</button>
       </div>
 
       <div id="admin-articles-list"></div>
+
+      <!-- ADMIN: SYSTEM-WIDE IN-REVIEW VIEW -->
+      <div id="admin-in-review-section" style="display:none;">
+        <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Every article currently claimed by an editor, system-wide — including ones returned to a writer and awaiting revision.</p>
+        <div id="admin-in-review-list">Loading...</div>
+      </div>
 
       <!-- USER MANAGEMENT -->
       <div id="user-management-section" style="display:none;">
@@ -264,8 +389,8 @@
           <input type="text" id="new-username" placeholder="Username">
           <input type="password" id="new-password" placeholder="Password">
           <select id="new-role">
-            <option value="employee">Employee</option>
-            <option value="manager">Manager</option>
+            <option value="writer">Writer</option>
+            <option value="editor">Editor</option>
             <option value="admin">Admin</option>
           </select>
           <button onclick="createUser()" style="width:auto;padding:10px 20px;">Create User</button>
@@ -283,6 +408,11 @@
           <button class="log-filter-btn" onclick="filterLogs('LOGIN', this)">Logins</button>
           <button class="log-filter-btn" onclick="filterLogs('FAILED_LOGIN', this)">Failed Logins</button>
           <button class="log-filter-btn" onclick="filterLogs('POST_ARTICLE', this)">Posts</button>
+          <button class="log-filter-btn" onclick="filterLogs('CLAIM_ARTICLE', this)">Claims</button>
+          <button class="log-filter-btn" onclick="filterLogs('APPROVE_ARTICLE', this)">Approvals</button>
+          <button class="log-filter-btn" onclick="filterLogs('RETURN_ARTICLE', this)">Returns</button>
+          <button class="log-filter-btn" onclick="filterLogs('DENY_ARTICLE', this)">Denials</button>
+          <button class="log-filter-btn" onclick="filterLogs('RESUBMIT_ARTICLE', this)">Resubmits</button>
           <button class="log-filter-btn" onclick="filterLogs('DELETE_ARTICLE', this)">Deletions</button>
           <button class="log-filter-btn" onclick="filterLogs('CENSOR_ARTICLE', this)">Censors</button>
           <button class="log-filter-btn" onclick="filterLogs('EDIT_ARTICLE', this)">Edits</button>
@@ -313,11 +443,25 @@
   </div>
 </div>
 
+<!-- RETURN / DENY MODAL -->
+<div class="review-modal-overlay" id="review-modal-overlay">
+  <div class="review-modal">
+    <h3 id="review-modal-title">Return Article</h3>
+    <label id="review-modal-label" style="color:#aaa; font-size:0.9rem;"></label>
+    <textarea id="review-modal-notes" placeholder="Be specific — the writer will see exactly this text."></textarea>
+    <div class="review-modal-actions">
+      <button class="btn-secondary-inline" style="width:auto;" onclick="closeReviewModal()">Cancel</button>
+      <button onclick="submitReviewModal()" style="width:auto; background:#c9a84c;">Submit</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let currentUser = null;
   let authToken = null;
   let allLogs = [];
   let currentDetailUserId = null;
+  let pendingReviewAction = null; // { id, type: 'return' | 'deny' }
 
   // ---------- auth helpers ----------
 
@@ -347,10 +491,7 @@
       document.getElementById('portal-screen').style.display = 'block';
       document.getElementById('user-display').textContent = data.user.username;
 
-      if (data.user.role === 'admin') {
-        document.getElementById('admin-section').style.display = 'block';
-        loadAdminArticles('all');
-      }
+      setupRoleUI(data.user.role);
     } else {
       document.getElementById('error-msg').textContent = 'Invalid username or password.';
     }
@@ -371,7 +512,26 @@
     document.getElementById('error-msg').textContent = '';
   }
 
-  // ---------- articles ----------
+  // ---------- role-aware UI setup ----------
+
+  function setupRoleUI(role) {
+    // Everyone (writer, editor, admin) can submit articles and track their own.
+    document.getElementById('my-articles-section').style.display = 'block';
+    loadMyArticles();
+
+    if (role === 'editor' || role === 'admin') {
+      document.getElementById('editor-section').style.display = 'block';
+      loadPendingQueue();
+      loadMyClaims();
+    }
+
+    if (role === 'admin') {
+      document.getElementById('admin-section').style.display = 'block';
+      loadAdminArticles('all');
+    }
+  }
+
+  // ---------- articles: submission ----------
 
   async function postArticle() {
     const title = document.getElementById('title').value;
@@ -394,15 +554,239 @@
     const msg = document.getElementById('post-msg');
     if (data.success) {
       msg.style.color = '#2ecc71';
-      msg.textContent = 'Article published successfully!';
+      msg.textContent = 'Article submitted for review!';
       document.getElementById('title').value = '';
       document.getElementById('content').value = '';
+      loadMyArticles();
+      if (currentUser.role === 'editor' || currentUser.role === 'admin') loadPendingQueue();
       if (currentUser.role === 'admin') loadAdminArticles('all');
     } else {
       msg.style.color = '#e74c3c';
-      msg.textContent = 'Failed to publish article.';
+      msg.textContent = 'Failed to submit article.';
     }
   }
+
+  // ---------- WRITER: My Articles ----------
+
+  async function loadMyArticles() {
+    const res = await fetch('/api/my-articles', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({})
+    });
+    const articles = await res.json();
+    const container = document.getElementById('my-articles-list');
+
+    if (!Array.isArray(articles) || !articles.length) {
+      container.innerHTML = '<p style="color:#666">You haven\'t submitted any articles yet.</p>';
+      return;
+    }
+
+    container.innerHTML = articles.map(a => `
+      <div class="article-item">
+        <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
+        <div class="meta">${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
+        <div class="preview">${escapeHtml(a.content).substring(0, 150)}...</div>
+        ${a.status === 'claimed' || a.status === 'returned' ? `<div class="review-tag">Under review by <strong>${escapeHtml(a.claimed_by)}</strong></div>` : ''}
+        ${a.status === 'returned' && a.review_notes ? `<div class="review-notes-box"><strong>Revision notes:</strong><br>${escapeHtml(a.review_notes)}</div>` : ''}
+        ${a.status === 'denied' && a.review_notes ? `<div class="review-notes-box"><strong>Reason for denial:</strong><br>${escapeHtml(a.review_notes)}</div>` : ''}
+        ${a.status === 'returned' ? `
+          <button class="btn-edit" style="width:auto;padding:8px 16px;margin-top:10px;" onclick="toggleResubmit(${a.id})">Revise & Resubmit</button>
+          <div class="resubmit-form" id="resubmit-form-${a.id}">
+            <input type="text" id="resubmit-title-${a.id}" value="${escapeHtml(a.title)}">
+            <textarea id="resubmit-content-${a.id}">${escapeHtml(a.content)}</textarea>
+            <button onclick="submitResubmit(${a.id})" style="width:auto;padding:10px 20px;">Send Back to ${escapeHtml(a.claimed_by)}</button>
+          </div>
+        ` : ''}
+      </div>
+    `).join('');
+  }
+
+  function toggleResubmit(id) {
+    document.getElementById(`resubmit-form-${id}`).classList.toggle('open');
+  }
+
+  async function submitResubmit(id) {
+    const title = document.getElementById(`resubmit-title-${id}`).value;
+    const content = document.getElementById(`resubmit-content-${id}`).value;
+
+    const res = await fetch('/api/my-articles/resubmit', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id, title, content })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadMyArticles();
+    } else {
+      alert(data.error || 'Failed to resubmit article.');
+    }
+  }
+
+  // ---------- EDITOR/ADMIN: Pending Review queue ----------
+
+  async function loadPendingQueue() {
+    const res = await fetch('/api/editor/pending', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({})
+    });
+    const articles = await res.json();
+    const container = document.getElementById('pending-queue-list');
+
+    if (!Array.isArray(articles) || !articles.length) {
+      container.innerHTML = '<p style="color:#666">No articles waiting for review.</p>';
+      return;
+    }
+
+    container.innerHTML = articles.map(a => `
+      <div class="article-item">
+        <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">pending review</span></h3>
+        <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
+        <div class="claim-bar">
+          <button class="btn-claim" onclick="claimArticle(${a.id})">Claim for Review</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function claimArticle(id) {
+    const res = await fetch('/api/editor/claim', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadPendingQueue();
+      loadMyClaims();
+      if (currentUser.role === 'admin') loadAllClaimed();
+    } else {
+      alert(data.error || 'Could not claim this article — someone may have just claimed it.');
+      loadPendingQueue();
+    }
+  }
+
+  // ---------- EDITOR/ADMIN: My Review Box ----------
+
+  async function loadMyClaims() {
+    const res = await fetch('/api/editor/my-claims', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({})
+    });
+    const articles = await res.json();
+    const container = document.getElementById('my-claims-list');
+
+    if (!Array.isArray(articles) || !articles.length) {
+      container.innerHTML = '<p style="color:#666">Your review box is empty.</p>';
+      return;
+    }
+
+    container.innerHTML = articles.map(a => `
+      <div class="article-item">
+        <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
+        <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.updated_at).toLocaleString()}</div>
+        <div class="preview">${escapeHtml(a.content).substring(0, 250)}...</div>
+        ${a.status === 'returned' ? `<div class="review-notes-box"><strong>Your notes (awaiting writer revision):</strong><br>${escapeHtml(a.review_notes || '')}</div>` : `
+          <div class="claim-bar">
+            <button class="btn-approve" onclick="approveArticle(${a.id})">Approve & Publish</button>
+            <button class="btn-return" onclick="openReviewModal(${a.id}, 'return')">Return with Instructions</button>
+            <button class="btn-deny" onclick="openReviewModal(${a.id}, 'deny')">Deny</button>
+          </div>
+        `}
+      </div>
+    `).join('');
+  }
+
+  async function approveArticle(id) {
+    if (!confirm('Approve and publish this article?')) return;
+    const res = await fetch('/api/editor/approve', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadMyClaims();
+      loadMyArticles();
+      if (currentUser.role === 'admin') { loadAdminArticles('all'); loadAllClaimed(); }
+    } else {
+      alert(data.error || 'Failed to approve article.');
+    }
+  }
+
+  // ---------- Return / Deny modal ----------
+
+  function openReviewModal(id, type) {
+    pendingReviewAction = { id, type };
+    document.getElementById('review-modal-title').textContent =
+      type === 'return' ? 'Return Article with Instructions' : 'Deny Article';
+    document.getElementById('review-modal-label').textContent =
+      type === 'return' ? 'Explain what needs to change before this can be approved:' : 'Reason for denial:';
+    document.getElementById('review-modal-notes').value = '';
+    document.getElementById('review-modal-overlay').classList.add('open');
+  }
+
+  function closeReviewModal() {
+    document.getElementById('review-modal-overlay').classList.remove('open');
+    pendingReviewAction = null;
+  }
+
+  async function submitReviewModal() {
+    if (!pendingReviewAction) return;
+    const notes = document.getElementById('review-modal-notes').value.trim();
+
+    if (pendingReviewAction.type === 'return' && !notes) {
+      alert('Instructions are required when returning an article.');
+      return;
+    }
+
+    const endpoint = pendingReviewAction.type === 'return' ? '/api/editor/return' : '/api/editor/deny';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id: pendingReviewAction.id, notes })
+    });
+    const data = await res.json();
+
+    closeReviewModal();
+
+    if (data.success) {
+      loadMyClaims();
+      if (currentUser.role === 'admin') loadAllClaimed();
+    } else {
+      alert(data.error || 'Action failed.');
+    }
+  }
+
+  // ---------- ADMIN: system-wide in-review view ----------
+
+  async function loadAllClaimed() {
+    const res = await fetch('/api/admin/all-claimed', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({})
+    });
+    const articles = await res.json();
+    const container = document.getElementById('admin-in-review-list');
+
+    if (!Array.isArray(articles) || !articles.length) {
+      container.innerHTML = '<p style="color:#666">Nothing is currently claimed or returned.</p>';
+      return;
+    }
+
+    container.innerHTML = articles.map(a => `
+      <div class="article-item">
+        <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
+        <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.updated_at).toLocaleString()}</div>
+        <div class="review-tag">Under review by <strong>${escapeHtml(a.claimed_by)}</strong></div>
+        ${a.status === 'returned' && a.review_notes ? `<div class="review-notes-box">${escapeHtml(a.review_notes)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // ---------- ADMIN: published-article moderation (unchanged) ----------
 
   async function loadAdminArticles(filter) {
     const res = await fetch('/api/admin/articles', {
@@ -420,12 +804,12 @@
 
     container.innerHTML = articles.map(a => `
       <div class="article-item" id="article-${a.id}">
-        <h3>${a.title} ${a.status === 'censored' ? '<span class="censored-label">[CENSORED]</span>' : ''}</h3>
-        <div class="meta">By ${a.author} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
-        <div class="preview">${a.content.substring(0, 150)}...</div>
+        <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
+        <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
+        <div class="preview">${escapeHtml(a.content).substring(0, 150)}...</div>
         <div class="article-actions">
           <button class="btn-edit" onclick="toggleEdit(${a.id})">Edit</button>
-          <button class="btn-censor" onclick="censorArticle(${a.id})">${a.status === 'censored' ? 'Uncensor' : 'Censor'}</button>
+          ${a.status === 'published' || a.status === 'censored' ? `<button class="btn-censor" onclick="censorArticle(${a.id})">${a.status === 'censored' ? 'Uncensor' : 'Censor'}</button>` : ''}
           <button class="btn-danger" onclick="deleteArticle(${a.id})">Delete</button>
         </div>
         <div class="edit-form" id="edit-form-${a.id}">
@@ -481,6 +865,7 @@
     document.getElementById('admin-articles-list').style.display = 'none';
     document.getElementById('user-management-section').style.display = 'none';
     document.getElementById('logs-section').style.display = 'none';
+    document.getElementById('admin-in-review-section').style.display = 'none';
 
     if (filter === 'users') {
       document.getElementById('user-management-section').style.display = 'block';
@@ -488,6 +873,9 @@
     } else if (filter === 'logs') {
       document.getElementById('logs-section').style.display = 'block';
       loadLogs();
+    } else if (filter === 'in-review') {
+      document.getElementById('admin-in-review-section').style.display = 'block';
+      loadAllClaimed();
     } else {
       document.getElementById('admin-articles-list').style.display = 'block';
       loadAdminArticles(filter);
@@ -519,8 +907,8 @@
       <div class="log-item">
         <div class="log-left">
           <div class="log-action ${l.action}">${l.action.replace(/_/g, ' ')}</div>
-          <div class="log-details">${l.details}</div>
-          ${l.username ? `<div class="log-user">by ${l.username}</div>` : ''}
+          <div class="log-details">${escapeHtml(l.details || '')}</div>
+          ${l.username ? `<div class="log-user">by ${escapeHtml(l.username)}</div>` : ''}
         </div>
         <div class="log-time">${new Date(l.created_at).toLocaleString()}</div>
       </div>
@@ -596,8 +984,8 @@
         </div>
         <div class="article-actions" style="margin-top:10px;">
           <select id="role-select-${u.id}" style="width:auto;padding:6px 10px;">
-            <option value="employee" ${u.role === 'employee' ? 'selected' : ''}>Employee</option>
-            <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Manager</option>
+            <option value="writer" ${u.role === 'writer' ? 'selected' : ''}>Writer</option>
+            <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Editor</option>
             <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
           <button class="btn-edit" onclick="changeRole(${u.id})">Change Role</button>
