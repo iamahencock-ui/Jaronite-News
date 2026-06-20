@@ -1,0 +1,6 @@
+name = "your-worker-name"
+main = "index.js"
+compatibility_date = "2030-01-01"
+
+[site]
+bucket = "./"
