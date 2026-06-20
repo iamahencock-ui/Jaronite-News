@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Crime & Justice Reports — Jaronite News</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header>
+  <a href="/"><h1>Jaronite News Inc.</h1></a>
+</header>
+
+<section>
+  <h1>Crime & Justice Reports</h1>
+  <div id="articles-container">Loading articles...</div>
+</section>
+
+<script>
+  async function loadArticles() {
+    const res = await fetch('/api/articles?category=crime-justice');
+    const articles = await res.json();
+    const container = document.getElementById('articles-container');
+
+    if (articles.length === 0) {
+      container.innerHTML = '<p>No articles yet.</p>';
+      return;
+    }
+
+    container.innerHTML = articles.map(article => `
+      <div class="article">
+        <h2>${article.title}</h2>
+        <p><small>By ${article.author} — ${new Date(article.created_at).toLocaleDateString()}</small></p>
+        <p>${article.content}</p>
+      </div>
+    `).join('');
+  }
+
+  loadArticles();
+</script>
+
+</body>
+</html>
