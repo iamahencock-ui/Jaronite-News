@@ -1,101 +1,129 @@
+/* ===== MAIN SITE ===== */
 body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f4f4f4;
-    color: #222;
-  }
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f4f4;
+  color: #222;
+}
 
-  header {
-    background: #4b2e83;
-    padding: 25px;
-    text-align: center;
-    color: white;
-  }
+header {
+  background: #4b2e83;
+  padding: 25px;
+  text-align: center;
+  color: white;
+}
 
-  header img {
-    width: 140px;
-    margin-bottom: 10px;
-  }
+header img {
+  width: 140px;
+  margin-bottom: 10px;
+}
 
-  nav {
-    margin-top: 12px;
-  }
+nav {
+  margin-top: 12px;
+}
 
-  nav a {
-    color: white;
-    margin: 0 15px;
-    text-decoration: none;
-    font-weight: bold;
-  }
+nav a {
+  color: white;
+  margin: 0 15px;
+  text-decoration: none;
+  font-weight: bold;
+}
 
-  nav a:hover {
-    text-decoration: underline;
-  }
+nav a:hover {
+  text-decoration: underline;
+}
 
-  .hero {
-    background: #6a42b8;
-    padding: 60px 20px;
-    text-align: center;
-    color: white;
-  }
+.hero {
+  background: #6a42b8;
+  padding: 60px 20px;
+  text-align: center;
+  color: white;
+}
 
-  .hero h1 {
-    font-size: 2.8em;
-    margin: 0;
-  }
+.hero h1 {
+  font-size: 2.8em;
+  margin: 0;
+}
 
-  .hero button {
-    margin-top: 20px;
-    padding: 12px 25px;
-    font-size: 1.1em;
-    border: none;
-    border-radius: 6px;
-    background: white;
-    color: #4b2e83;
-    cursor: pointer;
-    font-weight: bold;
-  }
+.hero button {
+  margin-top: 20px;
+  padding: 12px 25px;
+  font-size: 1.1em;
+  border: none;
+  border-radius: 6px;
+  background: white;
+  color: #4b2e83;
+  cursor: pointer;
+  font-weight: bold;
+}
 
-  .hero button:hover {
-    background: #e6e6e6;
-  }
+.hero button:hover {
+  background: #e6e6e6;
+}
 
-  .articles {
-    padding: 30px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-  }
+.articles {
+  padding: 30px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
 
-  .card {
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  }
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
 
-  .card img {
-    width: 100%;
-    border-radius: 8px;
-    background: #ddd; /* placeholder background */
-    height: 160px;
-    object-fit: cover;
-  }
+.card img {
+  width: 100%;
+  border-radius: 8px;
+  background: #ddd;
+  height: 160px;
+  object-fit: cover;
+}
 
-  footer {
-    background: #4b2e83;
-    color: white;
-    text-align: center;
-    padding: 15px;
-    margin-top: 40px;
-  }
-  a.card {
-    text-decoration: none;
-    color: inherit;
-    display: block;
-  }
+footer {
+  background: #4b2e83;
+  color: white;
+  text-align: center;
+  padding: 15px;
+  margin-top: 40px;
+}
 
-/* ===== PORTAL ===== */
+a.card {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+/* ===== PORTAL ONLY ===== */
+body.portal {
+  background: #0d0d0d;
+  color: #f0f0f0;
+  font-family: 'Georgia', serif;
+  min-height: 100vh;
+}
+
+body.portal * {
+  box-sizing: border-box;
+}
+
+body.portal button {
+  background: #c9a84c;
+  color: #000;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+}
+
+body.portal button:hover {
+  background: #e0bc6a;
+}
 
 #login-screen {
   display: flex;
@@ -128,7 +156,9 @@ body {
   gap: 14px;
 }
 
-input, textarea, select {
+body.portal input,
+body.portal textarea,
+body.portal select {
   background: #111;
   border: 1px solid #333;
   color: #f0f0f0;
@@ -139,47 +169,52 @@ input, textarea, select {
   outline: none;
 }
 
-input:focus, textarea:focus, select:focus {
+body.portal input:focus,
+body.portal textarea:focus,
+body.portal select:focus {
   border-color: #c9a84c;
 }
 
 .btn-danger {
-  background: #8b0000;
-  color: #fff;
-  width: auto;
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  background: #8b0000 !important;
+  color: #fff !important;
+  width: auto !important;
+  padding: 6px 14px !important;
+  font-size: 0.85rem !important;
 }
 
-.btn-danger:hover { background: #a00000; }
+.btn-danger:hover { background: #a00000 !important; }
 
 .btn-edit {
-  background: #1a3a5c;
-  color: #fff;
-  width: auto;
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  background: #1a3a5c !important;
+  color: #fff !important;
+  width: auto !important;
+  padding: 6px 14px !important;
+  font-size: 0.85rem !important;
 }
 
-.btn-edit:hover { background: #1e4a75; }
+.btn-edit:hover { background: #1e4a75 !important; }
 
 .btn-censor {
-  background: #4a4a00;
-  color: #fff;
-  width: auto;
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  background: #4a4a00 !important;
+  color: #fff !important;
+  width: auto !important;
+  padding: 6px 14px !important;
+  font-size: 0.85rem !important;
 }
 
-.btn-censor:hover { background: #666600; }
+.btn-censor:hover { background: #666600 !important; }
 
 .btn-secondary {
-  background: transparent;
-  border: 1px solid #555;
-  color: #aaa;
+  background: transparent !important;
+  border: 1px solid #555 !important;
+  color: #aaa !important;
 }
 
-.btn-secondary:hover { border-color: #c9a84c; color: #c9a84c; }
+.btn-secondary:hover {
+  border-color: #c9a84c !important;
+  color: #c9a84c !important;
+}
 
 #error-msg { color: #e74c3c; font-size: 0.9rem; text-align: center; }
 
@@ -210,13 +245,33 @@ input:focus, textarea:focus, select:focus {
   gap: 40px;
 }
 
+.portal-body .card {
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: none;
+}
+
+.portal-body .card h2 {
+  color: #c9a84c;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+  border-bottom: 1px solid #2e2e2e;
+  padding-bottom: 10px;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-textarea { resize: vertical; min-height: 160px; font-family: Georgia, serif; }
+body.portal textarea {
+  resize: vertical;
+  min-height: 160px;
+  font-family: Georgia, serif;
+}
 
 #post-msg { color: #2ecc71; font-size: 0.9rem; margin-top: 8px; }
 
