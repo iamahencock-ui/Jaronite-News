@@ -84,6 +84,45 @@ export default {
       return Response.json({ success: true });
     }
 
+    // ADMIN: Get all users
+    if (url.pathname === '/api/admin/users' && request.method === 'POST') {
+      const { username } = await request.json();
+      if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
+
+      const results = await env.DB.prepare('SELECT id, username, role FROM users ORDER BY role ASC').all();
+      return Response.json(results.results);
+    }
+
+    // ADMIN: Create user
+    if (url.pathname === '/api/admin/create-user' && request.method === 'POST') {
+      const { username, newUsername, newPassword, role } = await request.json();
+      if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
+
+      const existing = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(newUsername).first();
+      if (existing) return Response.json({ error: 'Username already exists' });
+
+      await env.DB.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').bind(newUsername, newPassword, role).run();
+      return Response.json({ success: true });
+    }
+
+    // ADMIN: Change user role
+    if (url.pathname === '/api/admin/change-role' && request.method === 'POST') {
+      const { username, targetId, role } = await request.json();
+      if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
+
+      await env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, targetId).run();
+      return Response.json({ success: true });
+    }
+
+    // ADMIN: Delete user
+    if (url.pathname === '/api/admin/delete-user' && request.method === 'POST') {
+      const { username, targetId } = await request.json();
+      if (!await isAdmin(env, username)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
+
+      await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
+      return Response.json({ success: true });
+    }
+
     // Serve static files
     try {
       return await getAssetFromKV(
