@@ -5,73 +5,152 @@
   <title>Crime & Justice — Jaronite News</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/styles.css">
-  <style>
-    .byline {
-      color: #888;
-      font-size: 0.85rem;
-      margin: 4px 0 16px;
-    }
-    .byline .reviewer { color: #c9a84c; }
-    .byline .self-published {
-      color: #888;
-      font-style: italic;
-    }
-  </style>
 </head>
 <body>
 
-<header>
-  <a href="/"><h1>Jaronite News Inc.</h1></a>
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="masthead">
+      <img src="logo.png" alt="Jaronite News Logo">
+      <div class="masthead-text">
+        <h1>Jaronite <span>News</span> Inc.</h1>
+        <div class="tagline">DemocracyCraft's Official Press — Est. 2024</div>
+      </div>
+    </div>
+    <nav class="site-nav">
+      <a href="/">Home</a>
+      <a href="mayoral-election.html">Politics</a>
+      <a href="business-economy.html">Economy</a>
+      <a href="city-projects.html">City</a>
+      <a href="crime-justice.html" class="active">Crime</a>
+      <a href="/portal.html">Staff Portal</a>
+    </nav>
+  </div>
 </header>
 
-<section>
-  <h1>Crime & Justice</h1>
-  <div id="articles-container">Loading articles...</div>
-</section>
+<main class="category-page">
+  <div class="category-page-header">
+    <div class="breadcrumb"><a href="/">Home</a> / Crime &amp; Justice</div>
+    <h1>Crime & Justice</h1>
+    <div class="category-accent-bar" style="background:#c0392b;"></div>
+  </div>
+
+  <div id="articles-container" class="state-loading">Loading dispatches...</div>
+</main>
+
+<!-- ARTICLE MODAL -->
+<div class="article-modal-overlay" id="article-modal" onclick="handleModalClick(event)">
+  <div class="article-modal" id="article-modal-panel">
+    <div class="article-modal-header">
+      <button class="article-modal-close" onclick="closeModal()" aria-label="Close">✕</button>
+      <div class="article-modal-stamp" id="modal-stamp">Mayoral Election · Jaronite News Inc.</div>
+      <h2 class="article-modal-title" id="modal-title">Loading...</h2>
+      <div class="article-modal-meta" id="modal-meta"></div>
+    </div>
+    <div class="article-modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
+  <a href="/portal.html">Staff Portal</a>
+</footer>
 
 <script>
+  const CATEGORY_SLUG  = 'crime-justice';
+  const CATEGORY_LABEL = 'Crime & Justice';
+
   function escapeHtml(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
   }
 
-  // Converts plain-text article content into safe HTML paragraphs/line breaks
-  // without ever interpreting the content itself as markup.
-  function renderContent(content) {
-    return escapeHtml(content).replace(/\n/g, '<br>');
+  // Convert plain-text content to HTML paragraphs (split on blank lines),
+  // escaping everything so no raw markup ever executes.
+  function contentToHtml(raw) {
+    const paragraphs = raw.split(/\n{2,}/);
+    if (paragraphs.length <= 1) {
+      // Single block — split on single newlines into <br> instead
+      return `<p>${escapeHtml(raw).replace(/\n/g, '<br>')}</p>`;
+    }
+    return paragraphs
+      .map(p => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`)
+      .join('');
   }
 
-  function renderByline(article) {
+  function buildBylineMeta(article) {
+    const date = new Date(article.created_at).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
     const authorPart = `By ${escapeHtml(article.author)}`;
-    const datePart = new Date(article.created_at).toLocaleDateString();
 
     let reviewPart;
     if (article.reviewed_by) {
       reviewPart = `Reviewed by <span class="reviewer">${escapeHtml(article.reviewed_by)}</span>`;
     } else {
-      reviewPart = `<span class="self-published">Self-Published</span>`;
+      reviewPart = `<span class="self-pub">Self-Published</span>`;
     }
 
-    return `${authorPart} · ${reviewPart} — ${datePart}`;
+    return `<span>${authorPart}</span><span>${reviewPart}</span><span>${date}</span>`;
   }
 
+  let articles = [];
+
   async function loadArticles() {
-    const res = await fetch('/api/articles?category=crime-justice');
-    const articles = await res.json();
     const container = document.getElementById('articles-container');
 
-    if (!Array.isArray(articles) || articles.length === 0) {
-      container.innerHTML = '<p>No articles yet.</p>';
+    try {
+      const res = await fetch(`/api/articles?category=${CATEGORY_SLUG}`);
+      articles = await res.json();
+    } catch (e) {
+      container.innerHTML = '<div class="state-empty"><strong>Couldn\'t load articles</strong>Check your connection and try again.</div>';
       return;
     }
 
-    container.innerHTML = articles.map(article => `
-      <div class="article">
-        <h2>${escapeHtml(article.title)}</h2>
-        <p class="byline"><small>${renderByline(article)}</small></p>
-        <p>${renderContent(article.content)}</p>
+    if (!Array.isArray(articles) || articles.length === 0) {
+      container.innerHTML = '<div class="state-empty"><strong>No stories yet</strong>Check back soon — our reporters are on it.</div>';
+      return;
+    }
+
+    container.className = 'articles-grid';
+    container.innerHTML = articles.map((a, i) => `
+      <div class="article-summary-card" onclick="openModal(${i})" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openModal(${i})">
+        <div class="card-category">${CATEGORY_LABEL}</div>
+        <h3>${escapeHtml(a.title)}</h3>
+        <div class="card-byline">By ${escapeHtml(a.author)}</div>
+        <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</div>
       </div>
     `).join('');
   }
+
+  function openModal(index) {
+    const a = articles[index];
+    if (!a) return;
+
+    document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
+    document.getElementById('modal-title').textContent = a.title;
+    document.getElementById('modal-meta').innerHTML = buildBylineMeta(a);
+    document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
+    document.getElementById('article-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    document.getElementById('article-modal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function handleModalClick(e) {
+    // Close if the click landed on the overlay backdrop, not the panel itself
+    if (e.target === document.getElementById('article-modal')) closeModal();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
 
   loadArticles();
 </script>

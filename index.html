@@ -8,56 +8,111 @@
 </head>
 <body>
 
-<header>
-  <img src="logo.png" alt="Jaronite News Logo">
-  <h1>Jaronite News Inc.</h1>
-  <p>Your Trusted Source for DemocracyCraft News</p>
-  <nav>
-    <a href="#">Home</a>
-    <a href="#">Politics</a>
-    <a href="#">Economy</a>
-    <a href="#">Guides</a>
-    <a href="#">About</a>
-  </nav>
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="masthead">
+      <img src="logo.png" alt="Jaronite News Logo">
+      <div class="masthead-text">
+        <h1>Jaronite <span>News</span> Inc.</h1>
+        <div class="tagline">DemocracyCraft's Official Press — Est. 2024</div>
+      </div>
+    </div>
+    <nav class="site-nav">
+      <a href="/" class="active">Home</a>
+      <a href="mayoral-election.html">Politics</a>
+      <a href="business-economy.html">Economy</a>
+      <a href="city-projects.html">City</a>
+      <a href="crime-justice.html">Crime</a>
+      <a href="/portal.html">Staff Portal</a>
+    </nav>
+  </div>
 </header>
 
 <section class="hero">
-  <h1>Reporting the Pulse of DemocracyCraft</h1>
-  <p>From elections to city events — we cover it all.</p>
-  <button>Read Latest Headlines</button>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <div class="hero-eyebrow">Breaking from DemocracyCraft</div>
+      <h2>Reporting the Pulse of DemocracyCraft</h2>
+      <p class="hero-sub">From mayoral elections to city infrastructure — independent journalism covering everything that shapes life on the server.</p>
+      <a href="mayoral-election.html" class="hero-cta">Read Latest Headlines</a>
+    </div>
+    <div class="hero-live-badge" id="hero-live-badge" style="display:none;">
+      <div class="hero-live-label">Latest story</div>
+      <div class="hero-latest-title" id="hero-latest-title">—</div>
+      <div class="hero-latest-meta" id="hero-latest-meta">—</div>
+    </div>
+  </div>
 </section>
 
-<section class="articles">
+<main class="categories-section">
+  <div class="section-label">Browse by Section</div>
+  <h2>What's happening on DemocracyCraft</h2>
 
-  <a href="mayoral-election.html" class="card">
-    <img src="placeholder1.png" alt="Your Image Here">
-    <h2>Mayoral Election Updates</h2>
-    <p>Stay informed with the latest polling, debates, and candidate announcements across DemocracyCraft.</p>
-  </a>
+  <div class="categories-grid">
 
-  <a href="city-projects.html" class="card">
-    <img src="placeholder2.png" alt="Your Image Here">
-    <h2>City Projects & Infrastructure</h2>
-    <p>Breaking coverage on new roads, buildings, and public works shaping the future of the server.</p>
-  </a>
+    <a href="mayoral-election.html" class="cat-card election">
+      <div class="cat-icon">🗳️</div>
+      <h3>Mayoral Election Updates</h3>
+      <p>Polling, debates, candidate profiles, and live vote coverage from across the server.</p>
+      <div class="cat-link">Read coverage →</div>
+    </a>
 
-  <a href="crime-justice.html" class="card">
-    <img src="placeholder3.png" alt="Your Image Here">
-    <h2>Crime & Justice Reports</h2>
-    <p>Follow major police cases, court rulings, and legal changes affecting citizens.</p>
-  </a>
+    <a href="city-projects.html" class="cat-card projects">
+      <div class="cat-icon">🏗️</div>
+      <h3>City Projects & Infrastructure</h3>
+      <p>New builds, roads, public works, and planning decisions shaping the future of DemocracyCraft.</p>
+      <div class="cat-link">Read coverage →</div>
+    </a>
 
-  <a href="business-economy.html" class="card">
-    <img src="placeholder4.png" alt="Your Image Here">
-    <h2>Business & Economy</h2>
-    <p>Market trends, job reports, and business highlights from across the DemocracyCraft world.</p>
-  </a>
+    <a href="crime-justice.html" class="cat-card crime">
+      <div class="cat-icon">⚖️</div>
+      <h3>Crime & Justice</h3>
+      <p>Major cases, court rulings, law enforcement updates, and legal changes affecting all citizens.</p>
+      <div class="cat-link">Read coverage →</div>
+    </a>
 
-</section>
+    <a href="business-economy.html" class="cat-card economy">
+      <div class="cat-icon">📈</div>
+      <h3>Business & Economy</h3>
+      <p>Market trends, job reports, new ventures, and the economic forces driving the server's growth.</p>
+      <div class="cat-link">Read coverage →</div>
+    </a>
 
-<footer>
-  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity
+  </div>
+</main>
+
+<footer class="site-footer">
+  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
+  <a href="/portal.html">Staff Portal</a>
 </footer>
+
+<script>
+  // Fetch the single most recent published article across all categories
+  // and surface it in the hero as a live "latest story" badge.
+  async function loadLatestHero() {
+    const categories = ['mayoral-election', 'city-projects', 'crime-justice', 'business-economy'];
+    const requests = categories.map(c =>
+      fetch(`/api/articles?category=${c}`)
+        .then(r => r.json())
+        .then(arr => arr[0] || null)
+        .catch(() => null)
+    );
+
+    const results = await Promise.all(requests);
+    const latest = results
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+    if (!latest) return;
+
+    document.getElementById('hero-latest-title').textContent = latest.title;
+    document.getElementById('hero-latest-meta').textContent =
+      `By ${latest.author} · ${new Date(latest.created_at).toLocaleDateString()}`;
+    document.getElementById('hero-live-badge').style.display = 'flex';
+  }
+
+  loadLatestHero();
+</script>
 
 </body>
 </html>
