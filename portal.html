@@ -3,81 +3,428 @@
 <head>
   <meta charset="UTF-8">
   <title>Jaronite News — Employee Portal</title>
-  <link rel="stylesheet" href="/styles.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #0d0d0d;
+      color: #f0f0f0;
+      min-height: 100vh;
+    }
+
+    /* LOGIN */
+    #login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
+    }
+
+    #login-screen h1 {
+      font-size: 2rem;
+      color: #c9a84c;
+      margin-bottom: 8px;
+    }
+
+    #login-screen p {
+      color: #888;
+      margin-bottom: 16px;
+    }
+
+    .login-box {
+      background: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      padding: 40px;
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    input, textarea, select {
+      background: #111;
+      border: 1px solid #333;
+      color: #f0f0f0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 1rem;
+      width: 100%;
+      outline: none;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: #c9a84c;
+    }
+
+    button {
+      background: #c9a84c;
+      color: #000;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    button:hover { background: #e0bc6a; }
+
+    .btn-danger {
+      background: #8b0000;
+      color: #fff;
+      width: auto;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
+    .btn-danger:hover { background: #a00000; }
+
+    .btn-edit {
+      background: #1a3a5c;
+      color: #fff;
+      width: auto;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
+    .btn-edit:hover { background: #1e4a75; }
+
+    .btn-censor {
+      background: #4a4a00;
+      color: #fff;
+      width: auto;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
+    .btn-censor:hover { background: #666600; }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid #555;
+      color: #aaa;
+    }
+
+    .btn-secondary:hover { border-color: #c9a84c; color: #c9a84c; }
+
+    #error-msg { color: #e74c3c; font-size: 0.9rem; text-align: center; }
+
+    /* PORTAL */
+    #portal-screen { display: none; }
+
+    .portal-header {
+      background: #1a1a1a;
+      border-bottom: 1px solid #2e2e2e;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .portal-header h1 { color: #c9a84c; font-size: 1.4rem; }
+    .portal-header span { color: #888; font-size: 0.9rem; }
+
+    .portal-header .right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .portal-body {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      padding: 30px;
+    }
+
+    .card h2 {
+      color: #c9a84c;
+      margin-bottom: 20px;
+      font-size: 1.2rem;
+      border-bottom: 1px solid #2e2e2e;
+      padding-bottom: 10px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    textarea { resize: vertical; min-height: 160px; font-family: Georgia, serif; }
+
+    #post-msg { color: #2ecc71; font-size: 0.9rem; margin-top: 8px; }
+
+    /* ARTICLES LIST */
+    .article-item {
+      border: 1px solid #2e2e2e;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: #111;
+    }
+
+    .article-item h3 { color: #f0f0f0; margin-bottom: 4px; }
+    .article-item .meta { color: #666; font-size: 0.8rem; margin-bottom: 10px; }
+    .article-item .preview { color: #aaa; font-size: 0.9rem; margin-bottom: 12px; }
+    .article-item .censored-label { color: #e74c3c; font-style: italic; font-size: 0.85rem; }
+
+    .article-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .edit-form { margin-top: 12px; display: none; flex-direction: column; gap: 10px; }
+    .edit-form.open { display: flex; }
+
+    #admin-section { display: none; }
+
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .tab {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: transparent;
+      color: #aaa;
+      cursor: pointer;
+      width: auto;
+    }
+
+    .tab.active {
+      background: #c9a84c;
+      color: #000;
+      border-color: #c9a84c;
+    }
+  </style>
 </head>
 <body>
 
-  <div id="login-screen">
-    <h1>Employee Login</h1>
+<!-- LOGIN -->
+<div id="login-screen">
+  <h1>Jaronite News Inc.</h1>
+  <p>Employee Portal — Authorized Personnel Only</p>
+  <div class="login-box">
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
     <button onclick="login()">Login</button>
-    <p id="error-msg" style="color:red;"></p>
+    <p id="error-msg"></p>
+  </div>
+</div>
+
+<!-- PORTAL -->
+<div id="portal-screen">
+  <div class="portal-header">
+    <h1>Jaronite News — Employee Portal</h1>
+    <div class="right">
+      <span>Logged in as <strong id="user-display"></strong></span>
+      <button class="btn-secondary" style="width:auto;padding:8px 16px;" onclick="logout()">Logout</button>
+    </div>
   </div>
 
-  <div id="portal-screen" style="display:none;">
-    <h1>Welcome, <span id="user-display"></span></h1>
-    <button onclick="logout()">Logout</button>
+  <div class="portal-body">
 
-    <h2>Post New Article</h2>
-    <input type="text" id="title" placeholder="Article Title">
-    <select id="category">
-      <option value="mayoral-election">Mayoral Election</option>
-      <option value="city-projects">City Projects</option>
-      <option value="crime-justice">Crime & Justice</option>
-      <option value="business-economy">Business & Economy</option>
-    </select>
-    <textarea id="content" placeholder="Write your article here..." rows="10"></textarea>
-    <button onclick="postArticle()">Publish Article</button>
-    <p id="post-msg"></p>
+    <!-- POST ARTICLE -->
+    <div class="card">
+      <h2>Post New Article</h2>
+      <div class="form-group">
+        <input type="text" id="title" placeholder="Article Title">
+        <select id="category">
+          <option value="mayoral-election">Mayoral Election</option>
+          <option value="city-projects">City Projects & Infrastructure</option>
+          <option value="crime-justice">Crime & Justice</option>
+          <option value="business-economy">Business & Economy</option>
+        </select>
+        <textarea id="content" placeholder="Write your article here..."></textarea>
+        <button onclick="postArticle()">Publish Article</button>
+        <p id="post-msg"></p>
+      </div>
+    </div>
+
+    <!-- ADMIN SECTION -->
+    <div class="card" id="admin-section">
+      <h2>Admin Controls</h2>
+
+      <div class="tab-bar">
+        <button class="tab active" onclick="switchTab('all')">All Articles</button>
+        <button class="tab" onclick="switchTab('censored')">Censored</button>
+      </div>
+
+      <div id="admin-articles-list">Loading...</div>
+    </div>
+
   </div>
+</div>
 
-  <script>
-    let currentUser = null;
+<script>
+  let currentUser = null;
 
-    async function login() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+  async function login() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
 
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (data.success) {
-        currentUser = data.user;
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('portal-screen').style.display = 'block';
-        document.getElementById('user-display').textContent = data.user.username;
-      } else {
-        document.getElementById('error-msg').textContent = 'Invalid username or password.';
+    if (data.success) {
+      currentUser = data.user;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('portal-screen').style.display = 'block';
+      document.getElementById('user-display').textContent = data.user.username;
+
+      if (data.user.role === 'admin') {
+        document.getElementById('admin-section').style.display = 'block';
+        loadAdminArticles('all');
       }
+    } else {
+      document.getElementById('error-msg').textContent = 'Invalid username or password.';
+    }
+  }
+
+  async function postArticle() {
+    const title = document.getElementById('title').value;
+    const category = document.getElementById('category').value;
+    const content = document.getElementById('content').value;
+
+    if (!title || !content) {
+      document.getElementById('post-msg').textContent = 'Please fill in all fields.';
+      document.getElementById('post-msg').style.color = '#e74c3c';
+      return;
     }
 
-    async function postArticle() {
-      const title = document.getElementById('title').value;
-      const category = document.getElementById('category').value;
-      const content = document.getElementById('content').value;
+    const res = await fetch('/api/articles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, category, content, author: currentUser.username })
+    });
 
-      const res = await fetch('/api/articles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, category, content, author: currentUser.username })
-      });
+    const data = await res.json();
+    const msg = document.getElementById('post-msg');
+    if (data.success) {
+      msg.style.color = '#2ecc71';
+      msg.textContent = 'Article published successfully!';
+      document.getElementById('title').value = '';
+      document.getElementById('content').value = '';
+      if (currentUser.role === 'admin') loadAdminArticles('all');
+    } else {
+      msg.style.color = '#e74c3c';
+      msg.textContent = 'Failed to publish article.';
+    }
+  }
 
-      const data = await res.json();
-      document.getElementById('post-msg').textContent = data.success ? 'Article published!' : 'Failed to publish.';
+  async function loadAdminArticles(filter) {
+    const res = await fetch('/api/admin/articles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username, password: currentUser.password, filter })
+    });
+    const articles = await res.json();
+    const container = document.getElementById('admin-articles-list');
+
+    if (!articles.length) {
+      container.innerHTML = '<p style="color:#666">No articles found.</p>';
+      return;
     }
 
-    function logout() {
-      currentUser = null;
-      document.getElementById('login-screen').style.display = 'block';
-      document.getElementById('portal-screen').style.display = 'none';
-    }
-  </script>
+    container.innerHTML = articles.map(a => `
+      <div class="article-item" id="article-${a.id}">
+        <h3>${a.title} ${a.status === 'censored' ? '<span class="censored-label">[CENSORED]</span>' : ''}</h3>
+        <div class="meta">By ${a.author} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
+        <div class="preview">${a.content.substring(0, 150)}...</div>
+        <div class="article-actions">
+          <button class="btn-edit" onclick="toggleEdit(${a.id}, \`${escapeJs(a.title)}\`, \`${escapeJs(a.content)}\`)">Edit</button>
+          <button class="btn-censor" onclick="censorArticle(${a.id})">${a.status === 'censored' ? 'Uncensor' : 'Censor'}</button>
+          <button class="btn-danger" onclick="deleteArticle(${a.id})">Delete</button>
+        </div>
+        <div class="edit-form" id="edit-form-${a.id}">
+          <input type="text" id="edit-title-${a.id}" value="${escapeHtml(a.title)}">
+          <textarea id="edit-content-${a.id}">${escapeHtml(a.content)}</textarea>
+          <button onclick="saveEdit(${a.id})" style="width:auto;padding:10px 20px;">Save Changes</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function toggleEdit(id, title, content) {
+    const form = document.getElementById(`edit-form-${id}`);
+    form.classList.toggle('open');
+  }
+
+  async function saveEdit(id) {
+    const title = document.getElementById(`edit-title-${id}`).value;
+    const content = document.getElementById(`edit-content-${id}`).value;
+
+    await fetch('/api/admin/edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username, id, title, content })
+    });
+
+    loadAdminArticles('all');
+  }
+
+  async function censorArticle(id) {
+    await fetch('/api/admin/censor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username, id })
+    });
+    loadAdminArticles('all');
+  }
+
+  async function deleteArticle(id) {
+    if (!confirm('Are you sure you want to delete this article?')) return;
+    await fetch('/api/admin/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username, id })
+    });
+    loadAdminArticles('all');
+  }
+
+  function switchTab(filter) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    loadAdminArticles(filter);
+  }
+
+  function logout() {
+    currentUser = null;
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('portal-screen').style.display = 'none';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('error-msg').textContent = '';
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function escapeJs(str) {
+    return str.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');
+  }
+</script>
 
 </body>
 </html>
