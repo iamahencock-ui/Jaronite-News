@@ -120,7 +120,9 @@ export default {
     }
 
     // API: Submit article (writers, editors, admins all submit through here)
-    // New articles always start as pending_review — nobody publishes directly anymore.
+    // New articles always start as pending_review — nobody publishes directly
+    // through this route, regardless of role. Editors/admins who want to skip
+    // review use /api/articles/instapublish instead.
     if (url.pathname === "/api/articles" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -130,6 +132,25 @@ export default {
         "INSERT INTO articles (title, category, content, author, status) VALUES (?, ?, ?, ?, 'pending_review')"
       ).bind(title, category, content, user.username).run();
       await log(env, user.username, "POST_ARTICLE", `Submitted article "${title}" in category "${category}" for review`);
+      return Response.json({ success: true });
+    }
+
+    // EDITOR/ADMIN: publish an article immediately, skipping the review pipeline
+    // entirely (no pending_review/claimed row is ever created). Logged distinctly
+    // so it's clear in the audit trail that it bypassed review.
+    if (url.pathname === "/api/articles/instapublish" && request.method === "POST") {
+      const user = await requireEditorOrAdmin(env, request);
+      if (!user) return Response.json({ error: "Unauthorized" }, { status: 403 });
+
+      const { title, category, content } = await request.json();
+      if (!title || !content || !category) {
+        return Response.json({ error: "Title, category, and content are all required." }, { status: 400 });
+      }
+
+      await env.DB.prepare(
+        "INSERT INTO articles (title, category, content, author, status) VALUES (?, ?, ?, ?, 'published')"
+      ).bind(title, category, content, user.username).run();
+      await log(env, user.username, "INSTAPUBLISH_ARTICLE", `Published article "${title}" in category "${category}" directly, bypassing review`);
       return Response.json({ success: true });
     }
 
@@ -229,17 +250,52 @@ export default {
     // ADMIN-ONLY: full view of every claimed/in-progress article across all editors,
     // each tagged with who has it ("under review by ___"). Editors only see their own
     // claims via /api/editor/my-claims; this route is for admin oversight.
+    // Includes full content so the admin can act (approve/return/deny) without
+    // needing to claim it first.
     if (url.pathname === "/api/admin/all-claimed" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
 
       const results = await env.DB.prepare(
-        "SELECT id, title, category, author, status, claimed_by, review_notes, created_at, updated_at FROM articles WHERE status IN ('claimed', 'returned') ORDER BY updated_at DESC"
+        "SELECT id, title, category, author, content, status, claimed_by, review_notes, created_at, updated_at FROM articles WHERE status IN ('claimed', 'returned') ORDER BY updated_at DESC"
       ).all();
       return Response.json(results.results);
     }
 
-    // EDITOR/ADMIN: approve a claimed article -> published
+    // ADMIN-ONLY: take over ("steal") any in-progress article, regardless of who
+    // currently has it claimed — or claim straight out of the open pending pool.
+    // Reassigns claimed_by to the admin. Logged as a distinct action so it's
+    // visible in the audit trail that it was taken from another reviewer.
+    if (url.pathname === "/api/admin/steal-claim" && request.method === "POST") {
+      const admin = await requireAdmin(env, request);
+      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+
+      const { id } = await request.json();
+      const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
+      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!["pending_review", "claimed", "returned"].includes(article.status)) {
+        return Response.json({ error: "This article isn't in a reviewable state." }, { status: 400 });
+      }
+
+      const previousOwner = article.claimed_by; // null if it was still in the open pool
+      const newStatus = article.status === "pending_review" ? "claimed" : article.status;
+
+      await env.DB.prepare(
+        "UPDATE articles SET status = ?, claimed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      ).bind(newStatus, admin.username, id).run();
+
+      await log(
+        env,
+        admin.username,
+        "ADMIN_REASSIGN_CLAIM",
+        previousOwner
+          ? `Took over article "${article.title}" (ID ${id}) from ${previousOwner}`
+          : `Claimed article "${article.title}" (ID ${id}) directly from the pending pool`
+      );
+      return Response.json({ success: true });
+    }
+
+    // EDITOR/ADMIN: approve a claimed (or, for admins, returned) article -> published
     if (url.pathname === "/api/editor/approve" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
@@ -247,11 +303,16 @@ export default {
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return Response.json({ error: "Not found" }, { status: 404 });
-      if (article.status !== "claimed") {
-        return Response.json({ error: "Only claimed articles can be approved." }, { status: 400 });
-      }
-      // Editors can only act on their own claims; admins can act on anyone's.
-      if (reviewer.role !== "admin" && article.claimed_by !== reviewer.username) {
+
+      // Editors may only act on their own 'claimed' articles. Admins may also act
+      // directly on a 'returned' article (bypassing the writer's revision step)
+      // and on anyone's claim, not just their own.
+      const adminCanAct = reviewer.role === "admin" && (article.status === "claimed" || article.status === "returned");
+      const editorCanAct = reviewer.role !== "admin" && article.status === "claimed" && article.claimed_by === reviewer.username;
+      if (!adminCanAct && !editorCanAct) {
+        if (article.status !== "claimed" && article.status !== "returned") {
+          return Response.json({ error: "Only claimed or returned articles can be approved." }, { status: 400 });
+        }
         return Response.json({ error: "This article is claimed by another editor." }, { status: 403 });
       }
 
@@ -282,6 +343,8 @@ export default {
         return Response.json({ error: "This article is claimed by another editor." }, { status: 403 });
       }
 
+      // Admins keep the existing claimed_by as-is unless they've already stolen the
+      // claim via /api/admin/steal-claim; returning doesn't itself reassign ownership.
       await env.DB.prepare(
         "UPDATE articles SET status = 'returned', review_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(notes, id).run();
@@ -289,7 +352,8 @@ export default {
       return Response.json({ success: true });
     }
 
-    // EDITOR/ADMIN: deny a claimed article. Permanent — kept in DB, writer can see why.
+    // EDITOR/ADMIN: deny a claimed (or, for admins, returned) article. Permanent —
+    // kept in DB, writer can see why.
     if (url.pathname === "/api/editor/deny" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
@@ -297,10 +361,13 @@ export default {
       const { id, notes } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return Response.json({ error: "Not found" }, { status: 404 });
-      if (article.status !== "claimed") {
-        return Response.json({ error: "Only claimed articles can be denied." }, { status: 400 });
-      }
-      if (reviewer.role !== "admin" && article.claimed_by !== reviewer.username) {
+
+      const adminCanAct = reviewer.role === "admin" && (article.status === "claimed" || article.status === "returned");
+      const editorCanAct = reviewer.role !== "admin" && article.status === "claimed" && article.claimed_by === reviewer.username;
+      if (!adminCanAct && !editorCanAct) {
+        if (article.status !== "claimed" && article.status !== "returned") {
+          return Response.json({ error: "Only claimed or returned articles can be denied." }, { status: 400 });
+        }
         return Response.json({ error: "This article is claimed by another editor." }, { status: 403 });
       }
 

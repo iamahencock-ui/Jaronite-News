@@ -76,6 +76,8 @@
     .log-action.RETURN_ARTICLE { color: #e67e22; }
     .log-action.DENY_ARTICLE { color: #e74c3c; }
     .log-action.RESUBMIT_ARTICLE { color: #9b59b6; }
+    .log-action.ADMIN_REASSIGN_CLAIM { color: #f1c40f; }
+    .log-action.INSTAPUBLISH_ARTICLE { color: #2ecc71; }
 
     .log-filters {
       display: flex;
@@ -327,7 +329,7 @@
     <!-- POST ARTICLE -->
     <div class="card">
       <h2>Post New Article</h2>
-      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">All submissions go to an editor for review before publishing.</p>
+      <p id="post-article-subtext" style="color:#666; font-size:0.85rem; margin-top:-8px;">All submissions go to an editor for review before publishing.</p>
       <div class="form-group">
         <input type="text" id="title" placeholder="Article Title">
         <select id="category">
@@ -337,7 +339,10 @@
           <option value="business-economy">Business & Economy</option>
         </select>
         <textarea id="content" placeholder="Write your article here..."></textarea>
-        <button onclick="postArticle()">Submit for Review</button>
+        <div class="claim-bar" style="margin-top:0;">
+          <button onclick="postArticle()" style="width:auto; flex:1;">Submit for Review</button>
+          <button id="instapublish-btn" onclick="instapublishArticle()" style="display:none; width:auto; flex:1; background:#2ecc71; color:#042e14;">Publish Directly</button>
+        </div>
         <p id="post-msg"></p>
       </div>
     </div>
@@ -413,6 +418,8 @@
           <button class="log-filter-btn" onclick="filterLogs('RETURN_ARTICLE', this)">Returns</button>
           <button class="log-filter-btn" onclick="filterLogs('DENY_ARTICLE', this)">Denials</button>
           <button class="log-filter-btn" onclick="filterLogs('RESUBMIT_ARTICLE', this)">Resubmits</button>
+          <button class="log-filter-btn" onclick="filterLogs('ADMIN_REASSIGN_CLAIM', this)">Takeovers</button>
+          <button class="log-filter-btn" onclick="filterLogs('INSTAPUBLISH_ARTICLE', this)">Direct Publishes</button>
           <button class="log-filter-btn" onclick="filterLogs('DELETE_ARTICLE', this)">Deletions</button>
           <button class="log-filter-btn" onclick="filterLogs('CENSOR_ARTICLE', this)">Censors</button>
           <button class="log-filter-btn" onclick="filterLogs('EDIT_ARTICLE', this)">Edits</button>
@@ -523,6 +530,11 @@
       document.getElementById('editor-section').style.display = 'block';
       loadPendingQueue();
       loadMyClaims();
+
+      // Editors and admins can skip the review pipeline entirely.
+      document.getElementById('instapublish-btn').style.display = 'block';
+      document.getElementById('post-article-subtext').textContent =
+        'Submit for review like normal, or publish directly — your call.';
     }
 
     if (role === 'admin') {
@@ -563,6 +575,41 @@
     } else {
       msg.style.color = '#e74c3c';
       msg.textContent = 'Failed to submit article.';
+    }
+  }
+
+  // Editor/admin only: publish immediately, skipping the review pipeline.
+  async function instapublishArticle() {
+    const title = document.getElementById('title').value;
+    const category = document.getElementById('category').value;
+    const content = document.getElementById('content').value;
+    const msg = document.getElementById('post-msg');
+
+    if (!title || !content) {
+      msg.style.color = '#e74c3c';
+      msg.textContent = 'Please fill in all fields.';
+      return;
+    }
+
+    if (!confirm('Publish this immediately, with no review?')) return;
+
+    const res = await fetch('/api/articles/instapublish', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ title, category, content })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      msg.style.color = '#2ecc71';
+      msg.textContent = 'Published directly — no review needed.';
+      document.getElementById('title').value = '';
+      document.getElementById('content').value = '';
+      loadMyArticles();
+      if (currentUser.role === 'admin') loadAdminArticles('all');
+    } else {
+      msg.style.color = '#e74c3c';
+      msg.textContent = data.error || 'Failed to publish article.';
     }
   }
 
@@ -761,6 +808,9 @@
   }
 
   // ---------- ADMIN: system-wide in-review view ----------
+  // Admins can act directly here — approve, return, or deny ANY claimed or
+  // returned article regardless of who holds it, and can take over ("steal")
+  // a claim from another editor without waiting for them to release it.
 
   async function loadAllClaimed() {
     const res = await fetch('/api/admin/all-claimed', {
@@ -781,9 +831,51 @@
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.updated_at).toLocaleString()}</div>
         <div class="review-tag">Under review by <strong>${escapeHtml(a.claimed_by)}</strong></div>
-        ${a.status === 'returned' && a.review_notes ? `<div class="review-notes-box">${escapeHtml(a.review_notes)}</div>` : ''}
+        <div class="preview">${escapeHtml(a.content || '').substring(0, 250)}...</div>
+        ${a.status === 'returned' && a.review_notes ? `<div class="review-notes-box"><strong>Notes sent to writer:</strong><br>${escapeHtml(a.review_notes)}</div>` : ''}
+        <div class="claim-bar">
+          <button class="btn-approve" onclick="adminApprove(${a.id})">Approve & Publish</button>
+          <button class="btn-return" onclick="openReviewModal(${a.id}, 'return')">Return with Instructions</button>
+          <button class="btn-deny" onclick="openReviewModal(${a.id}, 'deny')">Deny</button>
+          <button class="btn-claim" onclick="stealClaim(${a.id})">Take Over</button>
+        </div>
       </div>
     `).join('');
+  }
+
+  // Admin-only: approve directly from the In Review tab, regardless of who
+  // holds the claim or whether it's mid-revision ('returned').
+  async function adminApprove(id) {
+    if (!confirm('Approve and publish this article? This works even if another editor currently has it claimed.')) return;
+    const res = await fetch('/api/editor/approve', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadAllClaimed();
+      loadAdminArticles('all');
+    } else {
+      alert(data.error || 'Failed to approve article.');
+    }
+  }
+
+  // Admin-only: take over ("steal") a claim from whoever currently holds it,
+  // or claim straight out of the pending pool. Logged as a distinct action.
+  async function stealClaim(id) {
+    const res = await fetch('/api/admin/steal-claim', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadAllClaimed();
+      loadPendingQueue();
+    } else {
+      alert(data.error || 'Failed to take over this article.');
+    }
   }
 
   // ---------- ADMIN: published-article moderation (unchanged) ----------
