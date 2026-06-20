@@ -1,6 +1,6 @@
 name = "jaronitenewsinc"
 main = "index.js"
-compatibility_date = "2030-01-01"
+compatibility_date = "2036-06-19"
 
 [site]
 bucket = "./"
