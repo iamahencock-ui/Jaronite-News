@@ -153,7 +153,7 @@
   let integrityTimer = null;
   let currentArticleId = null;
   let currentServerHash = null;
-  let currentDomHash = null;
+  let currentSourceHash = null; // hash of a.title+a.content, not DOM textContent
 
   async function sha256Hex(str) {
     const enc = new TextEncoder();
@@ -161,11 +161,29 @@
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  // Hash exactly what's rendered, not the source data — so this only ever
-  // flags a difference between "what's on screen" and "what we put there".
-  async function hashRenderedDom() {
+  // Hash the article's source data (title + content from the API response).
+  // We deliberately avoid reading back from the DOM — textContent on rendered
+  // <p> nodes includes browser-inserted whitespace/newlines that vary between
+  // reads and would cause false tamper alerts. Instead, we compare what the
+  // DOM *displays* against what the DOM *element values* currently hold.
+  async function hashSourceData(title, content) {
+    return sha256Hex(`${title}\u0000${content}`);
+  }
+
+  // Read the current displayed text directly from the DOM elements
+  // (not textContent of the container, which includes child whitespace).
+  // modal-title uses .textContent (set directly, no HTML children).
+  // modal-body: collect textContent of each <p> child only, joined with \n\n,
+  // so extra whitespace nodes between tags don't affect the result.
+  function readDisplayedContent() {
     const title = document.getElementById('modal-title').textContent;
-    const body = document.getElementById('modal-body').textContent;
+    const bodyEl = document.getElementById('modal-body');
+    const paras = [...bodyEl.querySelectorAll('p')].map(p => p.textContent).join('\n\n');
+    return { title, body: paras };
+  }
+
+  async function hashDisplayed() {
+    const { title, body } = readDisplayedContent();
     return sha256Hex(`${title}\u0000${body}`);
   }
 
@@ -214,7 +232,7 @@
         }
         renderArticle(updated);
         currentServerHash = data.hash;
-        currentDomHash = await hashRenderedDom();
+        currentSourceHash = await hashSourceData(updated.title, updated.content);
         showNotice('This article was just updated by an editor — showing the latest version.');
         setTimeout(() => {
           const n = document.getElementById('modal-notice');
@@ -234,8 +252,11 @@
   }
 
   async function checkLocalIntegrity() {
-    const liveHash = await hashRenderedDom();
-    if (liveHash !== currentDomHash) {
+    // Compare what's currently displayed in the DOM against the hash of
+    // the source data we originally rendered. If someone edits the title
+    // or body text via devtools, the displayed hash won't match.
+    const liveHash = await hashDisplayed();
+    if (liveHash !== currentSourceHash) {
       tamperKick();
     }
   }
@@ -256,7 +277,7 @@
     integrityTimer = null;
     currentArticleId = null;
     currentServerHash = null;
-    currentDomHash = null;
+    currentSourceHash = null;
   }
 
   async function openModal(index) {
@@ -267,7 +288,10 @@
     document.getElementById('article-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    currentDomHash = await hashRenderedDom();
+    // Hash the source data we just rendered — this is the ground truth.
+    // We do NOT read back from the DOM here to avoid whitespace/newline
+    // inconsistencies in textContent that would cause false tamper alerts.
+    currentSourceHash = await hashSourceData(a.title, a.content);
     try {
       const res = await fetch(`/api/article-hash?id=${a.id}`);
       const data = await res.json();
