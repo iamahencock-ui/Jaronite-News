@@ -5,16 +5,40 @@ const assetManifest = JSON.parse(manifestJSON);
 
 // ---------- password hashing (Web Crypto PBKDF2, no extra deps) ----------
 
+/**
+ * Convert a binary buffer (ArrayBuffer or typed array) into a lowercase hex string.
+ * Used to turn raw crypto output (hashes, salts, session tokens) into a
+ * string that's safe to store in D1 and send over JSON.
+ * @param {ArrayBuffer} buf - The raw bytes to encode.
+ * @returns {string} Hex-encoded representation of the buffer.
+ */
 function bufToHex(buf) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Convert a hex string back into a raw binary buffer. The inverse of bufToHex.
+ * Used to recover a previously-stored salt (saved as hex in D1) into the
+ * ArrayBuffer form the Web Crypto API expects.
+ * @param {string} hex - Hex-encoded byte string.
+ * @returns {ArrayBuffer} The decoded raw bytes.
+ */
 function hexToBuf(hex) {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
   return bytes.buffer;
 }
 
+/**
+ * Hash a plaintext password with PBKDF2 (100,000 iterations, SHA-256).
+ * If saltHex is omitted, a fresh random 16-byte salt is generated — use this
+ * path when creating a new password. Pass an existing saltHex (read from the
+ * users table) when re-deriving a hash to verify a login attempt, so the
+ * same salt produces a comparable hash.
+ * @param {string} password - The plaintext password to hash.
+ * @param {string} [saltHex] - An existing hex-encoded salt to reuse, or omit to generate a new one.
+ * @returns {Promise<{hash: string, salt: string}>} The hex-encoded derived hash and the salt used.
+ */
 async function hashPassword(password, saltHex) {
   const enc = new TextEncoder();
   const salt = saltHex ? hexToBuf(saltHex) : crypto.getRandomValues(new Uint8Array(16)).buffer;
@@ -27,6 +51,16 @@ async function hashPassword(password, saltHex) {
   return { hash: bufToHex(bits), salt: bufToHex(salt) };
 }
 
+/**
+ * Check a login attempt's plaintext password against a stored PBKDF2 hash.
+ * Re-derives the hash using the stored salt, then compares byte-by-byte in
+ * constant time (XOR-accumulate over the whole string) to avoid leaking
+ * timing information that could help an attacker guess the password.
+ * @param {string} password - The plaintext password supplied at login.
+ * @param {string} storedHash - The hex-encoded hash stored in the users table.
+ * @param {string} storedSaltHex - The hex-encoded salt stored alongside that hash.
+ * @returns {Promise<boolean>} True if the password is correct.
+ */
 async function verifyPassword(password, storedHash, storedSaltHex) {
   const { hash } = await hashPassword(password, storedSaltHex);
   if (hash.length !== storedHash.length) return false;
@@ -35,12 +69,30 @@ async function verifyPassword(password, storedHash, storedSaltHex) {
   return diff === 0;
 }
 
+/**
+ * Generate a fresh, cryptographically random session token (32 random bytes,
+ * hex-encoded to 64 characters). Issued on every successful login and stored
+ * in the sessions table; the client sends it back as a Bearer token on every
+ * subsequent authenticated request.
+ * @returns {string} A new random hex session token.
+ */
 function newSessionToken() {
   return bufToHex(crypto.getRandomValues(new Uint8Array(32)).buffer);
 }
 
 // ---------- session-based auth ----------
 
+/**
+ * Resolve the currently authenticated user from a request's Bearer token.
+ * Looks up the session, rejects it if missing/expired, then loads the
+ * matching user and rejects if they're suspended. On success, also extends
+ * the session's expiry by 20 minutes (sliding expiry) so active users don't
+ * get logged out mid-session.
+ * @param {object} env - Worker environment bindings (used for env.DB).
+ * @param {Request} request - The incoming request, read for its Authorization header.
+ * @returns {Promise<{id: number, username: string, role: string, status: string}|null>}
+ *   The authenticated user record, or null if there's no valid session.
+ */
 async function getSessionUser(env, request) {
   const authHeader = request.headers.get("Authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -66,24 +118,104 @@ async function getSessionUser(env, request) {
   return user;
 }
 
+/**
+ * Authenticate a request and require the user to hold the 'admin' role.
+ * Thin wrapper around getSessionUser that adds a role check — use at the top
+ * of any /api/admin/* route handler.
+ * @param {object} env - Worker environment bindings.
+ * @param {Request} request - The incoming request.
+ * @returns {Promise<object|null>} The admin user record, or null if unauthenticated or not an admin.
+ */
 async function requireAdmin(env, request) {
   const user = await getSessionUser(env, request);
   if (!user || user.role !== "admin") return null;
   return user;
 }
 
-// Anything an editor can do, an admin can also do.
+/**
+ * Authenticate a request and require the user to hold the 'editor' or
+ * 'admin' role. Anything an editor can do, an admin can also do — use at
+ * the top of any /api/editor/* route handler (and any route shared between
+ * editors and admins).
+ * @param {object} env - Worker environment bindings.
+ * @param {Request} request - The incoming request.
+ * @returns {Promise<object|null>} The user record, or null if unauthenticated or neither editor nor admin.
+ */
 async function requireEditorOrAdmin(env, request) {
   const user = await getSessionUser(env, request);
   if (!user || (user.role !== "editor" && user.role !== "admin")) return null;
   return user;
 }
 
+/**
+ * Write one entry to the audit log (logs table). Called after nearly every
+ * state-changing action across the app — logins, article lifecycle events,
+ * and admin/user-management actions — so the Logs tab in the portal has a
+ * complete trail of who did what and when.
+ * @param {object} env - Worker environment bindings.
+ * @param {string} username - The actor performing the action.
+ * @param {string} action - A short machine-readable action code (e.g. "LOGIN", "APPROVE_ARTICLE").
+ * @param {string} [details] - Human-readable detail shown in the admin Logs view.
+ * @returns {Promise<void>}
+ */
 async function log(env, username, action, details = "") {
   await env.DB.prepare("INSERT INTO logs (username, action, details) VALUES (?, ?, ?)").bind(username, action, details).run();
 }
 
 export default {
+  /**
+   * Single entry point for the whole Worker. Every HTTP request — API calls
+   * and static asset requests alike — comes through here. Routes are matched
+   * by exact pathname + method against a flat if-chain; the first match wins
+   * and returns. Anything that doesn't match an /api/* route falls through
+   * to static asset serving at the bottom (the public site + portal HTML/CSS).
+   *
+   * Route reference (all POST unless noted):
+   *  PUBLIC (no auth required)
+   *   - POST /api/login                    Authenticate, issue a session token.
+   *   - POST /api/logout                   Invalidate the caller's session token.
+   *   - GET  /api/articles?category=...    List published articles in a category (public site).
+   *
+   *  ANY AUTHENTICATED USER
+   *   - POST /api/articles                 Submit a new article for review (always starts pending_review).
+   *   - POST /api/article-detail           Fetch one article's full detail (writers: own only; editors/admins: any).
+   *   - POST /api/my-articles              List the caller's own submitted articles + status.
+   *   - POST /api/my-articles/resubmit     Resubmit a 'returned' article with revisions.
+   *
+   *  EDITOR or ADMIN
+   *   - POST /api/articles/instapublish    Publish an article immediately, skipping review.
+   *   - POST /api/editor/pending           List the open pending_review queue.
+   *   - POST /api/editor/claim             Claim a pending article for review.
+   *   - POST /api/editor/my-claims         List articles claimed by the caller.
+   *   - POST /api/editor/approve           Approve a claimed/returned article -> published.
+   *   - POST /api/editor/return            Return a claimed article to its writer with notes.
+   *   - POST /api/editor/deny              Permanently deny a claimed/returned article.
+   *
+   *  ADMIN ONLY
+   *   - POST /api/admin/all-claimed        List every claimed/returned article system-wide.
+   *   - POST /api/admin/steal-claim        Reassign any in-progress article to the caller.
+   *   - POST /api/admin/articles           List all articles, optionally filtered by status.
+   *   - POST /api/admin/edit               Edit a published article's title/content.
+   *   - POST /api/admin/censor             Toggle a published article's censored state.
+   *   - POST /api/admin/delete             Permanently delete an article.
+   *   - POST /api/admin/users              List all user accounts.
+   *   - POST /api/admin/user-detail        Fetch one user's profile + article count.
+   *   - POST /api/admin/user-history       Fetch one user's full audit-log history.
+   *   - POST /api/admin/create-user        Create a new user account.
+   *   - POST /api/admin/change-role        Change a user's role (writer/editor/admin).
+   *   - POST /api/admin/set-status         Suspend or reactivate a user account.
+   *   - POST /api/admin/reset-password     Set a new password for a user.
+   *   - POST /api/admin/delete-user        Permanently delete a user account.
+   *   - POST /api/admin/logs               Fetch the global audit log.
+   *
+   *  FALLTHROUGH
+   *   - *                                  Serve static assets (HTML/CSS/JS/images) from KV.
+   *
+   * @param {Request} request - The incoming HTTP request.
+   * @param {object} env - Worker environment bindings (env.DB is the D1 database, env.__STATIC_CONTENT is the asset bucket).
+   * @param {ExecutionContext} ctx - Cloudflare execution context, used to extend the worker's lifetime for async KV asset fetches.
+   * @returns {Promise<Response>} The HTTP response for this request.
+   */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
