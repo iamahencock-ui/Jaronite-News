@@ -4,3 +4,16 @@ Used by the employees of Jaronite News Inc. to upload and write their articles, 
 
 ## Website Coding
 This website uses and is designed for Cloudflare Pages/Worker and runs on a system of js, html and css for a clean website design. The uploaded version of this website can currently be found at: https://jaronitenewsinc.ejblox476.workers.dev/ 
+
+## Features (using Javascript)
+- Multiple tiers of clearance on accounts
+- Working Account System
+- Admin, Editor and Writer tiers for newspaper website
+- Editable, Reviewable articles
+- Visuial pleasing website
+- Security measures including password hashing
+- Employee part of Website and Public part
+- Tamper Proof Systems
+- Article Publishment System
+- Advertising? idk
+- Good Website Design and Readable Code
