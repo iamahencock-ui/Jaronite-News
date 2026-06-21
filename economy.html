@@ -19,11 +19,11 @@
     </div>
     <nav class="site-nav">
       <a href="/">Home</a>
-      <a href="/politics">Politics</a>
-      <a href="/economy" class="active">Economy</a>
-      <a href="/guides">Guides</a>
-      <a href="/miscellaneous">Misc</a>
-      <a href="/portal">Staff Portal</a>
+      <a href="politics.html">Politics</a>
+      <a href="economy.html" class="active">Economy</a>
+      <a href="guides.html">Guides</a>
+      <a href="miscellaneous.html">Misc</a>
+      <a href="/portal.html">Staff Portal</a>
     </nav>
   </div>
 </header>
@@ -53,7 +53,7 @@
 
 <footer class="site-footer">
   © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
-  <a href="/portal">Staff Portal</a>
+  <a href="/portal.html">Staff Portal</a>
 </footer>
 
 <script>
@@ -126,21 +126,164 @@
     `).join('');
   }
 
-  function openModal(index) {
-    const a = articles[index];
-    if (!a) return;
+  // ---------- Article integrity polling ----------
+  //
+  // Two independent checks run every 5s while an article is open:
+  //
+  // 1. SERVER hash (via /api/article-hash) — detects the published article
+  //    actually changing server-side (an editor edited, censored, or deleted
+  //    it) while someone has it open. This is normal content-management
+  //    activity, not tampering, so the response is to quietly re-fetch and
+  //    re-render the current version in place (or, if it's gone, show a
+  //    brief notice and send the reader home) — never an accusatory popup.
+  //
+  // 2. LOCAL DOM hash — re-hashes the *rendered* title+body text in the
+  //    modal and compares it to what was hashed right after rendering.
+  //    A mismatch means the visible text was altered directly in the
+  //    browser (e.g. via devtools) after the fact. This is the only case
+  //    that triggers the "kick to homepage" flow.
+  //
+  // Caveat worth being upfront about: the local check can only catch
+  // tampering that leaves this polling code itself running and unmodified.
+  // Someone willing to also edit/disable the page's JavaScript via devtools
+  // can defeat it — there's no way to truly trust a fully client-controlled
+  // environment. This catches casual/incidental edits, not a determined
+  // attacker.
 
+  let integrityTimer = null;
+  let currentArticleId = null;
+  let currentServerHash = null;
+  let currentDomHash = null;
+
+  async function sha256Hex(str) {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Hash exactly what's rendered, not the source data — so this only ever
+  // flags a difference between "what's on screen" and "what we put there".
+  async function hashRenderedDom() {
+    const title = document.getElementById('modal-title').textContent;
+    const body = document.getElementById('modal-body').textContent;
+    return sha256Hex(`${title}\u0000${body}`);
+  }
+
+  function renderArticle(a) {
     document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
     document.getElementById('modal-title').textContent = a.title;
     document.getElementById('modal-meta').innerHTML = buildBylineMeta(a);
     document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
+  }
+
+  // Small inline notice for benign events (server-side update, article gone).
+  // Distinct from the blocking tamper alert below — this isn't an accusation.
+  function showNotice(message) {
+    let notice = document.getElementById('modal-notice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'modal-notice';
+      notice.className = 'modal-notice';
+      document.getElementById('modal-body').prepend(notice);
+    }
+    notice.textContent = message;
+  }
+
+  async function refreshArticleFromServer(id) {
+    try {
+      const res = await fetch(`/api/article-hash?id=${id}`);
+      const data = await res.json();
+
+      if (!data.exists) {
+        stopIntegrityPolling();
+        showNotice('This article is no longer available — returning to the homepage.');
+        setTimeout(() => { window.location.href = '/'; }, 2000);
+        return;
+      }
+
+      if (data.hash !== currentServerHash) {
+        // Article changed server-side — pull the fresh copy and re-render.
+        const fullRes = await fetch(`/api/articles?category=${CATEGORY_SLUG}`);
+        const fresh = await fullRes.json();
+        const updated = Array.isArray(fresh) ? fresh.find(x => x.id === id) : null;
+        if (!updated) {
+          stopIntegrityPolling();
+          showNotice('This article is no longer available — returning to the homepage.');
+          setTimeout(() => { window.location.href = '/'; }, 2000);
+          return;
+        }
+        renderArticle(updated);
+        currentServerHash = data.hash;
+        currentDomHash = await hashRenderedDom();
+        showNotice('This article was just updated by an editor — showing the latest version.');
+        setTimeout(() => {
+          const n = document.getElementById('modal-notice');
+          if (n) n.remove();
+        }, 4000);
+      }
+    } catch (e) {
+      // Network hiccup — don't punish the reader for a dropped request, just
+      // try again on the next tick.
+    }
+  }
+
+  function tamperKick() {
+    stopIntegrityPolling();
+    alert('This article\'s content doesn\'t match what was published — you\'re being returned to the homepage.');
+    window.location.href = '/';
+  }
+
+  async function checkLocalIntegrity() {
+    const liveHash = await hashRenderedDom();
+    if (liveHash !== currentDomHash) {
+      tamperKick();
+    }
+  }
+
+  function startIntegrityPolling(id) {
+    stopIntegrityPolling();
+    currentArticleId = id;
+    integrityTimer = setInterval(async () => {
+      await checkLocalIntegrity();
+      // If the local check already kicked the user out, currentArticleId
+      // will have been cleared — skip the server check in that case.
+      if (currentArticleId !== null) await refreshArticleFromServer(currentArticleId);
+    }, 5000);
+  }
+
+  function stopIntegrityPolling() {
+    if (integrityTimer) clearInterval(integrityTimer);
+    integrityTimer = null;
+    currentArticleId = null;
+    currentServerHash = null;
+    currentDomHash = null;
+  }
+
+  async function openModal(index) {
+    const a = articles[index];
+    if (!a) return;
+
+    renderArticle(a);
     document.getElementById('article-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    currentDomHash = await hashRenderedDom();
+    try {
+      const res = await fetch(`/api/article-hash?id=${a.id}`);
+      const data = await res.json();
+      currentServerHash = data.exists ? data.hash : null;
+    } catch (e) {
+      currentServerHash = null;
+    }
+    startIntegrityPolling(a.id);
   }
 
   function closeModal() {
     document.getElementById('article-modal').classList.remove('open');
     document.body.style.overflow = '';
+    stopIntegrityPolling();
+    const n = document.getElementById('modal-notice');
+    if (n) n.remove();
   }
 
   function handleModalClick(e) {

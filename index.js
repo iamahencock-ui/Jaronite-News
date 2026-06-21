@@ -35,6 +35,24 @@ async function verifyPassword(password, storedHash, storedSaltHex) {
   return diff === 0;
 }
 
+/**
+ * Hash an article's title+content with SHA-256 for integrity polling.
+ * Not a security/auth hash (no salt, no secret) — just a cheap fingerprint
+ * so a reader's open tab can tell "did this article's published text
+ * change" without re-downloading and diffing the full body every few
+ * seconds. Title and content are joined with a separator unlikely to
+ * appear naturally, so e.g. title:"AB" + content:"C" can't collide with
+ * title:"A" + content:"BC".
+ * @param {string} title
+ * @param {string} content
+ * @returns {Promise<string>} Hex-encoded SHA-256 hash.
+ */
+async function hashArticleText(title, content) {
+  const enc = new TextEncoder();
+  const bits = await crypto.subtle.digest("SHA-256", enc.encode(`${title}\u0000${content}`));
+  return bufToHex(bits);
+}
+
 function newSessionToken() {
   return bufToHex(crypto.getRandomValues(new Uint8Array(32)).buffer);
 }
@@ -161,6 +179,28 @@ export default {
         "SELECT * FROM articles WHERE category = ? AND status = 'published' ORDER BY created_at DESC"
       ).bind(category).all();
       return Response.json(results.results);
+    }
+
+    // API: Lightweight integrity check for an open article (public, no auth).
+    // Returns a SHA-256 hash of the article's current title+content so a
+    // reader's open tab can detect — without re-downloading the full body —
+    // whether the published article changed (edited/censored/deleted) while
+    // they were reading it. Polled client-side every few seconds from the
+    // article modal; cheap enough on D1 to call frequently.
+    if (url.pathname === "/api/article-hash" && request.method === "GET") {
+      const id = url.searchParams.get("id");
+      if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
+
+      const article = await env.DB.prepare(
+        "SELECT title, content FROM articles WHERE id = ? AND status = 'published'"
+      ).bind(id).first();
+
+      // Article was deleted, censored, or never existed — tell the client
+      // explicitly rather than letting a hash mismatch imply "edited".
+      if (!article) return Response.json({ exists: false });
+
+      const hash = await hashArticleText(article.title, article.content);
+      return Response.json({ exists: true, hash });
     }
 
     // ---------------- SHARED: article detail (powers the click-to-expand overlay) ----------------
@@ -587,30 +627,6 @@ export default {
     }
 
     // Serve static files
-    //
-    // Clean-URL support: getAssetFromKV matches the exact pathname in the KV
-    // manifest, so "/portal" would 404 even though "/portal.html" exists.
-    // If the requested path has no file extension (and isn't the root "/"),
-    // try appending ".html" first. This lets every page be reached at its
-    // clean URL (/portal, /politics, /economy, ...) while old links that
-    // still include ".html" keep working too, since we fall back to the
-    // original request if the rewritten one doesn't resolve.
-    const hasExtension = /\.[a-zA-Z0-9]+$/.test(url.pathname);
-    if (!hasExtension && url.pathname !== "/") {
-      try {
-        const htmlUrl = new URL(url.pathname.replace(/\/$/, "") + ".html", url.origin);
-        const htmlRequest = new Request(htmlUrl.toString(), request);
-        return await getAssetFromKV(
-          { request: htmlRequest, waitUntil(promise) { return ctx.waitUntil(promise); } },
-          { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
-        );
-      } catch (e) {
-        // No matching .html file — fall through to the normal lookup below
-        // (covers extensionless static assets, if any, and produces the
-        // standard 404 if nothing matches either way).
-      }
-    }
-
     try {
       return await getAssetFromKV(
         { request, waitUntil(promise) { return ctx.waitUntil(promise); } },

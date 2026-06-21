@@ -547,6 +547,20 @@ body {
   color: var(--ink);
 }
 
+/* Inline notice shown when an open article is refreshed (edited/censored
+   server-side) or about to be closed because it's no longer available.
+   Deliberately calm/informational — not an alarm or accusation. */
+.modal-notice {
+  font-family: var(--font-sans, system-ui);
+  font-size: 0.85rem;
+  background: #f7f0d8;
+  color: #6b5217;
+  border: 1px solid #e3d29a;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+}
+
 /* Drop cap on first paragraph */
 .article-modal-body p:first-child::first-letter {
   float: left;
