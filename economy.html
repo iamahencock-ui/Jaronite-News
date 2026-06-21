@@ -126,27 +126,28 @@
     `).join('');
   }
 
-  // ---------- Article integrity polling ----------
+  // ---------- Local tamper detection ----------
   //
-  // Every 5s while an article is open, two checks run:
+  // Every 5s while an article is open, we compare what's currently displayed
+  // in the modal against the original source strings from the API. If the
+  // title or body text has been altered via devtools, the strings won't match
+  // and the reader is kicked back to the homepage.
   //
-  // SERVER check: re-fetch /api/articles for this category and find the
-  // article by id. Compare title+content strings directly against what we
-  // originally rendered. If they differ, the article was legitimately updated
-  // server-side — re-render silently with a brief notice. If the article is
-  // gone (censored/deleted), show a notice and redirect home.
-  // No hash endpoint involved — direct string comparison is unambiguous.
+  // We store the raw API strings (renderedTitle / renderedContent) and
+  // compare them against what's in the DOM by reading modal-title.textContent
+  // directly and collecting each <p> element's text individually — avoiding
+  // the parent container's textContent which includes unpredictable browser
+  // whitespace nodes between tags.
   //
-  // LOCAL tamper check: read modal-title.textContent and each <p> element's
-  // textContent from modal-body, compare against the stored source strings.
-  // If they differ, someone edited the DOM → alert + redirect to homepage.
-  // We read individual <p> elements (not the container's textContent) to
-  // avoid browser whitespace nodes causing false positives.
+  // No server polling: string comparisons against a re-fetched copy of the
+  // article were producing false positives due to invisible whitespace
+  // differences (trailing spaces, \r\n vs \n) between the initially loaded
+  // data and the re-fetched copy. The local check is sufficient for the
+  // intended use case.
 
-  let integrityTimer   = null;
-  let currentArticleId = null;
-  let renderedTitle    = null;  // raw source strings from the API response
-  let renderedContent  = null;
+  let integrityTimer  = null;
+  let renderedTitle   = null;
+  let renderedContent = null;
 
   function renderArticle(a) {
     document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
@@ -155,103 +156,52 @@
     document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
   }
 
-  // Read what's currently displayed in the modal as plain strings.
-  // modal-title was set with .textContent so it has no child elements.
-  // modal-body contains <p> tags; we join their text to match how
-  // contentToHtml split the original content on blank lines.
-  function readDisplayed() {
-    const title = document.getElementById('modal-title').textContent;
-    const paras = [...document.getElementById('modal-body').querySelectorAll('p')];
-    const body  = paras.map(p => p.textContent).join('\n\n');
-    return { title, body };
-  }
-
-  // Normalise a raw content string the same way readDisplayed() would
-  // reconstruct it: split on 2+ newlines, trim each block, rejoin.
-  // Single-block content (no blank lines) is returned as-is.
+  // Reconstruct expected body text from the raw content string, matching
+  // exactly what contentToHtml renders and what <p>.textContent returns:
+  // split on 2+ blank lines, trim each block, join with \n\n.
   function normaliseContent(raw) {
     const blocks = raw.split(/\n{2,}/);
-    return blocks.length > 1 ? blocks.map(b => b.trim()).join('\n\n') : raw;
+    return blocks.length > 1 ? blocks.map(b => b.trim()).join('\n\n') : raw.trim();
   }
 
   function checkTamper() {
     if (renderedTitle === null) return;
-    const { title, body } = readDisplayed();
-    if (title !== renderedTitle || body !== normaliseContent(renderedContent)) {
-      stopIntegrityPolling();
+    const liveTitle = document.getElementById('modal-title').textContent;
+    const liveBody  = [...document.getElementById('modal-body').querySelectorAll('p')]
+                        .map(p => p.textContent).join('\n\n');
+    if (liveTitle !== renderedTitle || liveBody !== normaliseContent(renderedContent)) {
+      clearInterval(integrityTimer);
+      integrityTimer  = null;
+      renderedTitle   = null;
+      renderedContent = null;
       alert('This article\'s content doesn\'t match what was published — you\'re being returned to the homepage.');
       window.location.href = '/';
     }
   }
 
-  function showNotice(message) {
-    let n = document.getElementById('modal-notice');
-    if (!n) {
-      n = document.createElement('div');
-      n.id = 'modal-notice';
-      n.className = 'modal-notice';
-      document.getElementById('modal-body').prepend(n);
-    }
-    n.textContent = message;
-  }
-
-  async function checkServer(id) {
-    try {
-      const res   = await fetch(`/api/articles?category=${CATEGORY_SLUG}`);
-      const fresh = await res.json();
-      if (!Array.isArray(fresh)) return;
-
-      const updated = fresh.find(x => x.id === id);
-
-      if (!updated) {
-        // Article gone (censored/deleted) — not a tamper, just inform & redirect.
-        stopIntegrityPolling();
-        showNotice('This article is no longer available — returning to the homepage.');
-        setTimeout(() => { window.location.href = '/'; }, 2000);
-        return;
-      }
-
-      if (updated.title !== renderedTitle || updated.content !== renderedContent) {
-        // Article changed server-side — re-render with the new content.
-        renderArticle(updated);
-        renderedTitle   = updated.title;
-        renderedContent = updated.content;
-        showNotice('This article was just updated by an editor — showing the latest version.');
-        setTimeout(() => { const n = document.getElementById('modal-notice'); if (n) n.remove(); }, 4000);
-      }
-    } catch (e) {
-      // Network hiccup — skip this tick.
-    }
-  }
-
-  function startIntegrityPolling(id) {
-    stopIntegrityPolling();
-    currentArticleId = id;
-    integrityTimer = setInterval(() => {
-      checkTamper();
-      if (currentArticleId !== null) checkServer(currentArticleId);
-    }, 5000);
+  function startIntegrityPolling() {
+    if (integrityTimer) clearInterval(integrityTimer);
+    integrityTimer = setInterval(checkTamper, 5000);
   }
 
   function stopIntegrityPolling() {
     if (integrityTimer) clearInterval(integrityTimer);
-    integrityTimer   = null;
-    currentArticleId = null;
-    renderedTitle    = null;
-    renderedContent  = null;
+    integrityTimer  = null;
+    renderedTitle   = null;
+    renderedContent = null;
   }
 
-  async function openModal(index) {
+  function openModal(index) {
     const a = articles[index];
     if (!a) return;
 
     renderArticle(a);
-    renderedTitle   = a.title;    // store source strings before any await
+    renderedTitle   = a.title;
     renderedContent = a.content;
 
     document.getElementById('article-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
-    startIntegrityPolling(a.id);
+    startIntegrityPolling();
   }
 
   function closeModal() {
