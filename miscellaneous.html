@@ -128,64 +128,28 @@
 
   // ---------- Article integrity polling ----------
   //
-  // Two independent checks run every 5s while an article is open:
+  // Every 5s while an article modal is open, two checks run:
   //
-  // 1. SERVER hash (via /api/article-hash) — detects the published article
-  //    actually changing server-side (an editor edited, censored, or deleted
-  //    it) while someone has it open. This is normal content-management
-  //    activity, not tampering, so the response is to quietly re-fetch and
-  //    re-render the current version in place (or, if it's gone, show a
-  //    brief notice and send the reader home) — never an accusatory popup.
+  // 1. SERVER check — fetch /api/article-hash to see if the article changed
+  //    or was removed server-side (editor edit, censorship, deletion). If it
+  //    changed: silently re-fetch and re-render. If it's gone: notice + redirect.
+  //    This is normal content management, never treated as tampering.
   //
-  // 2. LOCAL DOM hash — re-hashes the *rendered* title+body text in the
-  //    modal and compares it to what was hashed right after rendering.
-  //    A mismatch means the visible text was altered directly in the
-  //    browser (e.g. via devtools) after the fact. This is the only case
-  //    that triggers the "kick to homepage" flow.
-  //
-  // Caveat worth being upfront about: the local check can only catch
-  // tampering that leaves this polling code itself running and unmodified.
-  // Someone willing to also edit/disable the page's JavaScript via devtools
-  // can defeat it — there's no way to truly trust a fully client-controlled
-  // environment. This catches casual/incidental edits, not a determined
-  // attacker.
+  // 2. LOCAL tamper check — compare what's currently displayed in the DOM
+  //    against the original source strings we rendered from. We store the
+  //    raw title and content strings from the API response, then on each tick
+  //    read modal-title.textContent and reconstruct the body text from the
+  //    rendered <p> elements and compare directly. No hashing of DOM content —
+  //    that was unreliable because textContent on a container includes
+  //    browser-inserted whitespace nodes that vary between reads.
+  //    If the strings don't match, someone edited the DOM → kick to homepage.
 
-  let integrityTimer = null;
+  let integrityTimer   = null;
   let currentArticleId = null;
   let currentServerHash = null;
-  let currentSourceHash = null; // hash of a.title+a.content, not DOM textContent
-
-  async function sha256Hex(str) {
-    const enc = new TextEncoder();
-    const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
-    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  // Hash the article's source data (title + content from the API response).
-  // We deliberately avoid reading back from the DOM — textContent on rendered
-  // <p> nodes includes browser-inserted whitespace/newlines that vary between
-  // reads and would cause false tamper alerts. Instead, we compare what the
-  // DOM *displays* against what the DOM *element values* currently hold.
-  async function hashSourceData(title, content) {
-    return sha256Hex(`${title}\u0000${content}`);
-  }
-
-  // Read the current displayed text directly from the DOM elements
-  // (not textContent of the container, which includes child whitespace).
-  // modal-title uses .textContent (set directly, no HTML children).
-  // modal-body: collect textContent of each <p> child only, joined with \n\n,
-  // so extra whitespace nodes between tags don't affect the result.
-  function readDisplayedContent() {
-    const title = document.getElementById('modal-title').textContent;
-    const bodyEl = document.getElementById('modal-body');
-    const paras = [...bodyEl.querySelectorAll('p')].map(p => p.textContent).join('\n\n');
-    return { title, body: paras };
-  }
-
-  async function hashDisplayed() {
-    const { title, body } = readDisplayedContent();
-    return sha256Hex(`${title}\u0000${body}`);
-  }
+  // The raw source strings we rendered — ground truth for tamper detection.
+  let renderedTitle   = null;
+  let renderedContent = null;
 
   function renderArticle(a) {
     document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
@@ -194,8 +158,37 @@
     document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
   }
 
-  // Small inline notice for benign events (server-side update, article gone).
-  // Distinct from the blocking tamper alert below — this isn't an accusation.
+  // Reconstruct the body text the same way contentToHtml would produce it,
+  // by reading each <p> element's textContent (already HTML-decoded by the
+  // browser) and joining with double-newline — matching the paragraph split
+  // logic in contentToHtml without touching the container's textContent.
+  function readDisplayedBody() {
+    const paras = document.getElementById('modal-body').querySelectorAll('p');
+    return [...paras].map(p => p.textContent).join('\n\n');
+  }
+
+  // Normalise the original content string the same way so the comparison is
+  // apples-to-apples: contentToHtml splits on /\n{2,}/ and trims each block,
+  // so we do the same reconstruction from the source string.
+  function normaliseContent(raw) {
+    const blocks = raw.split(/\n{2,}/);
+    if (blocks.length <= 1) return raw; // single-block articles stay as-is
+    return blocks.map(b => b.trim()).join('\n\n');
+  }
+
+  function checkTamper() {
+    if (renderedTitle === null) return;
+    const displayedTitle = document.getElementById('modal-title').textContent;
+    const displayedBody  = readDisplayedBody();
+    const expectedBody   = normaliseContent(renderedContent);
+    if (displayedTitle !== renderedTitle || displayedBody !== expectedBody) {
+      stopIntegrityPolling();
+      alert('This article\'s content doesn\'t match what was published — you\'re being returned to the homepage.');
+      window.location.href = '/';
+    }
+  }
+
+  // Small inline notice for benign server-side events (article updated/gone).
   function showNotice(message) {
     let notice = document.getElementById('modal-notice');
     if (!notice) {
@@ -209,7 +202,7 @@
 
   async function refreshArticleFromServer(id) {
     try {
-      const res = await fetch(`/api/article-hash?id=${id}`);
+      const res  = await fetch(`/api/article-hash?id=${id}`);
       const data = await res.json();
 
       if (!data.exists) {
@@ -220,9 +213,8 @@
       }
 
       if (data.hash !== currentServerHash) {
-        // Article changed server-side — pull the fresh copy and re-render.
         const fullRes = await fetch(`/api/articles?category=${CATEGORY_SLUG}`);
-        const fresh = await fullRes.json();
+        const fresh   = await fullRes.json();
         const updated = Array.isArray(fresh) ? fresh.find(x => x.id === id) : null;
         if (!updated) {
           stopIntegrityPolling();
@@ -232,52 +224,32 @@
         }
         renderArticle(updated);
         currentServerHash = data.hash;
-        currentSourceHash = await hashSourceData(updated.title, updated.content);
+        renderedTitle   = updated.title;
+        renderedContent = updated.content;
         showNotice('This article was just updated by an editor — showing the latest version.');
-        setTimeout(() => {
-          const n = document.getElementById('modal-notice');
-          if (n) n.remove();
-        }, 4000);
+        setTimeout(() => { const n = document.getElementById('modal-notice'); if (n) n.remove(); }, 4000);
       }
     } catch (e) {
-      // Network hiccup — don't punish the reader for a dropped request, just
-      // try again on the next tick.
-    }
-  }
-
-  function tamperKick() {
-    stopIntegrityPolling();
-    alert('This article\'s content doesn\'t match what was published — you\'re being returned to the homepage.');
-    window.location.href = '/';
-  }
-
-  async function checkLocalIntegrity() {
-    // Compare what's currently displayed in the DOM against the hash of
-    // the source data we originally rendered. If someone edits the title
-    // or body text via devtools, the displayed hash won't match.
-    const liveHash = await hashDisplayed();
-    if (liveHash !== currentSourceHash) {
-      tamperKick();
+      // Network hiccup — skip this tick, try again next interval.
     }
   }
 
   function startIntegrityPolling(id) {
     stopIntegrityPolling();
     currentArticleId = id;
-    integrityTimer = setInterval(async () => {
-      await checkLocalIntegrity();
-      // If the local check already kicked the user out, currentArticleId
-      // will have been cleared — skip the server check in that case.
-      if (currentArticleId !== null) await refreshArticleFromServer(currentArticleId);
+    integrityTimer = setInterval(() => {
+      checkTamper();
+      if (currentArticleId !== null) refreshArticleFromServer(currentArticleId);
     }, 5000);
   }
 
   function stopIntegrityPolling() {
     if (integrityTimer) clearInterval(integrityTimer);
-    integrityTimer = null;
-    currentArticleId = null;
+    integrityTimer    = null;
+    currentArticleId  = null;
     currentServerHash = null;
-    currentSourceHash = null;
+    renderedTitle     = null;
+    renderedContent   = null;
   }
 
   async function openModal(index) {
@@ -285,15 +257,16 @@
     if (!a) return;
 
     renderArticle(a);
+    // Store the source strings BEFORE any await so there's no window where
+    // the DOM could be read before these are set.
+    renderedTitle   = a.title;
+    renderedContent = a.content;
+
     document.getElementById('article-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    // Hash the source data we just rendered — this is the ground truth.
-    // We do NOT read back from the DOM here to avoid whitespace/newline
-    // inconsistencies in textContent that would cause false tamper alerts.
-    currentSourceHash = await hashSourceData(a.title, a.content);
     try {
-      const res = await fetch(`/api/article-hash?id=${a.id}`);
+      const res  = await fetch(`/api/article-hash?id=${a.id}`);
       const data = await res.json();
       currentServerHash = data.exists ? data.hash : null;
     } catch (e) {
