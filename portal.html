@@ -372,7 +372,7 @@
   <div class="login-box">
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
-    <button onclick="login()" title="Sign in to the employee portal with your username and password">Login</button>
+    <button onclick="login()">Login</button>
     <p id="error-msg"></p>
   </div>
 </div>
@@ -383,7 +383,7 @@
     <h1>Jaronite News — Employee Portal</h1>
     <div class="right">
       <span>Logged in as <strong id="user-display"></strong></span>
-      <button class="btn-secondary" style="width:auto;padding:8px 16px;" onclick="logout()" title="End your session and return to the login screen">Logout</button>
+      <button class="btn-secondary" style="width:auto;padding:8px 16px;" onclick="logout()">Logout</button>
     </div>
   </div>
 
@@ -395,16 +395,16 @@
       <p id="post-article-subtext" style="color:#666; font-size:0.85rem; margin-top:-8px;">All submissions go to an editor for review before publishing.</p>
       <div class="form-group">
         <input type="text" id="title" placeholder="Article Title">
-        <select id="category" title="Choose which section this article will appear under">
-          <option value="politics">Politics</option>
-          <option value="economy">Economy</option>
-          <option value="guides">Guides</option>
-          <option value="miscellaneous">Miscellaneous</option>
+        <select id="category">
+          <option value="mayoral-election">Mayoral Election</option>
+          <option value="city-projects">City Projects & Infrastructure</option>
+          <option value="crime-justice">Crime & Justice</option>
+          <option value="business-economy">Business & Economy</option>
         </select>
         <textarea id="content" placeholder="Write your article here..."></textarea>
         <div class="claim-bar" style="margin-top:0;">
-          <button onclick="postArticle()" style="width:auto; flex:1;" title="Send this article to the editorial queue — an editor must approve it before it goes live">Submit for Review</button>
-          <button id="instapublish-btn" onclick="instapublishArticle()" style="display:none; width:auto; flex:1; background:#2ecc71; color:#042e14;" title="Publish this article immediately, skipping editorial review entirely">Publish Directly</button>
+          <button onclick="postArticle()" style="width:auto; flex:1;">Submit for Review</button>
+          <button id="instapublish-btn" onclick="instapublishArticle()" style="display:none; width:auto; flex:1; background:#2ecc71; color:#042e14;">Publish Directly</button>
         </div>
         <p id="post-msg"></p>
       </div>
@@ -435,11 +435,11 @@
       <h2>Admin Controls</h2>
 
       <div class="tab-bar">
-        <button class="tab active" onclick="switchTab('all', this)" title="View every article in the system, regardless of status">All Articles</button>
-        <button class="tab" onclick="switchTab('censored', this)" title="View published articles that have been taken down by an admin">Censored</button>
-        <button class="tab" onclick="switchTab('in-review', this)" title="View every article currently claimed by an editor, system-wide">In Review</button>
-        <button class="tab" onclick="switchTab('users', this)" title="Manage employee accounts — create users, change roles, reset passwords">Users</button>
-        <button class="tab" onclick="switchTab('logs', this)" title="View the full audit trail of actions taken across the portal">Logs</button>
+        <button class="tab active" onclick="switchTab('all', this)">All Articles</button>
+        <button class="tab" onclick="switchTab('censored', this)">Censored</button>
+        <button class="tab" onclick="switchTab('in-review', this)">In Review</button>
+        <button class="tab" onclick="switchTab('users', this)">Users</button>
+        <button class="tab" onclick="switchTab('logs', this)">Logs</button>
       </div>
 
       <div id="admin-articles-list"></div>
@@ -461,7 +461,7 @@
             <option value="editor">Editor</option>
             <option value="admin">Admin</option>
           </select>
-          <button onclick="createUser()" style="width:auto;padding:10px 20px;" title="Create a new employee account with the username, password, and role above">Create User</button>
+          <button onclick="createUser()" style="width:auto;padding:10px 20px;">Create User</button>
           <p id="create-user-msg"></p>
         </div>
         <h3 style="color:#c9a84c; margin-bottom:16px;">Existing Users</h3>
@@ -472,23 +472,23 @@
       <!-- LOGS -->
       <div id="logs-section" style="display:none;">
         <div class="log-filters">
-          <button class="log-filter-btn active" onclick="filterLogs('ALL', this)" title="Show every logged action, unfiltered">All</button>
-          <button class="log-filter-btn" onclick="filterLogs('LOGIN', this)" title="Show successful sign-ins to the portal">Logins</button>
-          <button class="log-filter-btn" onclick="filterLogs('FAILED_LOGIN', this)" title="Show failed sign-in attempts">Failed Logins</button>
-          <button class="log-filter-btn" onclick="filterLogs('POST_ARTICLE', this)" title="Show articles submitted for editorial review">Posts</button>
-          <button class="log-filter-btn" onclick="filterLogs('CLAIM_ARTICLE', this)" title="Show when an editor claimed an article from the pending queue">Claims</button>
-          <button class="log-filter-btn" onclick="filterLogs('APPROVE_ARTICLE', this)" title="Show articles approved and published by an editor or admin">Approvals</button>
-          <button class="log-filter-btn" onclick="filterLogs('RETURN_ARTICLE', this)" title="Show articles sent back to writers with revision instructions">Returns</button>
-          <button class="log-filter-btn" onclick="filterLogs('DENY_ARTICLE', this)" title="Show articles permanently rejected by a reviewer">Denials</button>
-          <button class="log-filter-btn" onclick="filterLogs('RESUBMIT_ARTICLE', this)" title="Show when a writer resubmitted a revised article">Resubmits</button>
-          <button class="log-filter-btn" onclick="filterLogs('ADMIN_REASSIGN_CLAIM', this)" title="Show when an admin took over an article claimed by another editor">Takeovers</button>
-          <button class="log-filter-btn" onclick="filterLogs('INSTAPUBLISH_ARTICLE', this)" title="Show articles published directly by an editor or admin, bypassing review">Direct Publishes</button>
-          <button class="log-filter-btn" onclick="filterLogs('DELETE_ARTICLE', this)" title="Show articles permanently deleted by an admin">Deletions</button>
-          <button class="log-filter-btn" onclick="filterLogs('CENSOR_ARTICLE', this)" title="Show published articles taken down or restored by an admin">Censors</button>
-          <button class="log-filter-btn" onclick="filterLogs('EDIT_ARTICLE', this)" title="Show articles whose title or content was edited by an admin">Edits</button>
-          <button class="log-filter-btn" onclick="filterLogs('CREATE_USER', this)" title="Show new employee accounts created by an admin">User Created</button>
-          <button class="log-filter-btn" onclick="filterLogs('DELETE_USER', this)" title="Show employee accounts deleted by an admin">User Deleted</button>
-          <button class="log-filter-btn" onclick="filterLogs('CHANGE_ROLE', this)" title="Show when an admin changed an employee's role">Role Changes</button>
+          <button class="log-filter-btn active" onclick="filterLogs('ALL', this)">All</button>
+          <button class="log-filter-btn" onclick="filterLogs('LOGIN', this)">Logins</button>
+          <button class="log-filter-btn" onclick="filterLogs('FAILED_LOGIN', this)">Failed Logins</button>
+          <button class="log-filter-btn" onclick="filterLogs('POST_ARTICLE', this)">Posts</button>
+          <button class="log-filter-btn" onclick="filterLogs('CLAIM_ARTICLE', this)">Claims</button>
+          <button class="log-filter-btn" onclick="filterLogs('APPROVE_ARTICLE', this)">Approvals</button>
+          <button class="log-filter-btn" onclick="filterLogs('RETURN_ARTICLE', this)">Returns</button>
+          <button class="log-filter-btn" onclick="filterLogs('DENY_ARTICLE', this)">Denials</button>
+          <button class="log-filter-btn" onclick="filterLogs('RESUBMIT_ARTICLE', this)">Resubmits</button>
+          <button class="log-filter-btn" onclick="filterLogs('ADMIN_REASSIGN_CLAIM', this)">Takeovers</button>
+          <button class="log-filter-btn" onclick="filterLogs('INSTAPUBLISH_ARTICLE', this)">Direct Publishes</button>
+          <button class="log-filter-btn" onclick="filterLogs('DELETE_ARTICLE', this)">Deletions</button>
+          <button class="log-filter-btn" onclick="filterLogs('CENSOR_ARTICLE', this)">Censors</button>
+          <button class="log-filter-btn" onclick="filterLogs('EDIT_ARTICLE', this)">Edits</button>
+          <button class="log-filter-btn" onclick="filterLogs('CREATE_USER', this)">User Created</button>
+          <button class="log-filter-btn" onclick="filterLogs('DELETE_USER', this)">User Deleted</button>
+          <button class="log-filter-btn" onclick="filterLogs('CHANGE_ROLE', this)">Role Changes</button>
         </div>
         <div id="logs-list">Loading...</div>
       </div>
@@ -501,7 +501,7 @@
 <!-- USER DETAIL OVERLAY -->
 <div class="user-detail-overlay" id="user-detail-overlay">
   <div class="user-detail-panel">
-    <button class="close-btn" onclick="closeUserDetail()" title="Close this user's profile">Close ✕</button>
+    <button class="close-btn" onclick="closeUserDetail()">Close ✕</button>
     <h2 id="user-detail-name">Loading...</h2>
 
     <div class="user-detail-grid" id="user-detail-grid"></div>
@@ -516,7 +516,7 @@
 <!-- ARTICLE DETAIL OVERLAY (shared by every article list — role-aware actions) -->
 <div class="article-detail-overlay" id="article-detail-overlay">
   <div class="article-detail-panel">
-    <button class="close-btn" onclick="closeArticleDetail()" title="Close this article without saving any changes">Close ✕</button>
+    <button class="close-btn" onclick="closeArticleDetail()">Close ✕</button>
     <h2 id="article-detail-title">Loading...</h2>
     <div class="article-detail-meta" id="article-detail-meta"></div>
     <div id="article-detail-notes"></div>
@@ -524,7 +524,7 @@
     <div id="article-detail-edit-form" style="display:none; margin-bottom:20px;">
       <input type="text" id="article-detail-edit-title" style="margin-bottom:10px;">
       <textarea id="article-detail-edit-content"></textarea>
-      <button onclick="saveArticleDetailEdit()" style="width:auto; padding:10px 20px; margin-top:10px;" title="Save your changes to the title and content">Save Changes</button>
+      <button onclick="saveArticleDetailEdit()" style="width:auto; padding:10px 20px; margin-top:10px;">Save Changes</button>
     </div>
     <div class="article-detail-actions" id="article-detail-actions"></div>
   </div>
@@ -537,8 +537,8 @@
     <label id="review-modal-label" style="color:#aaa; font-size:0.9rem;"></label>
     <textarea id="review-modal-notes" placeholder="Be specific — the writer will see exactly this text."></textarea>
     <div class="review-modal-actions">
-      <button class="btn-secondary-inline" style="width:auto;" onclick="closeReviewModal()" title="Discard these notes and close without submitting">Cancel</button>
-      <button onclick="submitReviewModal()" style="width:auto; background:#c9a84c;" title="Submit these notes and finalize the return or denial">Submit</button>
+      <button class="btn-secondary-inline" style="width:auto;" onclick="closeReviewModal()">Cancel</button>
+      <button onclick="submitReviewModal()" style="width:auto; background:#c9a84c;">Submit</button>
     </div>
   </div>
 </div>
@@ -710,7 +710,7 @@
     }
 
     container.innerHTML = articles.map(a => `
-      <div class="article-item article-card" onclick="openArticleDetail(${a.id})" title="Click to view this article's full content and review status">
+      <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
         <div class="preview">${escapeHtml(a.content).substring(0, 150)}...</div>
@@ -736,11 +736,11 @@
     }
 
     container.innerHTML = articles.map(a => `
-      <div class="article-item article-card" onclick="openArticleDetail(${a.id})" title="Click to view this article's full content before claiming it">
+      <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">pending review</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
         <div class="claim-bar">
-          <button class="btn-claim" onclick="event.stopPropagation(); claimArticle(${a.id})" title="Assign this article to yourself for review — removes it from other editors' queue">Claim for Review</button>
+          <button class="btn-claim" onclick="event.stopPropagation(); claimArticle(${a.id})">Claim for Review</button>
         </div>
       </div>
     `).join('');
@@ -780,7 +780,7 @@
     }
 
     container.innerHTML = articles.map(a => `
-      <div class="article-item article-card" onclick="openArticleDetail(${a.id})" title="Click to review the full article and take action">
+      <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.updated_at).toLocaleString()}</div>
         <div class="preview">${escapeHtml(a.content).substring(0, 250)}...</div>
@@ -885,39 +885,39 @@
 
     // ---- Writer actions (apply to the writer viewing their own piece) ----
     if (isOwnArticle && a.status === 'returned') {
-      buttons.push(`<button class="btn-edit" onclick="startResubmitFromDetail()" title="Edit this article and send it back to the editor who returned it">Revise & Resubmit</button>`);
+      buttons.push(`<button class="btn-edit" onclick="startResubmitFromDetail()">Revise & Resubmit</button>`);
     }
 
     // ---- Editor actions ----
     if (role === 'editor') {
       if (a.status === 'pending_review') {
-        buttons.push(`<button class="btn-claim" onclick="claimFromDetail(${a.id})" title="Assign this article to yourself for review">Claim for Review</button>`);
+        buttons.push(`<button class="btn-claim" onclick="claimFromDetail(${a.id})">Claim for Review</button>`);
       } else if (a.status === 'claimed' && isOwnClaim) {
-        buttons.push(`<button class="btn-approve" onclick="approveFromDetail(${a.id})" title="Approve this article and publish it to the public site">Approve & Publish</button>`);
-        buttons.push(`<button class="btn-return" onclick="openReviewModal(${a.id}, 'return')" title="Send this article back to the writer with revision notes">Return with Instructions</button>`);
-        buttons.push(`<button class="btn-deny" onclick="openReviewModal(${a.id}, 'deny')" title="Permanently reject this article">Deny</button>`);
+        buttons.push(`<button class="btn-approve" onclick="approveFromDetail(${a.id})">Approve & Publish</button>`);
+        buttons.push(`<button class="btn-return" onclick="openReviewModal(${a.id}, 'return')">Return with Instructions</button>`);
+        buttons.push(`<button class="btn-deny" onclick="openReviewModal(${a.id}, 'deny')">Deny</button>`);
       }
     }
 
     // ---- Admin actions ----
     if (role === 'admin') {
       if (a.status === 'pending_review') {
-        buttons.push(`<button class="btn-claim" onclick="stealClaimFromDetail(${a.id})" title="Claim this article directly from the pending pool">Claim for Review</button>`);
+        buttons.push(`<button class="btn-claim" onclick="stealClaimFromDetail(${a.id})">Claim for Review</button>`);
       }
       if (a.status === 'claimed' || a.status === 'returned') {
-        buttons.push(`<button class="btn-approve" onclick="approveFromDetail(${a.id})" title="Approve this article and publish it to the public site">Approve & Publish</button>`);
-        buttons.push(`<button class="btn-return" onclick="openReviewModal(${a.id}, 'return')" title="Send this article back to the writer with revision notes">Return with Instructions</button>`);
-        buttons.push(`<button class="btn-deny" onclick="openReviewModal(${a.id}, 'deny')" title="Permanently reject this article">Deny</button>`);
+        buttons.push(`<button class="btn-approve" onclick="approveFromDetail(${a.id})">Approve & Publish</button>`);
+        buttons.push(`<button class="btn-return" onclick="openReviewModal(${a.id}, 'return')">Return with Instructions</button>`);
+        buttons.push(`<button class="btn-deny" onclick="openReviewModal(${a.id}, 'deny')">Deny</button>`);
         if (!isOwnClaim) {
-          buttons.push(`<button class="btn-claim" onclick="stealClaimFromDetail(${a.id})" title="Reassign this article to yourself, taking it from whoever currently has it claimed">Take Over</button>`);
+          buttons.push(`<button class="btn-claim" onclick="stealClaimFromDetail(${a.id})">Take Over</button>`);
         }
       }
       if (a.status === 'published' || a.status === 'censored') {
-        buttons.push(`<button class="btn-edit" onclick="startEditFromDetail()" title="Edit this article's title and content">Edit</button>`);
-        buttons.push(`<button class="btn-censor" onclick="censorFromDetail(${a.id})" title="${a.status === 'censored' ? 'Restore this article to the public site' : 'Remove this article from the public site without deleting it'}">${a.status === 'censored' ? 'Uncensor' : 'Censor'}</button>`);
+        buttons.push(`<button class="btn-edit" onclick="startEditFromDetail()">Edit</button>`);
+        buttons.push(`<button class="btn-censor" onclick="censorFromDetail(${a.id})">${a.status === 'censored' ? 'Uncensor' : 'Censor'}</button>`);
       }
       // Admins can delete an article in any state.
-      buttons.push(`<button class="btn-danger" onclick="deleteFromDetail(${a.id})" title="Permanently delete this article — cannot be undone">Delete</button>`);
+      buttons.push(`<button class="btn-danger" onclick="deleteFromDetail(${a.id})">Delete</button>`);
     }
 
     if (!buttons.length) {
@@ -1104,7 +1104,7 @@
     }
 
     container.innerHTML = articles.map(a => `
-      <div class="article-item article-card" onclick="openArticleDetail(${a.id})" title="Click to view full details and take admin action on this article">
+      <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.updated_at).toLocaleString()}</div>
         <div class="review-tag">Under review by <strong>${escapeHtml(a.claimed_by)}</strong></div>
@@ -1132,7 +1132,7 @@
     }
 
     container.innerHTML = articles.map(a => `
-      <div class="article-item article-card" onclick="openArticleDetail(${a.id})" title="Click to view full details and admin actions for this article">
+      <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
         <div class="preview">${escapeHtml(a.content).substring(0, 150)}...</div>
@@ -1255,7 +1255,7 @@
     container.innerHTML = users.map(u => `
       <div class="article-item">
         <div class="user-row">
-          <div class="user-row-main" onclick="openUserDetail(${u.id})" title="Click to view this user's full profile and action history">
+          <div class="user-row-main" onclick="openUserDetail(${u.id})">
             <h3>${escapeHtml(u.username)} <span style="color:#888;font-size:0.85rem;">[${u.role}]</span>
               <span class="status-badge ${u.status || 'active'}">${u.status || 'active'}</span>
             </h3>
@@ -1266,13 +1266,13 @@
           </div>
         </div>
         <div class="article-actions" style="margin-top:10px;">
-          <select id="role-select-${u.id}" style="width:auto;padding:6px 10px;" title="Choose a new role for this user">
+          <select id="role-select-${u.id}" style="width:auto;padding:6px 10px;">
             <option value="writer" ${u.role === 'writer' ? 'selected' : ''}>Writer</option>
             <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Editor</option>
             <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
-          <button class="btn-edit" onclick="changeRole(${u.id})" title="Apply the selected role to this user">Change Role</button>
-          <button class="btn-danger" onclick="deleteUser(${u.id})" title="Permanently delete this user account — cannot be undone">Delete</button>
+          <button class="btn-edit" onclick="changeRole(${u.id})">Change Role</button>
+          <button class="btn-danger" onclick="deleteUser(${u.id})">Delete</button>
         </div>
       </div>
     `).join('');
@@ -1363,10 +1363,10 @@
 
     const isSuspended = detail.status === 'suspended';
     document.getElementById('user-detail-actions').innerHTML = `
-      <button class="btn-secondary-inline" onclick="toggleSuspend(${detail.id}, '${isSuspended ? 'active' : 'suspended'}')" title="${isSuspended ? 'Restore this account access to the portal' : 'Block this user from logging in and end their active session'}">
+      <button class="btn-secondary-inline" onclick="toggleSuspend(${detail.id}, '${isSuspended ? 'active' : 'suspended'}')">
         ${isSuspended ? 'Reactivate Account' : 'Suspend Account'}
       </button>
-      <button class="btn-secondary-inline" onclick="resetUserPassword(${detail.id})" title="Set a new password for this user — their current sessions will be logged out">Reset Password</button>
+      <button class="btn-secondary-inline" onclick="resetUserPassword(${detail.id})">Reset Password</button>
     `;
 
     renderLogs(history, 'user-detail-history');
