@@ -165,6 +165,50 @@ async function requireEditorOrAdmin(env, request) {
   return user;
 }
 
+// ---------- Discord OAuth2 (public reader accounts) ----------
+//
+// Entirely separate identity system from staff `users`/`sessions` above.
+// Readers authenticate via Discord's OAuth2 authorization-code flow, never
+// supply or store a local password, and the resulting session only ever
+// grants access to reader-level actions (commenting, favoriting). It can
+// never satisfy requireAdmin/requireEditorOrAdmin/getSessionUser, since
+// those query the unrelated `sessions`/`users` tables.
+
+/**
+ * Resolve the currently authenticated Discord reader from a request's
+ * Bearer token, against the discord_sessions/discord_users tables. Mirrors
+ * getSessionUser's shape and sliding-expiry behavior so the two auth
+ * systems are easy to reason about side-by-side, but never cross-reads
+ * the staff tables.
+ * @param {object} env - Worker environment bindings (env.DB).
+ * @param {Request} request - The incoming request, read for its Authorization header.
+ * @returns {Promise<{id: number, discord_id: string, username: string, avatar_hash: string|null}|null>}
+ */
+async function getDiscordSessionUser(env, request) {
+  const authHeader = request.headers.get("Authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return null;
+
+  const session = await env.DB.prepare(
+    "SELECT discord_user_id, expires_at FROM discord_sessions WHERE token = ?"
+  ).bind(token).first();
+  if (!session) return null;
+  if (new Date(session.expires_at) < new Date()) return null;
+
+  const user = await env.DB.prepare(
+    "SELECT id, discord_id, username, avatar_hash, status FROM discord_users WHERE id = ?"
+  ).bind(session.discord_user_id).first();
+  if (!user || user.status !== "active") return null;
+
+  // Reader sessions last longer than staff sessions (30 days vs 20 min) —
+  // readers expect to stay logged in across visits like any normal site,
+  // staff sessions are deliberately short for an internal admin tool.
+  const newExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+  await env.DB.prepare("UPDATE discord_sessions SET expires_at = ? WHERE token = ?").bind(newExpiresAt, token).run();
+
+  return user;
+}
+
 /**
  * Write one entry to the audit log (logs table). Called after nearly every
  * state-changing action across the app — logins, article lifecycle events,
@@ -178,6 +222,40 @@ async function requireEditorOrAdmin(env, request) {
  */
 async function log(env, username, action, details = "") {
   await env.DB.prepare("INSERT INTO logs (username, action, details) VALUES (?, ?, ?)").bind(username, action, details).run();
+}
+
+/**
+ * Parse a User-Agent string into a coarse device type, browser, and OS
+ * label for analytics grouping. Deliberately simple regex matching rather
+ * than a full UA-parsing library — good enough to bucket views into
+ * meaningful categories on a dashboard without adding a dependency. Order
+ * of checks matters (e.g. Edge's UA also contains "Chrome", so Edge must
+ * be checked first).
+ * @param {string} ua - The raw User-Agent header string.
+ * @returns {{deviceType: string, browser: string, os: string}}
+ */
+function parseUserAgent(ua) {
+  const s = ua || "";
+
+  let deviceType = "desktop";
+  if (/tablet|ipad/i.test(s)) deviceType = "tablet";
+  else if (/mobile|android|iphone/i.test(s)) deviceType = "mobile";
+
+  let browser = "Other";
+  if (/edg\//i.test(s)) browser = "Edge";
+  else if (/opr\/|opera/i.test(s)) browser = "Opera";
+  else if (/chrome\//i.test(s)) browser = "Chrome";
+  else if (/firefox\//i.test(s)) browser = "Firefox";
+  else if (/safari\//i.test(s) && !/chrome/i.test(s)) browser = "Safari";
+
+  let os = "Other";
+  if (/windows/i.test(s)) os = "Windows";
+  else if (/mac os|macintosh/i.test(s)) os = "macOS";
+  else if (/android/i.test(s)) os = "Android";
+  else if (/iphone|ipad|ios/i.test(s)) os = "iOS";
+  else if (/linux/i.test(s)) os = "Linux";
+
+  return { deviceType, browser, os };
 }
 
 export default {
@@ -195,12 +273,28 @@ export default {
    *   - POST /api/logout                   Invalidate the caller's session token.
    *   - GET  /api/articles?category=...    List published articles in a category (public site).
    *   - GET  /api/article-hash?id=...      Lightweight integrity hash for one published article (powers client-side tamper/update detection).
+   *   - GET  /api/auth/discord/login       Redirect to Discord's OAuth2 consent screen.
+   *   - GET  /api/auth/discord/callback    Discord redirects here with a code; exchanges it, upserts the reader, issues a session.
+   *   - GET  /api/auth/discord/me          Resolve the caller's Discord session, if any.
+   *   - GET  /api/comments?article_id=...  List visible comments on an article.
+   *   - GET  /api/favorites/check          (used with reader token) which of a set of article IDs the caller has favorited.
+   *   - POST /api/analytics/view           Record one article view (called on article open).
+   *   - POST /api/analytics/ping           Heartbeat: update read time + scroll depth for an open view.
    *
-   *  ANY AUTHENTICATED USER
+   *  AUTH'D DISCORD READER (Bearer = discord session token)
+   *   - POST /api/auth/discord/logout      Invalidate the caller's Discord session token.
+   *   - POST /api/comments                 Post a comment on a published article.
+   *   - POST /api/comments/delete          Soft-delete the caller's own comment.
+   *   - GET  /api/favorites                List the caller's favorited articles (full objects).
+   *   - POST /api/favorites/toggle         Favorite/unfavorite an article.
+   *
+   *  ANY AUTHENTICATED STAFF USER
    *   - POST /api/articles                 Submit a new article for review (always starts pending_review).
    *   - POST /api/article-detail           Fetch one article's full detail (writers: own only; editors/admins: any).
    *   - POST /api/my-articles              List the caller's own submitted articles + status.
    *   - POST /api/my-articles/resubmit     Resubmit a 'returned' article with revisions.
+   *   - POST /api/analytics/article        Full analytics dashboard for one article (writers: own only; editors/admins: any).
+   *   - POST /api/analytics/summary        Views summary across the caller's articles (editors/admins can pass site_wide:true or target_username).
    *
    *  EDITOR or ADMIN
    *   - POST /api/articles/instapublish    Publish an article immediately, skipping review.
@@ -271,9 +365,412 @@ export default {
       return Response.json({ success: true });
     }
 
+    // ============================================================
+    // DISCORD OAUTH2 (public reader login)
+    // ============================================================
+
+    // PUBLIC: Kick off Discord OAuth2 — redirect the browser to Discord's
+    // consent screen. `state` is a random value stored nowhere server-side;
+    // instead we echo it back via redirect and let the client verify it
+    // against what it generated before navigating here (CSRF protection
+    // without needing server-side state storage for an anonymous visitor).
+    if (url.pathname === "/api/auth/discord/login" && request.method === "GET") {
+      const state = url.searchParams.get("state") || "";
+      const redirectUri = `${url.origin}/api/auth/discord/callback`;
+      const discordUrl = new URL("https://discord.com/oauth2/authorize");
+      discordUrl.searchParams.set("client_id", env.DISCORD_CLIENT_ID);
+      discordUrl.searchParams.set("redirect_uri", redirectUri);
+      discordUrl.searchParams.set("response_type", "code");
+      discordUrl.searchParams.set("scope", "identify");
+      discordUrl.searchParams.set("state", state);
+      discordUrl.searchParams.set("prompt", "consent");
+      return Response.redirect(discordUrl.toString(), 302);
+    }
+
+    // PUBLIC: Discord redirects back here with ?code=...&state=.... Exchange
+    // the code for an access token, fetch the user's Discord identity,
+    // upsert a discord_users row, issue our own session token, and redirect
+    // back to the site with the token + state in the URL fragment (never
+    // the query string — fragments aren't sent to the server or logged).
+    if (url.pathname === "/api/auth/discord/callback" && request.method === "GET") {
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state") || "";
+      if (!code) return Response.redirect(`${url.origin}/?discord_error=missing_code`, 302);
+
+      const redirectUri = `${url.origin}/api/auth/discord/callback`;
+
+      let tokenData;
+      try {
+        const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: env.DISCORD_CLIENT_ID,
+            client_secret: env.DISCORD_CLIENT_SECRET,
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: redirectUri,
+          }).toString(),
+        });
+        tokenData = await tokenRes.json();
+        if (!tokenData.access_token) throw new Error("No access token in response");
+      } catch (e) {
+        return Response.redirect(`${url.origin}/?discord_error=token_exchange_failed`, 302);
+      }
+
+      let discordProfile;
+      try {
+        const profileRes = await fetch("https://discord.com/api/users/@me", {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        discordProfile = await profileRes.json();
+        if (!discordProfile.id) throw new Error("No id in profile response");
+      } catch (e) {
+        return Response.redirect(`${url.origin}/?discord_error=profile_fetch_failed`, 302);
+      }
+
+      const displayName = discordProfile.global_name || discordProfile.username;
+
+      const existing = await env.DB.prepare(
+        "SELECT id FROM discord_users WHERE discord_id = ?"
+      ).bind(discordProfile.id).first();
+
+      let discordUserId;
+      if (existing) {
+        discordUserId = existing.id;
+        await env.DB.prepare(
+          "UPDATE discord_users SET username = ?, avatar_hash = ?, last_login_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(displayName, discordProfile.avatar || null, discordUserId).run();
+      } else {
+        const inserted = await env.DB.prepare(
+          "INSERT INTO discord_users (discord_id, username, avatar_hash, last_login_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)"
+        ).bind(discordProfile.id, displayName, discordProfile.avatar || null).run();
+        discordUserId = inserted.meta.last_row_id;
+      }
+
+      const banCheck = await env.DB.prepare("SELECT status FROM discord_users WHERE id = ?").bind(discordUserId).first();
+      if (banCheck.status !== "active") {
+        return Response.redirect(`${url.origin}/?discord_error=banned`, 302);
+      }
+
+      const sessionToken = newSessionToken();
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(); // 30-day reader session
+      await env.DB.prepare(
+        "INSERT INTO discord_sessions (token, discord_user_id, expires_at) VALUES (?, ?, ?)"
+      ).bind(sessionToken, discordUserId, expiresAt).run();
+
+      const redirectBack = new URL(url.origin + "/");
+      redirectBack.hash = `discord_token=${sessionToken}&state=${encodeURIComponent(state)}`;
+      return Response.redirect(redirectBack.toString(), 302);
+    }
+
+    // PUBLIC (auth'd reader): who am I — used by the front end on page load
+    // to restore a logged-in reader's name/avatar from a stored token.
+    if (url.pathname === "/api/auth/discord/me" && request.method === "GET") {
+      const reader = await getDiscordSessionUser(env, request);
+      if (!reader) return Response.json({ loggedIn: false });
+      return Response.json({
+        loggedIn: true,
+        username: reader.username,
+        avatarUrl: reader.avatar_hash
+          ? `https://cdn.discordapp.com/avatars/${reader.discord_id}/${reader.avatar_hash}.png`
+          : null,
+      });
+    }
+
+    // PUBLIC (auth'd reader): log out
+    if (url.pathname === "/api/auth/discord/logout" && request.method === "POST") {
+      const authHeader = request.headers.get("Authorization") || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      if (token) await env.DB.prepare("DELETE FROM discord_sessions WHERE token = ?").bind(token).run();
+      return Response.json({ success: true });
+    }
+
+    // ============================================================
+    // COMMENTS
+    // ============================================================
+
+    // PUBLIC: list visible comments for an article, oldest first.
+    if (url.pathname === "/api/comments" && request.method === "GET") {
+      const articleId = url.searchParams.get("article_id");
+      if (!articleId) return Response.json({ error: "Missing article_id" }, { status: 400 });
+
+      const results = await env.DB.prepare(
+        `SELECT comments.id, comments.content, comments.created_at, discord_users.username, discord_users.avatar_hash, discord_users.discord_id
+         FROM comments JOIN discord_users ON comments.discord_user_id = discord_users.id
+         WHERE comments.article_id = ? AND comments.status = 'visible'
+         ORDER BY comments.created_at ASC`
+      ).bind(articleId).all();
+
+      const comments = results.results.map((c) => ({
+        id: c.id,
+        content: c.content,
+        created_at: c.created_at,
+        username: c.username,
+        avatarUrl: c.avatar_hash ? `https://cdn.discordapp.com/avatars/${c.discord_id}/${c.avatar_hash}.png` : null,
+      }));
+      return Response.json(comments);
+    }
+
+    // AUTH'D READER: post a comment.
+    if (url.pathname === "/api/comments" && request.method === "POST") {
+      const reader = await getDiscordSessionUser(env, request);
+      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const { article_id, content } = await request.json();
+      const trimmed = (content || "").trim();
+      if (!trimmed) return Response.json({ error: "Comment cannot be empty" }, { status: 400 });
+      if (trimmed.length > 2000) return Response.json({ error: "Comment is too long (2000 character max)" }, { status: 400 });
+
+      const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ? AND status = 'published'").bind(article_id).first();
+      if (!article) return Response.json({ error: "Article not found" }, { status: 404 });
+
+      await env.DB.prepare(
+        "INSERT INTO comments (article_id, discord_user_id, content) VALUES (?, ?, ?)"
+      ).bind(article_id, reader.id, trimmed).run();
+      return Response.json({ success: true });
+    }
+
+    // AUTH'D READER: delete own comment (soft delete).
+    if (url.pathname === "/api/comments/delete" && request.method === "POST") {
+      const reader = await getDiscordSessionUser(env, request);
+      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const { comment_id } = await request.json();
+      const comment = await env.DB.prepare("SELECT discord_user_id FROM comments WHERE id = ?").bind(comment_id).first();
+      if (!comment || comment.discord_user_id !== reader.id) {
+        return Response.json({ error: "Not found or not yours" }, { status: 404 });
+      }
+
+      await env.DB.prepare("UPDATE comments SET status = 'removed' WHERE id = ?").bind(comment_id).run();
+      return Response.json({ success: true });
+    }
+
+    // ============================================================
+    // FAVORITES
+    // ============================================================
+
+    // AUTH'D READER: list own favorited articles (full article objects, for
+    // rendering the "My Favorites" menu without a second round of lookups).
+    if (url.pathname === "/api/favorites" && request.method === "GET") {
+      const reader = await getDiscordSessionUser(env, request);
+      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const results = await env.DB.prepare(
+        `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at, favorites.created_at as favorited_at
+         FROM favorites JOIN articles ON favorites.article_id = articles.id
+         WHERE favorites.discord_user_id = ? AND articles.status = 'published'
+         ORDER BY favorites.created_at DESC`
+      ).bind(reader.id).all();
+      return Response.json(results.results);
+    }
+
+    // AUTH'D READER: toggle favorite status for an article (favorite if not
+    // already, unfavorite if already favorited). Returns the resulting state
+    // so the client can flip its heart icon without a separate GET.
+    if (url.pathname === "/api/favorites/toggle" && request.method === "POST") {
+      const reader = await getDiscordSessionUser(env, request);
+      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const { article_id } = await request.json();
+      const existing = await env.DB.prepare(
+        "SELECT id FROM favorites WHERE discord_user_id = ? AND article_id = ?"
+      ).bind(reader.id, article_id).first();
+
+      if (existing) {
+        await env.DB.prepare("DELETE FROM favorites WHERE id = ?").bind(existing.id).run();
+        return Response.json({ favorited: false });
+      } else {
+        await env.DB.prepare(
+          "INSERT INTO favorites (discord_user_id, article_id) VALUES (?, ?)"
+        ).bind(reader.id, article_id).run();
+        return Response.json({ favorited: true });
+      }
+    }
+
+    // PUBLIC (auth'd reader): which of a given set of article IDs has the
+    // caller favorited — used to paint hearts correctly on page load across
+    // a whole category grid in one call instead of one round-trip per card.
+    if (url.pathname === "/api/favorites/check" && request.method === "POST") {
+      const reader = await getDiscordSessionUser(env, request);
+      if (!reader) return Response.json({ favorited: [] });
+
+      const { article_ids } = await request.json();
+      if (!Array.isArray(article_ids) || article_ids.length === 0) return Response.json({ favorited: [] });
+
+      const placeholders = article_ids.map(() => "?").join(",");
+      const results = await env.DB.prepare(
+        `SELECT article_id FROM favorites WHERE discord_user_id = ? AND article_id IN (${placeholders})`
+      ).bind(reader.id, ...article_ids).all();
+      return Response.json({ favorited: results.results.map((r) => r.article_id) });
+    }
+
+    // ============================================================
+    // ANALYTICS (view tracking, writer dashboard)
+    // ============================================================
+
+    // PUBLIC: record one article view. Called once when an article modal
+    // opens. device/browser/os are parsed server-side from the UA string
+    // (kept out of the client so the parsing logic lives in one place and
+    // can't be tampered with from devtools the way a client-computed label
+    // could be).
+    if (url.pathname === "/api/analytics/view" && request.method === "POST") {
+      const { article_id, visitor_id, referrer } = await request.json();
+      if (!article_id || !visitor_id) return Response.json({ error: "Missing fields" }, { status: 400 });
+
+      const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ?").bind(article_id).first();
+      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+
+      const ua = request.headers.get("User-Agent") || "";
+      const { deviceType, browser, os } = parseUserAgent(ua);
+
+      let referrerDomain = null;
+      if (referrer) {
+        try { referrerDomain = new URL(referrer).hostname; } catch (e) { referrerDomain = null; }
+      }
+
+      const reader = await getDiscordSessionUser(env, request);
+
+      const inserted = await env.DB.prepare(
+        `INSERT INTO page_views (article_id, visitor_id, referrer, referrer_domain, user_agent, device_type, browser, os, is_discord_user)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(article_id, visitor_id, referrer || "", referrerDomain, ua, deviceType, browser, os, reader ? 1 : 0).run();
+
+      return Response.json({ success: true, view_id: inserted.meta.last_row_id });
+    }
+
+    // PUBLIC: heartbeat ping while an article stays open, updating read time
+    // and max scroll depth for the view row created by /api/analytics/view.
+    // Client sends this every ~10s while the modal is open and the tab is
+    // visible (paused on tab-blur) so read_seconds reflects actual attention,
+    // not just "tab was open in the background".
+    if (url.pathname === "/api/analytics/ping" && request.method === "POST") {
+      const { view_id, read_seconds, max_scroll_pct } = await request.json();
+      if (!view_id) return Response.json({ error: "Missing view_id" }, { status: 400 });
+
+      await env.DB.prepare(
+        "UPDATE page_views SET read_seconds = ?, max_scroll_pct = ? WHERE id = ?"
+      ).bind(read_seconds || 0, max_scroll_pct || 0, view_id).run();
+      return Response.json({ success: true });
+    }
+
+    // AUTH'D (any staff): full analytics dashboard for one article. Writers
+    // may only request their own articles; editors/admins may request any.
+    // Returns a comprehensive bundle in one call (totals, a daily
+    // time series, referrer/device/browser/os breakdowns, and read-depth
+    // stats) so the dashboard renders from a single round trip.
+    if (url.pathname === "/api/analytics/article" && request.method === "POST") {
+      const user = await getSessionUser(env, request);
+      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const { article_id } = await request.json();
+      const article = await env.DB.prepare("SELECT id, title, author FROM articles WHERE id = ?").bind(article_id).first();
+      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (article.author !== user.username && user.role !== "editor" && user.role !== "admin") {
+        return Response.json({ error: "Unauthorized" }, { status: 403 });
+      }
+
+      const totals = await env.DB.prepare(
+        `SELECT COUNT(*) as total_views, COUNT(DISTINCT visitor_id) as unique_visitors,
+                AVG(read_seconds) as avg_read_seconds, AVG(max_scroll_pct) as avg_scroll_pct,
+                SUM(is_discord_user) as discord_views
+         FROM page_views WHERE article_id = ?`
+      ).bind(article_id).first();
+
+      const dailySeries = await env.DB.prepare(
+        `SELECT DATE(created_at) as day, COUNT(*) as views, COUNT(DISTINCT visitor_id) as unique_visitors
+         FROM page_views WHERE article_id = ? GROUP BY DATE(created_at) ORDER BY day ASC`
+      ).bind(article_id).all();
+
+      const referrers = await env.DB.prepare(
+        `SELECT COALESCE(NULLIF(referrer_domain, ''), 'Direct / Unknown') as source, COUNT(*) as views
+         FROM page_views WHERE article_id = ? GROUP BY source ORDER BY views DESC LIMIT 15`
+      ).bind(article_id).all();
+
+      const devices = await env.DB.prepare(
+        `SELECT device_type, COUNT(*) as views FROM page_views WHERE article_id = ? GROUP BY device_type ORDER BY views DESC`
+      ).bind(article_id).all();
+
+      const browsers = await env.DB.prepare(
+        `SELECT browser, COUNT(*) as views FROM page_views WHERE article_id = ? GROUP BY browser ORDER BY views DESC`
+      ).bind(article_id).all();
+
+      const osBreakdown = await env.DB.prepare(
+        `SELECT os, COUNT(*) as views FROM page_views WHERE article_id = ? GROUP BY os ORDER BY views DESC`
+      ).bind(article_id).all();
+
+      const readDepthBuckets = await env.DB.prepare(
+        `SELECT
+           SUM(CASE WHEN max_scroll_pct < 25 THEN 1 ELSE 0 END) as bucket_0_25,
+           SUM(CASE WHEN max_scroll_pct >= 25 AND max_scroll_pct < 50 THEN 1 ELSE 0 END) as bucket_25_50,
+           SUM(CASE WHEN max_scroll_pct >= 50 AND max_scroll_pct < 75 THEN 1 ELSE 0 END) as bucket_50_75,
+           SUM(CASE WHEN max_scroll_pct >= 75 THEN 1 ELSE 0 END) as bucket_75_100
+         FROM page_views WHERE article_id = ?`
+      ).bind(article_id).first();
+
+      return Response.json({
+        article: { id: article.id, title: article.title },
+        totals: {
+          total_views: totals.total_views || 0,
+          unique_visitors: totals.unique_visitors || 0,
+          avg_read_seconds: Math.round(totals.avg_read_seconds || 0),
+          avg_scroll_pct: Math.round(totals.avg_scroll_pct || 0),
+          discord_views: totals.discord_views || 0,
+        },
+        daily_series: dailySeries.results,
+        referrers: referrers.results,
+        devices: devices.results,
+        browsers: browsers.results,
+        os: osBreakdown.results,
+        read_depth: readDepthBuckets,
+      });
+    }
+
+    // AUTH'D (any staff): summary analytics across ALL of the caller's
+    // articles (writers see only their own; editors/admins can pass
+    // target_username to inspect someone else's, or omit it for site-wide).
+    // Powers a "My Articles" overview table sorted by views.
+    if (url.pathname === "/api/analytics/summary" && request.method === "POST") {
+      const user = await getSessionUser(env, request);
+      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+      const body = await request.json().catch(() => ({}));
+      let targetUsername = user.username;
+      if (body.target_username && (user.role === "editor" || user.role === "admin")) {
+        targetUsername = body.target_username; // null/omitted handled by site-wide branch below
+      }
+
+      const siteWide = (user.role === "editor" || user.role === "admin") && body.site_wide === true;
+
+      const query = siteWide
+        ? `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at,
+                  COUNT(page_views.id) as total_views, COUNT(DISTINCT page_views.visitor_id) as unique_visitors,
+                  AVG(page_views.read_seconds) as avg_read_seconds
+           FROM articles LEFT JOIN page_views ON page_views.article_id = articles.id
+           WHERE articles.status = 'published'
+           GROUP BY articles.id ORDER BY total_views DESC`
+        : `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at,
+                  COUNT(page_views.id) as total_views, COUNT(DISTINCT page_views.visitor_id) as unique_visitors,
+                  AVG(page_views.read_seconds) as avg_read_seconds
+           FROM articles LEFT JOIN page_views ON page_views.article_id = articles.id
+           WHERE articles.status = 'published' AND articles.author = ?
+           GROUP BY articles.id ORDER BY total_views DESC`;
+
+      const results = siteWide
+        ? await env.DB.prepare(query).all()
+        : await env.DB.prepare(query).bind(targetUsername).all();
+
+      const rows = results.results.map((r) => ({
+        ...r,
+        avg_read_seconds: Math.round(r.avg_read_seconds || 0),
+      }));
+      return Response.json(rows);
+    }
+
     // API: Submit article (writers, editors, admins all submit through here)
     // New articles always start as pending_review — nobody publishes directly
     // through this route, regardless of role. Editors/admins who want to skip
+
     // review use /api/articles/instapublish instead.
     if (url.pathname === "/api/articles" && request.method === "POST") {
       const user = await getSessionUser(env, request);

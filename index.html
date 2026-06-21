@@ -24,6 +24,7 @@
       <a href="/guides">Guides</a>
       <a href="/miscellaneous">Misc</a>
       <a href="/portal">Staff Portal</a>
+      <div class="reader-auth" id="reader-auth"></div>
     </nav>
   </div>
 </header>
@@ -86,6 +87,7 @@
   <a href="/portal">Staff Portal</a>
 </footer>
 
+<script src="/reader.js"></script>
 <script>
   async function loadLatestHero() {
     const categories = ['politics', 'economy', 'guides', 'miscellaneous'];
@@ -110,6 +112,7 @@
   }
 
   loadLatestHero();
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
 </script>
 
 </body>

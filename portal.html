@@ -417,6 +417,17 @@
       <div id="my-articles-list">Loading...</div>
     </div>
 
+    <!-- ANALYTICS -->
+    <div class="card" id="analytics-section" style="display:none;">
+      <h2>Analytics</h2>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Viewership for your published articles. Click any row for the full breakdown.</p>
+      <div class="analytics-site-toggle" id="analytics-site-toggle" style="display:none;">
+        <button class="tab active" id="analytics-toggle-mine" onclick="setAnalyticsScope(false)">My Articles</button>
+        <button class="tab" id="analytics-toggle-site" onclick="setAnalyticsScope(true)">Site-Wide</button>
+      </div>
+      <div id="analytics-summary-list">Loading...</div>
+    </div>
+
     <!-- EDITOR (and admin): REVIEW QUEUE + REVIEW BOX -->
     <div class="card" id="editor-section" style="display:none;">
       <h2>Editorial Review</h2>
@@ -530,6 +541,51 @@
   </div>
 </div>
 
+<!-- ANALYTICS DETAIL OVERLAY: full per-article dashboard -->
+<div class="analytics-detail-overlay" id="analytics-detail-overlay">
+  <div class="analytics-detail-panel">
+    <button class="close-btn" onclick="closeAnalyticsDetail()">Close ✕</button>
+    <h2 id="analytics-detail-title">Loading...</h2>
+
+    <div class="analytics-kpi-grid" id="analytics-kpi-grid"></div>
+
+    <div class="analytics-chart-row">
+      <div>
+        <div class="analytics-block-title">Views Over Time</div>
+        <div class="analytics-line-chart-wrap">
+          <svg id="analytics-line-chart" width="100%" height="200" viewBox="0 0 860 200" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="analytics-chart-grid-2">
+      <div>
+        <div class="analytics-block-title">Top Referrers</div>
+        <div id="analytics-referrers"></div>
+      </div>
+      <div>
+        <div class="analytics-block-title">Read Depth (scroll reached)</div>
+        <div id="analytics-read-depth"></div>
+      </div>
+    </div>
+
+    <div class="analytics-chart-grid-2">
+      <div>
+        <div class="analytics-block-title">Devices</div>
+        <div id="analytics-devices"></div>
+      </div>
+      <div>
+        <div class="analytics-block-title">Browsers</div>
+        <div id="analytics-browsers"></div>
+      </div>
+      <div>
+        <div class="analytics-block-title">Operating Systems</div>
+        <div id="analytics-os"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- RETURN / DENY MODAL -->
 <div class="review-modal-overlay" id="review-modal-overlay">
   <div class="review-modal">
@@ -605,6 +661,12 @@
     // Everyone (writer, editor, admin) can submit articles and track their own.
     document.getElementById('my-articles-section').style.display = 'block';
     loadMyArticles();
+
+    document.getElementById('analytics-section').style.display = 'block';
+    if (role === 'editor' || role === 'admin') {
+      document.getElementById('analytics-site-toggle').style.display = 'flex';
+    }
+    loadAnalyticsSummary();
 
     if (role === 'editor' || role === 'admin') {
       document.getElementById('editor-section').style.display = 'block';
@@ -717,6 +779,206 @@
         ${a.status === 'returned' ? `<div class="review-tag" style="margin-top:8px;">Click to revise & resubmit</div>` : ''}
       </div>
     `).join('');
+  }
+
+  // ---------- ANALYTICS ----------
+
+  let analyticsSiteWide = false;
+
+  function setAnalyticsScope(siteWide) {
+    analyticsSiteWide = siteWide;
+    document.getElementById('analytics-toggle-mine').classList.toggle('active', !siteWide);
+    document.getElementById('analytics-toggle-site').classList.toggle('active', siteWide);
+    loadAnalyticsSummary();
+  }
+
+  async function loadAnalyticsSummary() {
+    const container = document.getElementById('analytics-summary-list');
+    const res = await fetch('/api/analytics/summary', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ site_wide: analyticsSiteWide })
+    });
+    const rows = await res.json();
+
+    if (!Array.isArray(rows) || !rows.length) {
+      container.innerHTML = '<p style="color:#666">No published articles with view data yet.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="analytics-summary-table">
+        <thead>
+          <tr>
+            <th>Article</th>
+            ${analyticsSiteWide ? '<th>Author</th>' : ''}
+            <th class="num">Views</th>
+            <th class="num">Unique</th>
+            <th class="num">Avg. Read</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr class="clickable" onclick="openAnalyticsDetail(${r.id}, '${escapeHtml(r.title).replace(/'/g, "\\'")}')">
+              <td>
+                <div class="article-title-cell">${escapeHtml(r.title)}</div>
+                <div class="article-cat-cell">${escapeHtml(r.category)}</div>
+              </td>
+              ${analyticsSiteWide ? `<td>${escapeHtml(r.author)}</td>` : ''}
+              <td class="num">${r.total_views}</td>
+              <td class="num">${r.unique_visitors}</td>
+              <td class="num">${formatDuration(r.avg_read_seconds)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds) return '0s';
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
+  }
+
+  async function openAnalyticsDetail(articleId, title) {
+    document.getElementById('analytics-detail-overlay').classList.add('open');
+    document.getElementById('analytics-detail-title').textContent = title;
+    document.getElementById('analytics-kpi-grid').innerHTML = '';
+    document.getElementById('analytics-referrers').innerHTML = '<div class="analytics-empty-note">Loading…</div>';
+    document.getElementById('analytics-devices').innerHTML = '';
+    document.getElementById('analytics-browsers').innerHTML = '';
+    document.getElementById('analytics-os').innerHTML = '';
+    document.getElementById('analytics-read-depth').innerHTML = '';
+    document.getElementById('analytics-line-chart').innerHTML = '';
+
+    const res = await fetch('/api/analytics/article', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ article_id: articleId })
+    });
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById('analytics-referrers').innerHTML = `<div class="analytics-empty-note">${escapeHtml(data.error)}</div>`;
+      return;
+    }
+
+    renderAnalyticsKpis(data.totals);
+    renderAnalyticsLineChart(data.daily_series);
+    renderAnalyticsBarBlock('analytics-referrers', data.referrers, 'source', 'views');
+    renderAnalyticsBarBlock('analytics-devices', data.devices, 'device_type', 'views');
+    renderAnalyticsBarBlock('analytics-browsers', data.browsers, 'browser', 'views');
+    renderAnalyticsBarBlock('analytics-os', data.os, 'os', 'views');
+    renderReadDepth(data.read_depth, data.totals.total_views);
+  }
+
+  function closeAnalyticsDetail() {
+    document.getElementById('analytics-detail-overlay').classList.remove('open');
+  }
+
+  function renderAnalyticsKpis(totals) {
+    const kpis = [
+      { label: 'Total Views', value: totals.total_views },
+      { label: 'Unique Visitors', value: totals.unique_visitors },
+      { label: 'Avg. Read Time', value: formatDuration(totals.avg_read_seconds) },
+      { label: 'Avg. Scroll Depth', value: totals.avg_scroll_pct + '%' },
+      { label: 'Discord-Logged-In Views', value: totals.discord_views },
+    ];
+    document.getElementById('analytics-kpi-grid').innerHTML = kpis.map(k => `
+      <div class="analytics-kpi">
+        <div class="kpi-value">${k.value}</div>
+        <div class="kpi-label">${k.label}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderAnalyticsBarBlock(containerId, rows, labelKey, valueKey) {
+    const container = document.getElementById(containerId);
+    if (!Array.isArray(rows) || !rows.length || rows.every(r => !r[valueKey])) {
+      container.innerHTML = '<div class="analytics-empty-note">No data yet.</div>';
+      return;
+    }
+    const max = Math.max(...rows.map(r => r[valueKey] || 0));
+    container.innerHTML = rows.map(r => `
+      <div class="analytics-bar-row">
+        <div class="analytics-bar-label" title="${escapeHtml(String(r[labelKey] || 'Unknown'))}">${escapeHtml(String(r[labelKey] || 'Unknown'))}</div>
+        <div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${max > 0 ? (r[valueKey] / max * 100) : 0}%"></div></div>
+        <div class="analytics-bar-value">${r[valueKey]}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderReadDepth(depth, totalViews) {
+    const container = document.getElementById('analytics-read-depth');
+    if (!depth || !totalViews) {
+      container.innerHTML = '<div class="analytics-empty-note">No data yet.</div>';
+      return;
+    }
+    const buckets = [
+      { label: '0–25%', value: depth.bucket_0_25 || 0 },
+      { label: '25–50%', value: depth.bucket_25_50 || 0 },
+      { label: '50–75%', value: depth.bucket_50_75 || 0 },
+      { label: '75–100%', value: depth.bucket_75_100 || 0 },
+    ];
+    const max = Math.max(...buckets.map(b => b.value), 1);
+    container.innerHTML = buckets.map(b => `
+      <div class="analytics-bar-row">
+        <div class="analytics-bar-label">${b.label}</div>
+        <div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${b.value / max * 100}%"></div></div>
+        <div class="analytics-bar-value">${b.value}</div>
+      </div>
+    `).join('');
+  }
+
+  // Simple dependency-free SVG line chart for the daily views series.
+  function renderAnalyticsLineChart(series) {
+    const svg = document.getElementById('analytics-line-chart');
+    const W = 860, H = 200, PAD = 30;
+
+    if (!Array.isArray(series) || series.length === 0) {
+      svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="#666" font-size="13" text-anchor="middle">No view data yet.</text>`;
+      return;
+    }
+
+    const maxViews = Math.max(...series.map(d => d.views), 1);
+    const stepX = series.length > 1 ? (W - PAD * 2) / (series.length - 1) : 0;
+
+    const points = series.map((d, i) => {
+      const x = PAD + i * stepX;
+      const y = H - PAD - (d.views / maxViews) * (H - PAD * 2);
+      return { x, y, d };
+    });
+
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const areaPath = `${linePath} L${points[points.length - 1].x.toFixed(1)},${H - PAD} L${points[0].x.toFixed(1)},${H - PAD} Z`;
+
+    const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+      const y = H - PAD - f * (H - PAD * 2);
+      return `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="#2e2e2e" stroke-width="1"/>`;
+    }).join('');
+
+    const dots = points.map(p => `
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="#c9a84c">
+        <title>${p.d.day}: ${p.d.views} views</title>
+      </circle>
+    `).join('');
+
+    // Show a sparse set of date labels so they don't overlap on long ranges.
+    const labelEvery = Math.max(1, Math.ceil(series.length / 7));
+    const labels = points.map((p, i) => {
+      if (i % labelEvery !== 0 && i !== points.length - 1) return '';
+      const short = new Date(p.d.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return `<text x="${p.x.toFixed(1)}" y="${H - 8}" fill="#888" font-size="10" text-anchor="middle">${short}</text>`;
+    }).join('');
+
+    svg.innerHTML = `
+      ${gridLines}
+      <path d="${areaPath}" fill="#7c5cbf" opacity="0.15"/>
+      <path d="${linePath}" fill="none" stroke="#c9a84c" stroke-width="2"/>
+      ${dots}
+      ${labels}
+    `;
   }
 
   // ---------- EDITOR/ADMIN: Pending Review queue ----------

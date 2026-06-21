@@ -24,6 +24,7 @@
       <a href="/guides">Guides</a>
       <a href="/miscellaneous" class="active">Misc</a>
       <a href="/portal">Staff Portal</a>
+      <div class="reader-auth" id="reader-auth"></div>
     </nav>
   </div>
 </header>
@@ -48,6 +49,7 @@
       <div class="article-modal-meta" id="modal-meta"></div>
     </div>
     <div class="article-modal-body" id="modal-body"></div>
+    <div id="modal-comments"></div>
   </div>
 </div>
 
@@ -56,6 +58,7 @@
   <a href="/portal">Staff Portal</a>
 </footer>
 
+<script src="/reader.js"></script>
 <script>
   const CATEGORY_SLUG  = 'miscellaneous';
   const CATEGORY_LABEL = 'Miscellaneous';
@@ -73,8 +76,8 @@
   function contentToHtml(raw) {
     const paragraphs = raw.split(/\n{2,}/);
     if (paragraphs.length <= 1) {
-      // Single block — split on single newlines into <br> instead
-      return `<p>${escapeHtml(raw).replace(/\n/g, '<br>')}</p>`;
+      // Single block — trim (matches normaliseContent) then split on single newlines into <br> instead
+      return `<p>${escapeHtml(raw.trim()).replace(/\n/g, '<br>')}</p>`;
     }
     return paragraphs
       .map(p => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`)
@@ -117,13 +120,16 @@
 
     container.className = 'articles-grid';
     container.innerHTML = articles.map((a, i) => `
-      <div class="article-summary-card" onclick="openModal(${i})" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openModal(${i})">
+      <div class="article-summary-card" style="position:relative;" onclick="openModal(${i})" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openModal(${i})">
+        ${favButtonHtml(a.id, false, 'card-fav-btn')}
         <div class="card-category">${CATEGORY_LABEL}</div>
         <h3>${escapeHtml(a.title)}</h3>
         <div class="card-byline">By ${escapeHtml(a.author)}</div>
         <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</div>
       </div>
     `).join('');
+
+    paintFavoriteStates(articles.map(a => a.id));
   }
 
   // ---------- Local tamper detection ----------
@@ -152,8 +158,11 @@
   function renderArticle(a) {
     document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
     document.getElementById('modal-title').textContent = a.title;
-    document.getElementById('modal-meta').innerHTML = buildBylineMeta(a);
+    document.getElementById('modal-meta').innerHTML = buildBylineMeta(a) + favButtonHtml(a.id, false);
     document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
+    document.getElementById('modal-comments').innerHTML = commentsSectionHtml(a.id);
+    loadComments(a.id, document.getElementById('comments-list'));
+    paintFavoriteStates([a.id]);
   }
 
   // Reconstruct expected body text from the raw content string, matching
@@ -202,12 +211,14 @@
     document.getElementById('article-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
     startIntegrityPolling();
+    startArticleViewTracking(a.id, document.getElementById('article-modal'));
   }
 
   function closeModal() {
     document.getElementById('article-modal').classList.remove('open');
     document.body.style.overflow = '';
     stopIntegrityPolling();
+    stopArticleViewTracking();
     const n = document.getElementById('modal-notice');
     if (n) n.remove();
   }
@@ -222,6 +233,7 @@
   });
 
   loadArticles();
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
 </script>
 
 </body>
