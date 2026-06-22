@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Title and OG tags are set dynamically once the article loads -->
+  <title>Loading… — Jaronite News</title>
+  <meta property="og:site_name" content="Jaronite News Inc.">
+  <meta property="og:type" content="article">
+  <meta id="og-title" property="og:title" content="Jaronite News Inc.">
+  <meta id="og-description" property="og:description" content="DemocracyCraft's Official Press">
+  <meta id="og-url" property="og:url" content="">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    /* Article page uses the same .article-modal-body prose styles but full-width */
+    .article-page-wrap {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    .article-page-stamp {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--mid-purple);
+      margin-bottom: 12px;
+    }
+
+    .article-page-title {
+      font-family: var(--font-serif);
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.2;
+      margin: 0 0 16px;
+    }
+
+    .article-page-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--ink-soft);
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      padding: 12px 0;
+      margin-bottom: 32px;
+    }
+
+    .article-page-meta .reviewer { color: var(--mid-purple); font-weight: 600; }
+    .article-page-meta .self-pub { color: var(--ink-muted); font-style: italic; }
+
+    .article-page-body {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      line-height: 1.8;
+      color: var(--ink);
+    }
+
+    .article-page-body p {
+      margin: 0 0 1.4em;
+    }
+
+    .article-page-body p:first-child::first-letter {
+      float: left;
+      font-size: 3.4em;
+      line-height: 0.85;
+      font-weight: 700;
+      color: var(--ink-purple);
+      margin-right: 6px;
+      margin-top: 4px;
+      font-family: var(--font-serif);
+    }
+
+    .article-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: var(--mid-purple);
+      text-decoration: none;
+      margin-bottom: 28px;
+      font-weight: 500;
+    }
+
+    .article-back-link:hover { text-decoration: underline; }
+
+    .article-share-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--rule);
+      flex-wrap: wrap;
+    }
+
+    .article-share-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+    }
+
+    .share-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--rule);
+      background: #fff;
+      color: var(--ink);
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .share-btn:hover { background: var(--paper-dim); border-color: var(--ink-muted); }
+    .share-btn.copied { background: #e8f5e9; border-color: #66bb6a; color: #2e7d32; }
+
+    .article-error {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--ink-soft);
+    }
+
+    .article-error h2 { color: var(--ink); margin-bottom: 12px; }
+    .article-error a { color: var(--mid-purple); }
+
+    .article-loading {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--ink-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Tamper notice (same style as portal notice) */
+    .tamper-notice {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+      color: #856404;
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="masthead">
+      <a href="/"><img src="/logo.png" alt="Jaronite News Logo" style="display:block;"></a>
+      <div class="masthead-text">
+        <h1>Jaronite <span>News</span> Inc.</h1>
+        <div class="tagline">DemocracyCraft's Official Press — Est. 2024</div>
+      </div>
+    </div>
+    <nav class="site-nav">
+      <a href="/">Home</a>
+      <a href="/politics">Politics</a>
+      <a href="/economy">Economy</a>
+      <a href="/guides">Guides</a>
+      <a href="/miscellaneous">Misc</a>
+      <a href="/portal">Staff Portal</a>
+      <div class="reader-auth" id="reader-auth"></div>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="article-page-wrap" id="article-wrap">
+    <div class="article-loading">Loading article…</div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
+  <a href="/portal">Staff Portal</a>
+</footer>
+
+<script src="/reader.js"></script>
+<script>
+  // ---- Utilities (same as category pages) ----
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function contentToHtml(raw) {
+    const paragraphs = raw.split(/\n{2,}/);
+    if (paragraphs.length <= 1) {
+      return `<p>${escapeHtml(raw.trim()).replace(/\n/g, '<br>')}</p>`;
+    }
+    return paragraphs.map(p => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+  }
+
+  function normaliseContent(raw) {
+    const blocks = raw.split(/\n{2,}/);
+    return blocks.length > 1 ? blocks.map(b => b.trim()).join('\n\n') : raw.trim();
+  }
+
+  function buildBylineMeta(article) {
+    const date = new Date(article.created_at).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+    const authorPart = `By ${escapeHtml(article.author)}`;
+    const reviewPart = article.reviewed_by
+      ? `Reviewed by <span class="reviewer">${escapeHtml(article.reviewed_by)}</span>`
+      : `<span class="self-pub">Self-Published</span>`;
+    return `<span>${authorPart}</span><span>${reviewPart}</span><span>${date}</span>`;
+  }
+
+  function categoryLabel(slug) {
+    return { politics: 'Politics', economy: 'Economy', guides: 'Guides', miscellaneous: 'Miscellaneous' }[slug] || slug;
+  }
+
+  // ---- Copy link share button ----
+
+  async function copyLink() {
+    const btn = document.getElementById('copy-link-btn');
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '🔗 Copy Link'; btn.classList.remove('copied'); }, 2000);
+    } catch (e) {
+      btn.textContent = 'Copy failed';
+    }
+  }
+
+  // ---- Tamper detection (same logic as category pages, adapted for full page) ----
+
+  let integrityTimer = null;
+  let renderedTitle  = null;
+  let renderedContent = null;
+
+  function normaliseBody(raw) {
+    const blocks = raw.split(/\n{2,}/);
+    return blocks.length > 1 ? blocks.map(b => b.trim()).join('\n\n') : raw.trim();
+  }
+
+  function startTamperDetection(article) {
+    renderedTitle   = article.title;
+    renderedContent = article.content;
+    if (integrityTimer) clearInterval(integrityTimer);
+    integrityTimer = setInterval(() => {
+      const liveTitle = document.getElementById('article-title')?.textContent;
+      const liveBody  = [...(document.getElementById('article-body')?.querySelectorAll('p') || [])]
+                          .map(p => p.textContent).join('\n\n');
+      if (!liveTitle) return; // element gone, ignore
+      if (liveTitle !== renderedTitle || liveBody !== normaliseBody(renderedContent)) {
+        clearInterval(integrityTimer);
+        alert("This article's content doesn't match what was published. You'll be returned to the homepage.");
+        window.location.href = '/';
+      }
+    }, 5000);
+  }
+
+  // ---- Main: fetch and render the article ----
+
+  async function loadArticle() {
+    const wrap = document.getElementById('article-wrap');
+
+    // Parse the id-slug from the URL pathname: /article/1-some-title
+    const slug = window.location.pathname.replace(/^\/article\//, '').replace(/\/$/, '');
+    if (!slug) {
+      renderError(wrap, 'No article specified.');
+      return;
+    }
+
+    let article;
+    try {
+      const res = await fetch(`/api/article/${encodeURIComponent(slug)}`);
+      if (!res.ok) { renderError(wrap, 'Article not found.'); return; }
+      article = await res.json();
+      if (article.error) { renderError(wrap, article.error); return; }
+    } catch (e) {
+      renderError(wrap, 'Couldn\'t load the article — check your connection.');
+      return;
+    }
+
+    // Set page title and OG tags for link-preview sharing
+    const pageTitle = `${article.title} — Jaronite News Inc.`;
+    document.title = pageTitle;
+    document.getElementById('og-title').setAttribute('content', article.title);
+    document.getElementById('og-description').setAttribute('content',
+      article.content.slice(0, 200).replace(/\n+/g, ' ').trim()
+    );
+    document.getElementById('og-url').setAttribute('content', window.location.href);
+
+    const catLabel = categoryLabel(article.category);
+
+    wrap.innerHTML = `
+      <a class="article-back-link" href="/${escapeHtml(article.category)}">← Back to ${escapeHtml(catLabel)}</a>
+      <div class="article-page-stamp">${escapeHtml(catLabel)} · Jaronite News Inc.</div>
+      <h1 class="article-page-title" id="article-title">${escapeHtml(article.title)}</h1>
+      <div class="article-page-meta" id="article-meta">
+        ${buildBylineMeta(article)}
+        ${favButtonHtml(article.id, false)}
+      </div>
+      <div class="article-page-body" id="article-body">${contentToHtml(article.content)}</div>
+      <div class="article-share-bar">
+        <span class="article-share-label">Share</span>
+        <button id="copy-link-btn" class="share-btn" onclick="copyLink()">🔗 Copy Link</button>
+        <a class="share-btn" target="_blank" rel="noopener"
+           href="https://discord.com/channels/@me?message=${encodeURIComponent(article.title + ' — ' + window.location.href)}">
+          Share to Discord
+        </a>
+      </div>
+      <div id="article-comments">${commentsSectionHtml(article.id)}</div>
+    `;
+
+    // Paint favorite state for this article
+    paintFavoriteStates([article.id]);
+
+    // Load comments
+    loadComments(article.id, document.getElementById('comments-list'));
+
+    // Start tamper detection
+    startTamperDetection(article);
+
+    // Start view analytics tracking (scroll container = window since it's a full page)
+    startArticleViewTracking(article.id, document.documentElement);
+  }
+
+  function renderError(wrap, message) {
+    wrap.innerHTML = `
+      <div class="article-error">
+        <h2>Article not found</h2>
+        <p>${escapeHtml(message)}</p>
+        <a href="/">← Return to homepage</a>
+      </div>`;
+  }
+
+  // ---- Category pages: update cards to link to the article page ----
+  // (This file only runs on /article/* — the category-page update is
+  //  done in each category page's card template, handled separately.)
+
+  loadArticle();
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
+</script>
+
+</body>
+</html>

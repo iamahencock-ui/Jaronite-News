@@ -225,6 +225,25 @@ async function log(env, username, action, details = "") {
 }
 
 /**
+ * Convert an article title into a URL-safe slug for use in /article/[id]-[slug].
+ * Lowercases, strips non-alphanumeric characters (except hyphens), collapses
+ * runs of hyphens, and trims leading/trailing hyphens. The article id is
+ * always prepended by the caller so collisions between identically-titled
+ * articles are impossible.
+ * @param {string} title
+ * @returns {string}
+ */
+function slugify(title) {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/[\s-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80); // cap length so URLs stay readable
+}
+
+/**
  * Parse a User-Agent string into a coarse device type, browser, and OS
  * label for analytics grouping. Deliberately simple regex matching rather
  * than a full UA-parsing library — good enough to bucket views into
@@ -273,6 +292,7 @@ export default {
    *   - POST /api/logout                   Invalidate the caller's session token.
    *   - GET  /api/articles?category=...    List published articles in a category (public site).
    *   - GET  /api/article-hash?id=...      Lightweight integrity hash for one published article (powers client-side tamper/update detection).
+   *   - GET  /api/article/:id-slug         Fetch one published article by its id-slug (e.g. /api/article/1-mayoral-election). Used by the /article/* page renderer.
    *   - GET  /api/auth/discord/login       Redirect to Discord's OAuth2 consent screen.
    *   - GET  /api/auth/discord/callback    Discord redirects here with a code; exchanges it, upserts the reader, issues a session.
    *   - GET  /api/auth/discord/me          Resolve the caller's Discord session, if any.
@@ -809,7 +829,33 @@ export default {
       const results = await env.DB.prepare(
         "SELECT * FROM articles WHERE category = ? AND status = 'published' ORDER BY created_at DESC"
       ).bind(category).all();
-      return Response.json(results.results);
+
+      // Attach a computed slug to each article so the front end can build
+      // /article/[id]-[slug] links without a separate lookup.
+      const articles = results.results.map(a => ({
+        ...a,
+        slug: `${a.id}-${slugify(a.title)}`,
+      }));
+      return Response.json(articles);
+    }
+
+    // PUBLIC: fetch one published article by its id-slug for the /article/* page.
+    // The slug format is [id]-[title-slug] (e.g. "1-mayoral-election-results").
+    // We parse the numeric id from the front of the param, look up by id, then
+    // verify the article is published — the slug portion is cosmetic/readable
+    // but not used for the lookup (so renamed articles keep their old URLs
+    // working as long as the id prefix is still present).
+    if (url.pathname.startsWith("/api/article/") && request.method === "GET") {
+      const param = url.pathname.slice("/api/article/".length);
+      const id = parseInt(param.split("-")[0], 10);
+      if (!id || isNaN(id)) return Response.json({ error: "Not found" }, { status: 404 });
+
+      const article = await env.DB.prepare(
+        "SELECT * FROM articles WHERE id = ? AND status = 'published'"
+      ).bind(id).first();
+      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+
+      return Response.json({ ...article, slug: `${article.id}-${slugify(article.title)}` });
     }
 
     // API: Lightweight integrity check for an open article (public, no auth).
@@ -1266,6 +1312,24 @@ export default {
     // clean URL (/portal, /politics, /economy, ...) while old links that
     // still include ".html" keep working too, since we fall back to the
     // original request if the rewritten one doesn't resolve.
+    //
+    // /article/* is a special case: these are dynamic article pages with no
+    // corresponding static file per article. They all share a single
+    // article.html shell that reads the id-slug from the URL client-side and
+    // fetches the article data from /api/article/:idslug.
+    if (url.pathname.startsWith("/article/")) {
+      const articleUrl = new URL("/article.html", url.origin);
+      const articleRequest = new Request(articleUrl.toString(), request);
+      try {
+        return await getAssetFromKV(
+          { request: articleRequest, waitUntil(promise) { return ctx.waitUntil(promise); } },
+          { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
+        );
+      } catch (e) {
+        return new Response("Article page not found", { status: 404 });
+      }
+    }
+
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(url.pathname);
     if (!hasExtension && url.pathname !== "/") {
       try {
