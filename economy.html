@@ -19,6 +19,7 @@
     </div>
     <nav class="site-nav">
       <a href="/">Home</a>
+      <a href="/articles">All Articles</a>
       <a href="/politics">Politics</a>
       <a href="/economy" class="active">Economy</a>
       <a href="/guides">Guides</a>
@@ -34,6 +35,17 @@
     <div class="breadcrumb"><a href="/">Home</a> / Economy</div>
     <h1>Economy</h1>
     <div class="category-accent-bar" style="background:#27ae60;"></div>
+  </div>
+
+  <div class="article-controls">
+    <input type="search" id="search-input" placeholder="Search by title or author…" oninput="applyFilters()">
+    <select id="sort-select" onchange="applyFilters()">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="author">Author A–Z</option>
+      <option value="title">Title A–Z</option>
+    </select>
+    <span class="article-controls-count" id="results-count"></span>
   </div>
 
   <div id="articles-container" class="state-loading">Loading dispatches...</div>

@@ -34,10 +34,28 @@
   <div class="category-page-header">
     <div class="breadcrumb"><a href="/">Home</a> / All Articles</div>
     <h1>All Articles</h1>
-    <div class="category-accent-bar" style="background: linear-gradient(90deg, #7c5cbf, #27ae60, #2e86de, #c0392b);"></div>
+    <div class="category-accent-bar" style="background:linear-gradient(90deg,#7c5cbf,#27ae60,#2e86de,#c0392b);"></div>
   </div>
 
-  <div id="articles-container" class="state-loading">Loading dispatches...</div>
+  <div class="article-controls">
+    <input type="search" id="search-input" placeholder="Search by title or author…" oninput="applyFilters()">
+    <select id="sort-select" onchange="applyFilters()">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="author">Author A–Z</option>
+      <option value="title">Title A–Z</option>
+    </select>
+    <select id="cat-select" onchange="applyFilters()">
+      <option value="">All categories</option>
+      <option value="politics">Politics</option>
+      <option value="economy">Economy</option>
+      <option value="guides">Guides</option>
+      <option value="miscellaneous">Miscellaneous</option>
+    </select>
+    <span class="article-controls-count" id="results-count"></span>
+  </div>
+
+  <div id="articles-container" class="state-loading">Loading dispatches…</div>
 </main>
 
 <footer class="site-footer">
@@ -48,60 +66,84 @@
 <script src="/reader.js"></script>
 <script>
   const CATEGORY_LABELS = {
-    politics: 'Politics',
-    economy: 'Economy',
-    guides: 'Guides',
-    miscellaneous: 'Miscellaneous'
+    politics: 'Politics', economy: 'Economy',
+    guides: 'Guides', miscellaneous: 'Miscellaneous'
   };
 
   function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function slugify(title) {
-    return title.toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/[\s-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80);
+    return title.toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim()
+      .replace(/[\s-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
   }
+
+  let allArticles = [];
 
   async function loadArticles() {
     const container = document.getElementById('articles-container');
-    let articles;
     try {
       const res = await fetch('/api/articles/all');
-      articles = await res.json();
+      allArticles = await res.json();
     } catch (e) {
       container.innerHTML = '<div class="state-empty"><strong>Couldn\'t load articles</strong>Check your connection and try again.</div>';
       return;
     }
+    if (!Array.isArray(allArticles) || allArticles.length === 0) {
+      container.innerHTML = '<div class="state-empty"><strong>No stories yet</strong>Check back soon.</div>';
+      return;
+    }
+    applyFilters();
+  }
 
-    if (!Array.isArray(articles) || articles.length === 0) {
-      container.innerHTML = '<div class="state-empty"><strong>No stories yet</strong>Check back soon — our reporters are on it.</div>';
+  function applyFilters() {
+    const container = document.getElementById('articles-container');
+    const q = document.getElementById('search-input').value.trim().toLowerCase();
+    const sort = document.getElementById('sort-select').value;
+    const cat = document.getElementById('cat-select').value;
+
+    let filtered = allArticles.filter(a => {
+      if (cat && a.category !== cat) return false;
+      if (q) {
+        const inTitle  = a.title.toLowerCase().includes(q);
+        const inAuthor = a.author.toLowerCase().includes(q);
+        if (!inTitle && !inAuthor) return false;
+      }
+      return true;
+    });
+
+    filtered = [...filtered].sort((a, b) => {
+      if (sort === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+      if (sort === 'author') return a.author.localeCompare(b.author);
+      if (sort === 'title')  return a.title.localeCompare(b.title);
+      return new Date(b.created_at) - new Date(a.created_at); // newest
+    });
+
+    document.getElementById('results-count').textContent =
+      `${filtered.length} article${filtered.length !== 1 ? 's' : ''}`;
+
+    if (filtered.length === 0) {
+      container.className = 'articles-grid';
+      container.innerHTML = '<div class="no-results-msg">No articles match your search.</div>';
       return;
     }
 
     container.className = 'articles-grid';
-    container.innerHTML = articles.map(a => {
+    container.innerHTML = filtered.map(a => {
       const catLabel = CATEGORY_LABELS[a.category] || a.category;
-      const articleSlug = `${a.id}-${slugify(a.title)}`;
+      const slug = `${a.id}-${slugify(a.title)}`;
       return `
-        <a class="article-summary-card" style="position:relative;text-decoration:none;display:block;" href="/article/${articleSlug}">
+        <a class="article-summary-card" style="position:relative;text-decoration:none;display:block;" href="/article/${slug}">
           ${favButtonHtml(a.id, false, 'card-fav-btn')}
           <div class="card-category">${escapeHtml(catLabel)}</div>
           <h3>${escapeHtml(a.title)}</h3>
           <div class="card-byline">By ${escapeHtml(a.author)}</div>
-          <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</div>
+          <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>
         </a>`;
     }).join('');
 
-    paintFavoriteStates(articles.map(a => a.id));
+    paintFavoriteStates(filtered.map(a => a.id));
   }
 
   loadArticles();

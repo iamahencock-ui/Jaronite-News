@@ -454,6 +454,27 @@
         <button class="tab" onclick="switchTab('logs', this)">Logs</button>
       </div>
 
+      <div id="admin-article-controls" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;">
+        <input type="search" id="admin-search" placeholder="Search by title or author…"
+               oninput="applyAdminFilters()"
+               style="flex:1 1 200px;min-width:160px;padding:8px 12px;border:1px solid #333;border-radius:7px;background:#1a1a1a;color:#f0f0f0;font-size:0.85rem;outline:none;">
+        <select id="admin-sort" onchange="applyAdminFilters()"
+                style="padding:8px 12px;border:1px solid #333;border-radius:7px;background:#1a1a1a;color:#f0f0f0;font-size:0.85rem;cursor:pointer;outline:none;">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="author">Author A–Z</option>
+          <option value="title">Title A–Z</option>
+        </select>
+        <select id="admin-cat-filter" onchange="applyAdminFilters()"
+                style="padding:8px 12px;border:1px solid #333;border-radius:7px;background:#1a1a1a;color:#f0f0f0;font-size:0.85rem;cursor:pointer;outline:none;">
+          <option value="">All categories</option>
+          <option value="politics">Politics</option>
+          <option value="economy">Economy</option>
+          <option value="guides">Guides</option>
+          <option value="miscellaneous">Miscellaneous</option>
+        </select>
+        <span id="admin-results-count" style="font-size:0.75rem;color:#888;margin-left:auto;white-space:nowrap;"></span>
+      </div>
       <div id="admin-articles-list"></div>
 
       <!-- ADMIN: SYSTEM-WIDE IN-REVIEW VIEW -->
@@ -1379,6 +1400,8 @@
 
   // ---------- ADMIN: published-article moderation (unchanged) ----------
 
+  let _adminArticlesCache = [];
+
   async function loadAdminArticles(filter) {
     window.currentAdminArticleFilter = filter;
     const res = await fetch('/api/admin/articles', {
@@ -1386,15 +1409,45 @@
       headers: authHeaders(),
       body: JSON.stringify({ filter })
     });
-    const articles = await res.json();
-    const container = document.getElementById('admin-articles-list');
+    _adminArticlesCache = await res.json();
+    // Reset search/sort/filter controls when switching tabs
+    const searchEl = document.getElementById('admin-search');
+    const sortEl   = document.getElementById('admin-sort');
+    const catEl    = document.getElementById('admin-cat-filter');
+    if (searchEl) searchEl.value = '';
+    if (sortEl)   sortEl.value  = 'newest';
+    if (catEl)    catEl.value   = '';
+    applyAdminFilters();
+  }
 
-    if (!articles.length) {
-      container.innerHTML = '<p style="color:#666">No articles found.</p>';
+  function applyAdminFilters() {
+    const container = document.getElementById('admin-articles-list');
+    const q    = (document.getElementById('admin-search')?.value || '').trim().toLowerCase();
+    const sort = document.getElementById('admin-sort')?.value || 'newest';
+    const cat  = document.getElementById('admin-cat-filter')?.value || '';
+
+    let filtered = _adminArticlesCache.filter(a => {
+      if (cat && a.category !== cat) return false;
+      if (q && !a.title.toLowerCase().includes(q) && !a.author.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    filtered = [...filtered].sort((a, b) => {
+      if (sort === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+      if (sort === 'author') return a.author.localeCompare(b.author);
+      if (sort === 'title')  return a.title.localeCompare(b.title);
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    const countEl = document.getElementById('admin-results-count');
+    if (countEl) countEl.textContent = `${filtered.length} article${filtered.length !== 1 ? 's' : ''}`;
+
+    if (!filtered.length) {
+      container.innerHTML = '<p style="color:#666">No articles match your search.</p>';
       return;
     }
 
-    container.innerHTML = articles.map(a => `
+    container.innerHTML = filtered.map(a => `
       <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
@@ -1409,6 +1462,7 @@
     btn.classList.add('active');
 
     document.getElementById('admin-articles-list').style.display = 'none';
+    document.getElementById('admin-article-controls').style.display = 'none';
     document.getElementById('user-management-section').style.display = 'none';
     document.getElementById('logs-section').style.display = 'none';
     document.getElementById('admin-in-review-section').style.display = 'none';
@@ -1423,6 +1477,7 @@
       document.getElementById('admin-in-review-section').style.display = 'block';
       loadAllClaimed();
     } else {
+      document.getElementById('admin-article-controls').style.display = 'flex';
       document.getElementById('admin-articles-list').style.display = 'block';
       loadAdminArticles(filter);
     }
