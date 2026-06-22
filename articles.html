@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>All Articles — Jaronite News</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="masthead">
+      <a href="/"><img src="/logo.png" alt="Jaronite News Logo" style="display:block;"></a>
+      <div class="masthead-text">
+        <h1>Jaronite <span>News</span> Inc.</h1>
+        <div class="tagline">DemocracyCraft's Official Press — Est. 2024</div>
+      </div>
+    </div>
+    <nav class="site-nav">
+      <a href="/">Home</a>
+      <a href="/articles" class="active">All Articles</a>
+      <a href="/politics">Politics</a>
+      <a href="/economy">Economy</a>
+      <a href="/guides">Guides</a>
+      <a href="/miscellaneous">Misc</a>
+      <a href="/portal">Staff Portal</a>
+      <div class="reader-auth" id="reader-auth"></div>
+    </nav>
+  </div>
+</header>
+
+<main class="category-page">
+  <div class="category-page-header">
+    <div class="breadcrumb"><a href="/">Home</a> / All Articles</div>
+    <h1>All Articles</h1>
+    <div class="category-accent-bar" style="background: linear-gradient(90deg, #7c5cbf, #27ae60, #2e86de, #c0392b);"></div>
+  </div>
+
+  <div id="articles-container" class="state-loading">Loading dispatches...</div>
+</main>
+
+<footer class="site-footer">
+  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
+  <a href="/portal">Staff Portal</a>
+</footer>
+
+<script src="/reader.js"></script>
+<script>
+  const CATEGORY_LABELS = {
+    politics: 'Politics',
+    economy: 'Economy',
+    guides: 'Guides',
+    miscellaneous: 'Miscellaneous'
+  };
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  function slugify(title) {
+    return title.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/[\s-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+  }
+
+  async function loadArticles() {
+    const container = document.getElementById('articles-container');
+    let articles;
+    try {
+      const res = await fetch('/api/articles/all');
+      articles = await res.json();
+    } catch (e) {
+      container.innerHTML = '<div class="state-empty"><strong>Couldn\'t load articles</strong>Check your connection and try again.</div>';
+      return;
+    }
+
+    if (!Array.isArray(articles) || articles.length === 0) {
+      container.innerHTML = '<div class="state-empty"><strong>No stories yet</strong>Check back soon — our reporters are on it.</div>';
+      return;
+    }
+
+    container.className = 'articles-grid';
+    container.innerHTML = articles.map(a => {
+      const catLabel = CATEGORY_LABELS[a.category] || a.category;
+      const articleSlug = `${a.id}-${slugify(a.title)}`;
+      return `
+        <a class="article-summary-card" style="position:relative;text-decoration:none;display:block;" href="/article/${articleSlug}">
+          ${favButtonHtml(a.id, false, 'card-fav-btn')}
+          <div class="card-category">${escapeHtml(catLabel)}</div>
+          <h3>${escapeHtml(a.title)}</h3>
+          <div class="card-byline">By ${escapeHtml(a.author)}</div>
+          <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</div>
+        </a>`;
+    }).join('');
+
+    paintFavoriteStates(articles.map(a => a.id));
+  }
+
+  loadArticles();
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
+</script>
+
+</body>
+</html>

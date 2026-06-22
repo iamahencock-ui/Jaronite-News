@@ -839,6 +839,19 @@ export default {
       return Response.json(articles);
     }
 
+    // PUBLIC: fetch ALL published articles across every category, newest first.
+    // Used by the All Articles page (/articles).
+    if (url.pathname === "/api/articles/all" && request.method === "GET") {
+      const results = await env.DB.prepare(
+        "SELECT * FROM articles WHERE status = 'published' ORDER BY created_at DESC"
+      ).all();
+      const articles = results.results.map(a => ({
+        ...a,
+        slug: `${a.id}-${slugify(a.title)}`,
+      }));
+      return Response.json(articles);
+    }
+
     // PUBLIC: fetch one published article by its id-slug for the /article/* page.
     // The slug format is [id]-[title-slug] (e.g. "1-mayoral-election-results").
     // We parse the numeric id from the front of the param, look up by id, then
@@ -1317,6 +1330,19 @@ export default {
     // corresponding static file per article. They all share a single
     // article.html shell that reads the id-slug from the URL client-side and
     // fetches the article data from /api/article/:idslug.
+    // /articles -> articles.html (All Articles page — no per-article slug so must come before /article/)
+    if (url.pathname === "/articles") {
+      const articlesUrl = new URL("/articles.html", url.origin);
+      try {
+        return await getAssetFromKV(
+          { request: new Request(articlesUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
+          { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
+        );
+      } catch (e) {
+        return new Response("Not found", { status: 404 });
+      }
+    }
+
     if (url.pathname.startsWith("/article/")) {
       const articleUrl = new URL("/article.html", url.origin);
       const articleRequest = new Request(articleUrl.toString(), request);
