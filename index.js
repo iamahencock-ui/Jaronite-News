@@ -840,7 +840,6 @@ export default {
     }
 
     // PUBLIC: fetch ALL published articles across every category, newest first.
-    // Used by the All Articles page (/articles).
     if (url.pathname === "/api/articles/all" && request.method === "GET") {
       const results = await env.DB.prepare(
         "SELECT * FROM articles WHERE status = 'published' ORDER BY created_at DESC"
@@ -1330,12 +1329,25 @@ export default {
     // corresponding static file per article. They all share a single
     // article.html shell that reads the id-slug from the URL client-side and
     // fetches the article data from /api/article/:idslug.
-    // /articles -> articles.html (All Articles page — no per-article slug so must come before /article/)
+    // /articles -> articles.html (All Articles page)
     if (url.pathname === "/articles") {
       const articlesUrl = new URL("/articles.html", url.origin);
       try {
         return await getAssetFromKV(
           { request: new Request(articlesUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
+          { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
+        );
+      } catch (e) {
+        return new Response("Not found", { status: 404 });
+      }
+    }
+
+    // /favorites -> favorites.html (dedicated Favorites page for logged-in readers)
+    if (url.pathname === "/favorites") {
+      const favUrl = new URL("/favorites.html", url.origin);
+      try {
+        return await getAssetFromKV(
+          { request: new Request(favUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
       } catch (e) {

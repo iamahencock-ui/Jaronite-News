@@ -911,6 +911,20 @@ body {
   font-style: italic;
 }
 
+/* ---------- NAV FAVORITES BUTTON ---------- */
+
+.site-nav .nav-favorites-btn {
+  background: rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.site-nav .nav-favorites-btn:hover {
+  background: rgba(255,255,255,0.22);
+}
+
 /* ---------- ARTICLE SEARCH / SORT / FILTER CONTROLS ---------- */
 
 .article-controls {

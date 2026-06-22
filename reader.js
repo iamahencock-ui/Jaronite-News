@@ -123,19 +123,17 @@ async function renderReaderAuthWidget(container) {
       <span class="reader-name">${escapeHtmlGlobal(me.username)}</span>
     </div>
     <div class="reader-menu" id="reader-menu">
-      <div class="reader-menu-header">My Favorites</div>
-      <div id="reader-favorites-list"><div class="reader-menu-empty">Loading…</div></div>
+      <div class="reader-menu-header">Logged in as ${escapeHtmlGlobal(me.username)}</div>
+      <a class="reader-menu-item" href="/favorites">♡ My Favorites</a>
       <div class="reader-menu-divider"></div>
       <a class="reader-menu-item reader-menu-logout" onclick="discordLogout()">Log out</a>
     </div>`;
 
   const toggle = document.getElementById("reader-account-toggle");
   const menu = document.getElementById("reader-menu");
-  toggle.addEventListener("click", async (e) => {
+  toggle.addEventListener("click", (e) => {
     e.stopPropagation();
-    const wasOpen = menu.classList.contains("open");
     menu.classList.toggle("open");
-    if (!wasOpen) await loadFavoritesIntoMenu();
   });
   document.addEventListener("click", () => menu.classList.remove("open"));
   menu.addEventListener("click", (e) => e.stopPropagation());

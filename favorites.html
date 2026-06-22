@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Favorites — Jaronite News</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="masthead">
+      <a href="/"><img src="/logo.png" alt="Jaronite News Logo" style="display:block;"></a>
+      <div class="masthead-text">
+        <h1>Jaronite <span>News</span> Inc.</h1>
+        <div class="tagline">DemocracyCraft's Official Press — Est. 2024</div>
+      </div>
+    </div>
+    <nav class="site-nav">
+      <a href="/">Home</a>
+      <a href="/articles">All Articles</a>
+      <a href="/politics">Politics</a>
+      <a href="/economy">Economy</a>
+      <a href="/guides">Guides</a>
+      <a href="/miscellaneous">Misc</a>
+      <a href="/favorites" class="nav-favorites-btn active">♡ Favorites</a>
+      <a href="/portal">Staff Portal</a>
+      <div class="reader-auth" id="reader-auth"></div>
+    </nav>
+  </div>
+</header>
+
+<main class="category-page">
+  <div class="category-page-header">
+    <div class="breadcrumb"><a href="/">Home</a> / My Favorites</div>
+    <h1>My Favorites</h1>
+    <div class="category-accent-bar" style="background:#e91e8c;"></div>
+  </div>
+
+  <div id="favorites-wrap">
+    <div class="article-loading" style="text-align:center;padding:60px 0;color:var(--ink-muted);font-size:0.95rem;">
+      Checking login…
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
+  <a href="/portal">Staff Portal</a>
+</footer>
+
+<script src="/reader.js"></script>
+<script>
+  const CATEGORY_LABELS = {
+    politics: 'Politics', economy: 'Economy',
+    guides: 'Guides', miscellaneous: 'Miscellaneous'
+  };
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function slugify(title) {
+    return title.toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim()
+      .replace(/[\s-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+  }
+
+  let allFavorites = [];
+
+  async function loadFavorites() {
+    const wrap = document.getElementById('favorites-wrap');
+    const token = getReaderToken();
+
+    if (!token) {
+      wrap.innerHTML = `
+        <div class="state-empty" style="text-align:center;padding:60px 24px;">
+          <strong>Log in to see your favorites</strong>
+          <p style="margin:12px 0 20px;color:var(--ink-muted);font-size:0.9rem;">
+            Save articles with the ♡ button while reading, then find them all here.
+          </p>
+          <button class="reader-login-btn" onclick="startDiscordLogin()" style="margin:0 auto;">
+            <svg viewBox="0 0 127.14 96.36"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+            Login with Discord
+          </button>
+        </div>`;
+      return;
+    }
+
+    // Verify token is still valid
+    try {
+      const meRes = await fetch('/api/auth/discord/me', { headers: { Authorization: `Bearer ${token}` } });
+      const me = await meRes.json();
+      if (!me.loggedIn) {
+        clearReaderToken();
+        return loadFavorites(); // re-render as logged-out
+      }
+    } catch (e) { /* network hiccup — try loading anyway */ }
+
+    try {
+      const res = await fetch('/api/favorites', { headers: { Authorization: `Bearer ${token}` } });
+      allFavorites = await res.json();
+    } catch (e) {
+      wrap.innerHTML = '<div class="state-empty"><strong>Couldn\'t load favorites</strong>Check your connection and try again.</div>';
+      return;
+    }
+
+    if (!Array.isArray(allFavorites) || allFavorites.length === 0) {
+      wrap.innerHTML = `
+        <div class="state-empty" style="text-align:center;padding:60px 24px;">
+          <strong>No favorites yet</strong>
+          <p style="margin:12px 0;color:var(--ink-muted);font-size:0.9rem;">
+            Tap the ♡ on any article to save it here.
+          </p>
+          <a href="/articles" style="color:var(--mid-purple);font-size:0.9rem;">Browse all articles →</a>
+        </div>`;
+      return;
+    }
+
+    // Build controls + grid
+    wrap.innerHTML = `
+      <div class="article-controls">
+        <input type="search" id="fav-search" placeholder="Search favorites…" oninput="applyFilters()">
+        <select id="fav-sort" onchange="applyFilters()">
+          <option value="favorited">Recently favorited</option>
+          <option value="newest">Article date (newest)</option>
+          <option value="oldest">Article date (oldest)</option>
+          <option value="author">Author A–Z</option>
+          <option value="title">Title A–Z</option>
+        </select>
+        <span class="article-controls-count" id="fav-count"></span>
+      </div>
+      <div id="fav-grid" class="articles-grid"></div>`;
+
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q    = (document.getElementById('fav-search')?.value || '').trim().toLowerCase();
+    const sort = document.getElementById('fav-sort')?.value || 'favorited';
+
+    let filtered = allFavorites.filter(a => {
+      if (!q) return true;
+      return a.title.toLowerCase().includes(q) || a.author.toLowerCase().includes(q);
+    });
+
+    filtered = [...filtered].sort((a, b) => {
+      if (sort === 'favorited') return new Date(b.favorited_at) - new Date(a.favorited_at);
+      if (sort === 'newest')    return new Date(b.created_at)   - new Date(a.created_at);
+      if (sort === 'oldest')    return new Date(a.created_at)   - new Date(b.created_at);
+      if (sort === 'author')    return a.author.localeCompare(b.author);
+      if (sort === 'title')     return a.title.localeCompare(b.title);
+      return 0;
+    });
+
+    const countEl = document.getElementById('fav-count');
+    if (countEl) countEl.textContent = `${filtered.length} favorite${filtered.length !== 1 ? 's' : ''}`;
+
+    const grid = document.getElementById('fav-grid');
+    if (!grid) return;
+
+    if (filtered.length === 0) {
+      grid.innerHTML = '<div class="no-results-msg">No favorites match your search.</div>';
+      return;
+    }
+
+    grid.innerHTML = filtered.map(a => {
+      const catLabel = CATEGORY_LABELS[a.category] || a.category;
+      const slug = `${a.id}-${slugify(a.title)}`;
+      const favDate = new Date(a.favorited_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      return `
+        <a class="article-summary-card" style="position:relative;text-decoration:none;display:block;" href="/article/${slug}">
+          ${favButtonHtml(a.id, true, 'card-fav-btn')}
+          <div class="card-category">${escapeHtml(catLabel)}</div>
+          <h3>${escapeHtml(a.title)}</h3>
+          <div class="card-byline">By ${escapeHtml(a.author)}</div>
+          <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>
+          <div class="card-date" style="color:var(--mid-purple);margin-top:2px;">♡ Saved ${escapeHtml(favDate)}</div>
+        </a>`;
+    }).join('');
+
+    // Cards start marked as favorited; if user un-favorites one, remove it from the list
+    document.querySelectorAll('.card-fav-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // After toggle, if now un-favorited, remove from allFavorites and re-render
+        const id = parseInt(btn.dataset.articleId);
+        setTimeout(() => {
+          if (!btn.classList.contains('favorited')) {
+            allFavorites = allFavorites.filter(a => a.id !== id);
+            if (allFavorites.length === 0) {
+              loadFavorites(); // re-render empty state
+            } else {
+              applyFilters();
+            }
+          }
+        }, 400); // wait for toggle animation
+      });
+    });
+  }
+
+  loadFavorites();
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
+</script>
+
+</body>
+</html>
