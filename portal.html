@@ -403,6 +403,20 @@
           <option value="miscellaneous">Miscellaneous</option>
         </select>
         <textarea id="content" placeholder="Write your article here..."></textarea>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="color:#888;font-size:0.82rem;">Article Photo <span style="color:#555;">(optional — JPEG, PNG, WebP or GIF, max ~600 KB)</span></label>
+          <input type="file" id="article-photo" accept="image/jpeg,image/png,image/webp,image/gif"
+                 style="padding:6px 10px;font-size:0.82rem;" onchange="previewArticlePhoto('article-photo','article-photo-preview','article-photo-clear')">
+          <div id="article-photo-preview" style="display:none;position:relative;max-width:320px;">
+            <img id="article-photo-preview-img" src="" alt="Preview"
+                 style="width:100%;border-radius:6px;border:1px solid #333;display:block;">
+            <button id="article-photo-clear" onclick="clearArticlePhoto('article-photo','article-photo-preview','article-photo-clear')"
+                    style="position:absolute;top:6px;right:6px;width:auto!important;padding:4px 10px!important;font-size:0.75rem!important;background:#1a1a1a!important;border:1px solid #555!important;color:#aaa!important;">
+              ✕ Remove
+            </button>
+          </div>
+          <p id="article-photo-msg" style="color:#e74c3c;font-size:0.8rem;margin:0;"></p>
+        </div>
         <div class="claim-bar" style="margin-top:0;">
           <button onclick="postArticle()" style="width:auto; flex:1;">Submit for Review</button>
           <button id="instapublish-btn" onclick="instapublishArticle()" style="display:none; width:auto; flex:1; background:#2ecc71; color:#042e14;">Publish Directly</button>
@@ -557,7 +571,29 @@
     <div id="article-detail-edit-form" style="display:none; margin-bottom:20px;">
       <input type="text" id="article-detail-edit-title" style="margin-bottom:10px;">
       <textarea id="article-detail-edit-content"></textarea>
-      <button onclick="saveArticleDetailEdit()" style="width:auto; padding:10px 20px; margin-top:10px;">Save Changes</button>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+        <label style="color:#888;font-size:0.82rem;">Article Photo <span style="color:#555;">(optional)</span></label>
+        <input type="file" id="article-detail-edit-photo" accept="image/jpeg,image/png,image/webp,image/gif"
+               style="padding:6px 10px;font-size:0.82rem;" onchange="previewArticlePhoto('article-detail-edit-photo','article-detail-edit-photo-preview','article-detail-edit-photo-clear')">
+        <div id="article-detail-edit-photo-preview" style="display:none;position:relative;max-width:320px;">
+          <img id="article-detail-edit-photo-preview-img" src="" alt="Preview"
+               style="width:100%;border-radius:6px;border:1px solid #333;display:block;">
+          <button id="article-detail-edit-photo-clear" onclick="clearArticlePhoto('article-detail-edit-photo','article-detail-edit-photo-preview','article-detail-edit-photo-clear')"
+                  style="position:absolute;top:6px;right:6px;width:auto!important;padding:4px 10px!important;font-size:0.75rem!important;background:#1a1a1a!important;border:1px solid #555!important;color:#aaa!important;">
+            ✕ Remove
+          </button>
+        </div>
+        <div id="article-detail-edit-photo-current" style="display:none;margin-top:4px;">
+          <span style="color:#888;font-size:0.8rem;">Current photo:</span>
+          <img id="article-detail-edit-photo-current-img" src="" alt=""
+               style="max-width:200px;border-radius:4px;display:block;margin-top:4px;">
+          <button onclick="removeCurrentPhoto()" id="article-detail-remove-photo-btn"
+                  style="width:auto!important;padding:4px 10px!important;font-size:0.75rem!important;background:#3a1a1a!important;border:1px solid #a00000!important;color:#e74c3c!important;margin-top:6px;">
+            ✕ Remove current photo
+          </button>
+        </div>
+      </div>
+      <button onclick="saveArticleDetailEdit()" style="width:auto; padding:10px 20px; margin-top:12px;">Save Changes</button>
     </div>
     <div class="article-detail-actions" id="article-detail-actions"></div>
   </div>
@@ -713,32 +749,46 @@
     const title = document.getElementById('title').value;
     const category = document.getElementById('category').value;
     const content = document.getElementById('content').value;
+    const msg = document.getElementById('post-msg');
 
     if (!title || !content) {
-      document.getElementById('post-msg').textContent = 'Please fill in all fields.';
-      document.getElementById('post-msg').style.color = '#e74c3c';
+      msg.textContent = 'Please fill in all fields.';
+      msg.style.color = '#e74c3c';
       return;
+    }
+
+    let image_url = null;
+    const photoFile = document.getElementById('article-photo')?.files?.[0];
+    if (photoFile) {
+      const photoErr = document.getElementById('article-photo-msg');
+      try {
+        image_url = await fileToDataUrl(photoFile);
+      } catch (e) {
+        photoErr.textContent = e.message || 'Failed to read photo.';
+        return;
+      }
+      photoErr.textContent = '';
     }
 
     const res = await fetch('/api/articles', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ title, category, content })
+      body: JSON.stringify({ title, category, content, image_url })
     });
 
     const data = await res.json();
-    const msg = document.getElementById('post-msg');
     if (data.success) {
       msg.style.color = '#2ecc71';
       msg.textContent = 'Article submitted for review!';
       document.getElementById('title').value = '';
       document.getElementById('content').value = '';
+      clearArticlePhoto('article-photo','article-photo-preview','article-photo-clear');
       loadMyArticles();
       if (currentUser.role === 'editor' || currentUser.role === 'admin') loadPendingQueue();
       if (currentUser.role === 'admin') loadAdminArticles(window.currentAdminArticleFilter || 'all');
     } else {
       msg.style.color = '#e74c3c';
-      msg.textContent = 'Failed to submit article.';
+      msg.textContent = data.error || 'Failed to submit article.';
     }
   }
 
@@ -757,10 +807,23 @@
 
     if (!confirm('Publish this immediately, with no review?')) return;
 
+    let image_url = null;
+    const photoFile = document.getElementById('article-photo')?.files?.[0];
+    if (photoFile) {
+      const photoErr = document.getElementById('article-photo-msg');
+      try {
+        image_url = await fileToDataUrl(photoFile);
+      } catch (e) {
+        photoErr.textContent = e.message || 'Failed to read photo.';
+        return;
+      }
+      photoErr.textContent = '';
+    }
+
     const res = await fetch('/api/articles/instapublish', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ title, category, content })
+      body: JSON.stringify({ title, category, content, image_url })
     });
 
     const data = await res.json();
@@ -769,6 +832,7 @@
       msg.textContent = 'Published directly — no review needed.';
       document.getElementById('title').value = '';
       document.getElementById('content').value = '';
+      clearArticlePhoto('article-photo','article-photo-preview','article-photo-clear');
       loadMyArticles();
       if (currentUser.role === 'admin') loadAdminArticles(window.currentAdminArticleFilter || 'all');
     } else {
@@ -1292,12 +1356,29 @@
     refreshAllOpenLists();
   }
 
+  let _pendingRemovePhoto = false;
+
+  function removeCurrentPhoto() {
+    _pendingRemovePhoto = true;
+    document.getElementById('article-detail-edit-photo-current').style.display = 'none';
+  }
+
   function startResubmitFromDetail() {
+    _pendingRemovePhoto = false;
     fetch('/api/article-detail', {
       method: 'POST', headers: authHeaders(), body: JSON.stringify({ id: currentDetailArticle })
     }).then(r => r.json()).then(a => {
       document.getElementById('article-detail-edit-title').value = a.title;
       document.getElementById('article-detail-edit-content').value = a.content;
+      // Show existing photo if any
+      const existingWrap = document.getElementById('article-detail-edit-photo-current');
+      const existingImg = document.getElementById('article-detail-edit-photo-current-img');
+      if (a.image_url) {
+        existingImg.src = a.image_url;
+        existingWrap.style.display = 'block';
+      } else {
+        existingWrap.style.display = 'none';
+      }
       document.getElementById('article-detail-edit-form').style.display = 'block';
       // Repurpose the same edit form's save button for resubmission via a one-off override.
       const form = document.getElementById('article-detail-edit-form');
@@ -1306,9 +1387,14 @@
       saveBtn.onclick = async () => {
         const title = document.getElementById('article-detail-edit-title').value;
         const content = document.getElementById('article-detail-edit-content').value;
+        let image_url = undefined;
+        let remove_image = false;
+        const photoFile = document.getElementById('article-detail-edit-photo')?.files?.[0];
+        if (_pendingRemovePhoto) { remove_image = true; _pendingRemovePhoto = false; }
+        else if (photoFile) { try { image_url = await fileToDataUrl(photoFile); } catch (e) { alert(e.message || 'Photo error'); return; } }
         const res = await fetch('/api/my-articles/resubmit', {
           method: 'POST', headers: authHeaders(),
-          body: JSON.stringify({ id: currentDetailArticle, title, content })
+          body: JSON.stringify({ id: currentDetailArticle, title, content, image_url, remove_image })
         });
         const data = await res.json();
         if (data.success) {
@@ -1731,6 +1817,58 @@
   function escapeJs(str) {
     return str.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');
   }
+
+  // ---- Photo upload helpers ----
+
+  /**
+   * Read a File into a base64 data URL, enforcing a size cap.
+   * @param {File} file
+   * @returns {Promise<string>}
+   */
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const MAX = 800_000; // ~600 KB raw -> ~800 KB base64
+      if (file.size > MAX * 0.75) {
+        reject(new Error(`Image is too large (max ~600 KB). Please compress it and try again.`));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (result.length > MAX) {
+          reject(new Error('Image is too large after encoding (max ~600 KB).'));
+        } else {
+          resolve(result);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function previewArticlePhoto(inputId, previewWrapperId, clearBtnId) {
+    const input = document.getElementById(inputId);
+    const wrap  = document.getElementById(previewWrapperId);
+    const img   = document.getElementById(previewWrapperId + '-img');
+    const file  = input?.files?.[0];
+    if (!file || !img || !wrap) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      img.src = e.target.result;
+      wrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearArticlePhoto(inputId, previewWrapperId, clearBtnId) {
+    const input = document.getElementById(inputId);
+    const wrap  = document.getElementById(previewWrapperId);
+    const img   = document.getElementById(previewWrapperId + '-img');
+    if (input) input.value = '';
+    if (img)   img.src = '';
+    if (wrap)  wrap.style.display = 'none';
+  }
+
 </script>
 
 </body>

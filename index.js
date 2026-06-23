@@ -153,6 +153,23 @@ const VALID_CATEGORIES = new Set(["politics", "economy", "guides", "miscellaneou
 const MAX_TITLE_LEN   = 300;
 const MAX_CONTENT_LEN = 100_000;
 const MAX_COMMENT_LEN = 2000;
+const MAX_IMAGE_BYTES = 800_000; // ~800 KB base64 data URL
+
+/**
+ * Validate an image_url field: must be null/undefined, or a data URL
+ * with a safe image MIME type and within the size cap.
+ * @param {any} val
+ * @returns {string|null} cleaned value or null
+ */
+function validateImageUrl(val) {
+  if (!val) return null;
+  if (typeof val !== "string") return null;
+  if (!val.startsWith("data:image/")) return null;
+  const allowed = ["data:image/jpeg;base64,", "data:image/jpg;base64,", "data:image/png;base64,", "data:image/gif;base64,", "data:image/webp;base64,"];
+  if (!allowed.some(prefix => val.startsWith(prefix))) return null;
+  if (val.length > MAX_IMAGE_BYTES) return null;
+  return val;
+}
 
 async function verifyPassword(password, storedHash, storedSaltHex) {
   const { hash } = await hashPassword(password, storedSaltHex);
@@ -896,16 +913,18 @@ export default {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
-      const { title, category, content } = await request.json();
+      const { title, category, content, image_url: imageUrlRaw } = await request.json();
       if (!title || !title.trim()) return secureJson({ error: "Title is required." }, { status: 400 });
       if (!content || !content.trim()) return secureJson({ error: "Content is required." }, { status: 400 });
       if (!VALID_CATEGORIES.has(category)) return secureJson({ error: "Invalid category." }, { status: 400 });
       if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
       if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
+      const imageUrl = validateImageUrl(imageUrlRaw);
+      if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image (max ~600 KB, JPEG/PNG/WebP/GIF only)." }, { status: 400 });
 
       await env.DB.prepare(
-        "INSERT INTO articles (title, category, content, author, status) VALUES (?, ?, ?, ?, 'pending_review')"
-      ).bind(title.trim(), category, content.trim(), user.username).run();
+        "INSERT INTO articles (title, category, content, author, status, image_url) VALUES (?, ?, ?, ?, 'pending_review', ?)"
+      ).bind(title.trim(), category, content.trim(), user.username, imageUrl).run();
       await log(env, user.username, "POST_ARTICLE", `Submitted article "${title.trim()}" in category "${category}" for review`);
       return secureJson({ success: true });
     }
@@ -917,17 +936,19 @@ export default {
       const user = await requireEditorOrAdmin(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
-      const { title, category, content } = await request.json();
+      const { title, category, content, image_url: imageUrlRaw } = await request.json();
       if (!title || !content || !category) {
         return secureJson({ error: "Title, category, and content are all required." }, { status: 400 });
       }
       if (!VALID_CATEGORIES.has(category)) return secureJson({ error: "Invalid category." }, { status: 400 });
       if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
       if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
+      const imageUrl = validateImageUrl(imageUrlRaw);
+      if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image (max ~600 KB, JPEG/PNG/WebP/GIF only)." }, { status: 400 });
 
       await env.DB.prepare(
-        "INSERT INTO articles (title, category, content, author, status) VALUES (?, ?, ?, ?, 'published')"
-      ).bind(title.trim(), category, content.trim(), user.username).run();
+        "INSERT INTO articles (title, category, content, author, status, image_url) VALUES (?, ?, ?, ?, 'published', ?)"
+      ).bind(title.trim(), category, content.trim(), user.username, imageUrl).run();
       await log(env, user.username, "INSTAPUBLISH_ARTICLE", `Published article "${title.trim()}" in category "${category}" directly, bypassing review`);
       return secureJson({ success: true });
     }
@@ -1051,7 +1072,7 @@ export default {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
-      const { id, title, content } = await request.json();
+      const { id, title, content, image_url: imageUrlRaw, remove_image } = await request.json();
       const article = await env.DB.prepare(
         "SELECT * FROM articles WHERE id = ? AND author = ?"
       ).bind(id, user.username).first();
@@ -1061,9 +1082,20 @@ export default {
         return secureJson({ error: "This article isn't awaiting revision." }, { status: 400 });
       }
 
-      await env.DB.prepare(
-        "UPDATE articles SET title = ?, content = ?, status = 'claimed', review_notes = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      ).bind(title, content, id).run();
+      let imageUpdateSql = "";
+      let imageUpdateVal = undefined;
+      if (remove_image) {
+        imageUpdateSql = ", image_url = NULL";
+      } else if (imageUrlRaw !== undefined) {
+        const imageUrl = validateImageUrl(imageUrlRaw);
+        if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image." }, { status: 400 });
+        imageUpdateSql = ", image_url = ?";
+        imageUpdateVal = imageUrl;
+      }
+
+      const resubSql = `UPDATE articles SET title = ?, content = ?${imageUpdateSql}, status = 'claimed', review_notes = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+      const resubBinds = imageUpdateVal !== undefined ? [title, content, imageUpdateVal, id] : [title, content, id];
+      await env.DB.prepare(resubSql).bind(...resubBinds).run();
       await log(env, user.username, "RESUBMIT_ARTICLE", `Resubmitted article "${title}" (ID ${id}) to ${article.claimed_by} after revision`);
       return secureJson({ success: true });
     }
@@ -1265,13 +1297,29 @@ export default {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
-      const { id, title, content } = await request.json();
+      const { id, title, content, image_url: imageUrlRaw, remove_image } = await request.json();
       if (!title || !title.trim()) return secureJson({ error: "Title is required." }, { status: 400 });
       if (!content || !content.trim()) return secureJson({ error: "Content is required." }, { status: 400 });
       if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
       if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
 
-      await env.DB.prepare("UPDATE articles SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(title.trim(), content.trim(), id).run();
+      // image_url: pass a new data URL to replace, pass remove_image:true to clear, omit both to leave as-is
+      let imageUpdateSql = "";
+      let imageUpdateVal = undefined;
+      if (remove_image) {
+        imageUpdateSql = ", image_url = NULL";
+      } else if (imageUrlRaw !== undefined) {
+        const imageUrl = validateImageUrl(imageUrlRaw);
+        if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image." }, { status: 400 });
+        imageUpdateSql = ", image_url = ?";
+        imageUpdateVal = imageUrl;
+      }
+
+      const sql = `UPDATE articles SET title = ?, content = ?${imageUpdateSql}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+      const binds = imageUpdateVal !== undefined
+        ? [title.trim(), content.trim(), imageUpdateVal, id]
+        : [title.trim(), content.trim(), id];
+      await env.DB.prepare(sql).bind(...binds).run();
       await log(env, admin.username, "EDIT_ARTICLE", `Edited article ID ${id} — new title: "${title.trim()}"`);
       return secureJson({ success: true });
     }

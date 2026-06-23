@@ -145,13 +145,19 @@
     container.className = 'articles-grid';
     container.innerHTML = articles.map((a, i) => {
       const articleSlug = `${a.id}-${slugify(a.title)}`;
+      const thumbHtml = a.image_url
+        ? `<img class="card-thumb" src="${escapeHtml(a.image_url)}" alt="${escapeHtml(a.title)}" loading="lazy">`
+        : '';
       return `
-        <a class="article-summary-card" style="position:relative;text-decoration:none;display:block;" href="/article/${articleSlug}">
+        <a class="article-summary-card${a.image_url ? ' has-thumb' : ''}" style="position:relative;text-decoration:none;display:block;" href="/article/${articleSlug}">
           ${favButtonHtml(a.id, false, 'card-fav-btn')}
-          <div class="card-category">${CATEGORY_LABEL}</div>
-          <h3>${escapeHtml(a.title)}</h3>
-          <div class="card-byline">By ${escapeHtml(a.author)}</div>
-          <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</div>
+          ${thumbHtml}
+          <div class="card-text">
+            <div class="card-category">${CATEGORY_LABEL}</div>
+            <h3>${escapeHtml(a.title)}</h3>
+            <div class="card-byline">By ${escapeHtml(a.author)}</div>
+            <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</div>
+          </div>
         </a>`;
     }).join('');
 
@@ -185,6 +191,20 @@
     document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
     document.getElementById('modal-title').textContent = a.title;
     document.getElementById('modal-meta').innerHTML = buildBylineMeta(a) + favButtonHtml(a.id, false);
+    // Banner image sits between header and body; insert/remove as needed
+    const existing = document.getElementById('modal-banner-img');
+    if (existing) existing.remove();
+    if (a.image_url) {
+      const bannerImg = document.createElement('img');
+      bannerImg.id = 'modal-banner-img';
+      bannerImg.className = 'article-modal-banner';
+      bannerImg.src = a.image_url;
+      bannerImg.alt = a.title;
+      bannerImg.loading = 'lazy';
+      // Insert before modal-body
+      const body = document.getElementById('modal-body');
+      body.parentNode.insertBefore(bannerImg, body);
+    }
     document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
     document.getElementById('modal-comments').innerHTML = commentsSectionHtml(a.id);
     loadComments(a.id, document.getElementById('comments-list'));

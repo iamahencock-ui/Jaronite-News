@@ -458,7 +458,59 @@ body {
   letter-spacing: 0.05em;
 }
 
+/* ---------- ARTICLE CARD THUMBNAIL ---------- */
+
+.card-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 7px;
+  display: block;
+  margin-bottom: 4px;
+  /* thumbnail sits above the text content in the card */
+}
+
+/* When a card has a thumbnail, reduce top padding slightly */
+.article-summary-card.has-thumb {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.article-summary-card.has-thumb .card-thumb {
+  /* negative margin bleeds the image to card edges, padding resumes below */
+  margin: 0 0 14px;
+  border-radius: 9px 9px 0 0;
+  width: calc(100% + 0px); /* full bleed within the card */
+}
+
+.article-summary-card.has-thumb .card-text {
+  padding: 0 2px;
+}
+
+/* ---------- ARTICLE PAGE BANNER ---------- */
+
+.article-page-banner {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+  margin-bottom: 28px;
+}
+
+/* ---------- ARTICLE MODAL BANNER ---------- */
+
+.article-modal-banner {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+  /* sits flush against the header, no border-radius on top */
+  border-radius: 0;
+}
+
 /* ---------- ARTICLE MODAL ---------- */
+
 
 .article-modal-overlay {
   display: none;

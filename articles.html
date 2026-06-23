@@ -135,13 +135,19 @@
     container.innerHTML = filtered.map(a => {
       const catLabel = CATEGORY_LABELS[a.category] || a.category;
       const slug = `${a.id}-${slugify(a.title)}`;
+      const thumbHtml = a.image_url
+        ? `<img class="card-thumb" src="${escapeHtml(a.image_url)}" alt="${escapeHtml(a.title)}" loading="lazy">`
+        : '';
       return `
-        <a class="article-summary-card" style="position:relative;text-decoration:none;display:block;" href="/article/${slug}">
+        <a class="article-summary-card${a.image_url ? ' has-thumb' : ''}" style="position:relative;text-decoration:none;display:block;" href="/article/${slug}">
           ${favButtonHtml(a.id, false, 'card-fav-btn')}
-          <div class="card-category">${escapeHtml(catLabel)}</div>
-          <h3>${escapeHtml(a.title)}</h3>
-          <div class="card-byline">By ${escapeHtml(a.author)}</div>
-          <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>
+          ${thumbHtml}
+          <div class="card-text">
+            <div class="card-category">${escapeHtml(catLabel)}</div>
+            <h3>${escapeHtml(a.title)}</h3>
+            <div class="card-byline">By ${escapeHtml(a.author)}</div>
+            <div class="card-date">${new Date(a.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>
+          </div>
         </a>`;
     }).join('');
 

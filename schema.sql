@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS articles (
   reviewed_by TEXT,
   -- instructions on return, or reason on denial. Shown to the writer.
   review_notes TEXT,
+  -- Optional banner/thumbnail photo, stored as a base64 data URL.
+  -- NULL when no photo was uploaded. Max ~800 KB enforced in the API.
+  image_url TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -132,3 +135,16 @@ CREATE INDEX IF NOT EXISTS idx_favorites_article_id ON favorites(article_id);
 CREATE INDEX IF NOT EXISTS idx_page_views_article_id ON page_views(article_id);
 CREATE INDEX IF NOT EXISTS idx_page_views_created_at ON page_views(created_at);
 CREATE INDEX IF NOT EXISTS idx_page_views_visitor_id ON page_views(visitor_id);
+-- ============================================================
+-- Article photos: optional banner image stored as a base64
+-- data URL (e.g. "data:image/jpeg;base64,...").
+-- NULL means no photo was attached; the UI falls back to the
+-- existing text-only layout in that case.
+-- Column added via ALTER TABLE in production:
+--   ALTER TABLE articles ADD COLUMN image_url TEXT;
+-- The CREATE TABLE above already defines articles without it,
+-- so we add it here for new installs and document the migration.
+-- ============================================================
+-- For new installs the column is included in the CREATE TABLE.
+-- For existing installs run:
+--   ALTER TABLE articles ADD COLUMN image_url TEXT;
