@@ -79,6 +79,81 @@ async function hashArticleText(title, content) {
  * @param {string} storedSaltHex - The hex-encoded salt stored alongside that hash.
  * @returns {Promise<boolean>} True if the password is correct.
  */
+
+// ---------- security headers ----------
+
+/**
+ * Standard security headers added to every HTML/API response.
+ * CSP stops injected scripts; the rest are defence-in-depth headers that
+ * cost nothing but significantly raise the bar for common attack classes.
+ */
+function securityHeaders(extraHeaders = {}) {
+  return {
+    "Content-Security-Policy":
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com data:; connect-src 'self' https://discord.com; font-src 'self'; frame-ancestors 'none';",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    ...extraHeaders,
+  };
+}
+
+/**
+ * Wrap a JSON response with security headers.
+ */
+function secureJson(data, init = {}) {
+  const res = Response.json(data, init);
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(securityHeaders())) headers.set(k, v);
+  return new Response(res.body, { status: res.status, headers });
+}
+
+// ---------- in-memory rate limiting ----------
+//
+// Simple token-bucket per key (IP-based for login; user-id-based for comments).
+// Workers are single-threaded, so no locking needed. The map is bounded by
+// keeping only the last-seen timestamp per key — entries expire naturally as
+// the map is pruned on each check. This is best-effort (resets on Worker
+// restart / new isolate), not a hard guarantee, but it's sufficient to slow
+// down brute-force and comment-spam attacks significantly.
+
+const rateLimitStore = new Map(); // key -> { count, windowStart }
+
+/**
+ * Check whether a key has exceeded its rate limit.
+ * @param {string} key        - Unique identifier (e.g. IP, user id).
+ * @param {number} maxCalls   - Maximum calls allowed in the window.
+ * @param {number} windowMs   - Window length in milliseconds.
+ * @returns {boolean} true if the request should be blocked.
+ */
+function isRateLimited(key, maxCalls, windowMs) {
+  const now = Date.now();
+  let entry = rateLimitStore.get(key);
+  if (!entry || now - entry.windowStart > windowMs) {
+    entry = { count: 1, windowStart: now };
+    rateLimitStore.set(key, entry);
+    return false;
+  }
+  entry.count++;
+  if (entry.count > maxCalls) return true;
+  return false;
+}
+
+// Prune stale entries periodically so the map doesn't grow unboundedly.
+// Called on each rate-limit check — O(n) but the map stays small in practice.
+function pruneRateLimitStore(maxAgeMs = 60_000) {
+  const cutoff = Date.now() - maxAgeMs;
+  for (const [key, entry] of rateLimitStore) {
+    if (entry.windowStart < cutoff) rateLimitStore.delete(key);
+  }
+}
+
+const VALID_CATEGORIES = new Set(["politics", "economy", "guides", "miscellaneous"]);
+const MAX_TITLE_LEN   = 300;
+const MAX_CONTENT_LEN = 100_000;
+const MAX_COMMENT_LEN = 2000;
+
 async function verifyPassword(password, storedHash, storedSaltHex) {
   const { hash } = await hashPassword(password, storedSaltHex);
   if (hash.length !== storedHash.length) return false;
@@ -353,9 +428,21 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Cloudflare sets CF-Connecting-IP on every request; fall back to a
+    // request-id derivative so rate limiting still works in local dev.
+    const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+
     // API: Login
     if (url.pathname === "/api/login" && request.method === "POST") {
+      pruneRateLimitStore();
+      // 10 attempts per IP per minute to slow brute-force without locking out legitimate users.
+      if (isRateLimited(`login:${clientIp}`, 10, 60_000)) {
+        return secureJson({ success: false, error: "Too many login attempts — try again in a minute." }, { status: 429 });
+      }
+
       const { username, password } = await request.json();
+      if (!username || !password) return secureJson({ success: false }, { status: 400 });
+
       const user = await env.DB.prepare(
         "SELECT * FROM users WHERE username = ?"
       ).bind(username).first();
@@ -371,10 +458,10 @@ export default {
         await env.DB.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE username = ?").bind(user.username).run();
 
         await log(env, username, "LOGIN", "Logged into employee portal");
-        return Response.json({ success: true, token, user: { username: user.username, role: user.role } });
+        return secureJson({ success: true, token, user: { username: user.username, role: user.role } });
       }
       await log(env, username, "FAILED_LOGIN", "Failed login attempt");
-      return Response.json({ success: false });
+      return secureJson({ success: false });
     }
 
     // API: Logout
@@ -382,7 +469,7 @@ export default {
       const authHeader = request.headers.get("Authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
       if (token) await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(token).run();
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ============================================================
@@ -413,6 +500,10 @@ export default {
     // back to the site with the token + state in the URL fragment (never
     // the query string — fragments aren't sent to the server or logged).
     if (url.pathname === "/api/auth/discord/callback" && request.method === "GET") {
+      pruneRateLimitStore();
+      if (isRateLimited(`discord_cb:${clientIp}`, 20, 60_000)) {
+        return Response.redirect(`${url.origin}/?discord_error=rate_limited`, 302);
+      }
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state") || "";
       if (!code) return Response.redirect(`${url.origin}/?discord_error=missing_code`, 302);
@@ -488,8 +579,8 @@ export default {
     // to restore a logged-in reader's name/avatar from a stored token.
     if (url.pathname === "/api/auth/discord/me" && request.method === "GET") {
       const reader = await getDiscordSessionUser(env, request);
-      if (!reader) return Response.json({ loggedIn: false });
-      return Response.json({
+      if (!reader) return secureJson({ loggedIn: false });
+      return secureJson({
         loggedIn: true,
         username: reader.username,
         avatarUrl: reader.avatar_hash
@@ -503,7 +594,7 @@ export default {
       const authHeader = request.headers.get("Authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
       if (token) await env.DB.prepare("DELETE FROM discord_sessions WHERE token = ?").bind(token).run();
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ============================================================
@@ -513,7 +604,7 @@ export default {
     // PUBLIC: list visible comments for an article, oldest first.
     if (url.pathname === "/api/comments" && request.method === "GET") {
       const articleId = url.searchParams.get("article_id");
-      if (!articleId) return Response.json({ error: "Missing article_id" }, { status: 400 });
+      if (!articleId) return secureJson({ error: "Missing article_id" }, { status: 400 });
 
       const results = await env.DB.prepare(
         `SELECT comments.id, comments.content, comments.created_at, discord_users.username, discord_users.avatar_hash, discord_users.discord_id
@@ -529,41 +620,50 @@ export default {
         username: c.username,
         avatarUrl: c.avatar_hash ? `https://cdn.discordapp.com/avatars/${c.discord_id}/${c.avatar_hash}.png` : null,
       }));
-      return Response.json(comments);
+      return secureJson(comments);
     }
 
     // AUTH'D READER: post a comment.
     if (url.pathname === "/api/comments" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
-      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
+
+      // 5 comments per Discord user per minute — prevents spam flooding.
+      pruneRateLimitStore();
+      if (isRateLimited(`comment:${reader.id}`, 5, 60_000)) {
+        return secureJson({ error: "You're posting too fast — please wait a moment." }, { status: 429 });
+      }
 
       const { article_id, content } = await request.json();
       const trimmed = (content || "").trim();
-      if (!trimmed) return Response.json({ error: "Comment cannot be empty" }, { status: 400 });
-      if (trimmed.length > 2000) return Response.json({ error: "Comment is too long (2000 character max)" }, { status: 400 });
+      if (!trimmed) return secureJson({ error: "Comment cannot be empty" }, { status: 400 });
+      if (trimmed.length > MAX_COMMENT_LEN) return secureJson({ error: `Comment is too long (${MAX_COMMENT_LEN} character max)` }, { status: 400 });
 
-      const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ? AND status = 'published'").bind(article_id).first();
-      if (!article) return Response.json({ error: "Article not found" }, { status: 404 });
+      const articleIdInt = parseInt(article_id, 10);
+      if (!articleIdInt || isNaN(articleIdInt)) return secureJson({ error: "Invalid article" }, { status: 400 });
+
+      const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ? AND status = 'published'").bind(articleIdInt).first();
+      if (!article) return secureJson({ error: "Article not found" }, { status: 404 });
 
       await env.DB.prepare(
         "INSERT INTO comments (article_id, discord_user_id, content) VALUES (?, ?, ?)"
-      ).bind(article_id, reader.id, trimmed).run();
-      return Response.json({ success: true });
+      ).bind(articleIdInt, reader.id, trimmed).run();
+      return secureJson({ success: true });
     }
 
     // AUTH'D READER: delete own comment (soft delete).
     if (url.pathname === "/api/comments/delete" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
-      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const { comment_id } = await request.json();
       const comment = await env.DB.prepare("SELECT discord_user_id FROM comments WHERE id = ?").bind(comment_id).first();
       if (!comment || comment.discord_user_id !== reader.id) {
-        return Response.json({ error: "Not found or not yours" }, { status: 404 });
+        return secureJson({ error: "Not found or not yours" }, { status: 404 });
       }
 
       await env.DB.prepare("UPDATE comments SET status = 'removed' WHERE id = ?").bind(comment_id).run();
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ============================================================
@@ -574,7 +674,7 @@ export default {
     // rendering the "My Favorites" menu without a second round of lookups).
     if (url.pathname === "/api/favorites" && request.method === "GET") {
       const reader = await getDiscordSessionUser(env, request);
-      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const results = await env.DB.prepare(
         `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at, favorites.created_at as favorited_at
@@ -582,7 +682,7 @@ export default {
          WHERE favorites.discord_user_id = ? AND articles.status = 'published'
          ORDER BY favorites.created_at DESC`
       ).bind(reader.id).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // AUTH'D READER: toggle favorite status for an article (favorite if not
@@ -590,7 +690,7 @@ export default {
     // so the client can flip its heart icon without a separate GET.
     if (url.pathname === "/api/favorites/toggle" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
-      if (!reader) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const { article_id } = await request.json();
       const existing = await env.DB.prepare(
@@ -599,12 +699,12 @@ export default {
 
       if (existing) {
         await env.DB.prepare("DELETE FROM favorites WHERE id = ?").bind(existing.id).run();
-        return Response.json({ favorited: false });
+        return secureJson({ favorited: false });
       } else {
         await env.DB.prepare(
           "INSERT INTO favorites (discord_user_id, article_id) VALUES (?, ?)"
         ).bind(reader.id, article_id).run();
-        return Response.json({ favorited: true });
+        return secureJson({ favorited: true });
       }
     }
 
@@ -613,16 +713,16 @@ export default {
     // a whole category grid in one call instead of one round-trip per card.
     if (url.pathname === "/api/favorites/check" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
-      if (!reader) return Response.json({ favorited: [] });
+      if (!reader) return secureJson({ favorited: [] });
 
       const { article_ids } = await request.json();
-      if (!Array.isArray(article_ids) || article_ids.length === 0) return Response.json({ favorited: [] });
+      if (!Array.isArray(article_ids) || article_ids.length === 0) return secureJson({ favorited: [] });
 
       const placeholders = article_ids.map(() => "?").join(",");
       const results = await env.DB.prepare(
         `SELECT article_id FROM favorites WHERE discord_user_id = ? AND article_id IN (${placeholders})`
       ).bind(reader.id, ...article_ids).all();
-      return Response.json({ favorited: results.results.map((r) => r.article_id) });
+      return secureJson({ favorited: results.results.map((r) => r.article_id) });
     }
 
     // ============================================================
@@ -636,10 +736,10 @@ export default {
     // could be).
     if (url.pathname === "/api/analytics/view" && request.method === "POST") {
       const { article_id, visitor_id, referrer } = await request.json();
-      if (!article_id || !visitor_id) return Response.json({ error: "Missing fields" }, { status: 400 });
+      if (!article_id || !visitor_id) return secureJson({ error: "Missing fields" }, { status: 400 });
 
       const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ?").bind(article_id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
       const ua = request.headers.get("User-Agent") || "";
       const { deviceType, browser, os } = parseUserAgent(ua);
@@ -656,7 +756,7 @@ export default {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(article_id, visitor_id, referrer || "", referrerDomain, ua, deviceType, browser, os, reader ? 1 : 0).run();
 
-      return Response.json({ success: true, view_id: inserted.meta.last_row_id });
+      return secureJson({ success: true, view_id: inserted.meta.last_row_id });
     }
 
     // PUBLIC: heartbeat ping while an article stays open, updating read time
@@ -666,12 +766,12 @@ export default {
     // not just "tab was open in the background".
     if (url.pathname === "/api/analytics/ping" && request.method === "POST") {
       const { view_id, read_seconds, max_scroll_pct } = await request.json();
-      if (!view_id) return Response.json({ error: "Missing view_id" }, { status: 400 });
+      if (!view_id) return secureJson({ error: "Missing view_id" }, { status: 400 });
 
       await env.DB.prepare(
         "UPDATE page_views SET read_seconds = ?, max_scroll_pct = ? WHERE id = ?"
       ).bind(read_seconds || 0, max_scroll_pct || 0, view_id).run();
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // AUTH'D (any staff): full analytics dashboard for one article. Writers
@@ -681,13 +781,13 @@ export default {
     // stats) so the dashboard renders from a single round trip.
     if (url.pathname === "/api/analytics/article" && request.method === "POST") {
       const user = await getSessionUser(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const { article_id } = await request.json();
       const article = await env.DB.prepare("SELECT id, title, author FROM articles WHERE id = ?").bind(article_id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.author !== user.username && user.role !== "editor" && user.role !== "admin") {
-        return Response.json({ error: "Unauthorized" }, { status: 403 });
+        return secureJson({ error: "Unauthorized" }, { status: 403 });
       }
 
       const totals = await env.DB.prepare(
@@ -728,7 +828,7 @@ export default {
          FROM page_views WHERE article_id = ?`
       ).bind(article_id).first();
 
-      return Response.json({
+      return secureJson({
         article: { id: article.id, title: article.title },
         totals: {
           total_views: totals.total_views || 0,
@@ -752,7 +852,7 @@ export default {
     // Powers a "My Articles" overview table sorted by views.
     if (url.pathname === "/api/analytics/summary" && request.method === "POST") {
       const user = await getSessionUser(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const body = await request.json().catch(() => ({}));
       let targetUsername = user.username;
@@ -784,7 +884,7 @@ export default {
         ...r,
         avg_read_seconds: Math.round(r.avg_read_seconds || 0),
       }));
-      return Response.json(rows);
+      return secureJson(rows);
     }
 
     // API: Submit article (writers, editors, admins all submit through here)
@@ -794,14 +894,20 @@ export default {
     // review use /api/articles/instapublish instead.
     if (url.pathname === "/api/articles" && request.method === "POST") {
       const user = await getSessionUser(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const { title, category, content } = await request.json();
+      if (!title || !title.trim()) return secureJson({ error: "Title is required." }, { status: 400 });
+      if (!content || !content.trim()) return secureJson({ error: "Content is required." }, { status: 400 });
+      if (!VALID_CATEGORIES.has(category)) return secureJson({ error: "Invalid category." }, { status: 400 });
+      if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
+      if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
+
       await env.DB.prepare(
         "INSERT INTO articles (title, category, content, author, status) VALUES (?, ?, ?, ?, 'pending_review')"
-      ).bind(title, category, content, user.username).run();
-      await log(env, user.username, "POST_ARTICLE", `Submitted article "${title}" in category "${category}" for review`);
-      return Response.json({ success: true });
+      ).bind(title.trim(), category, content.trim(), user.username).run();
+      await log(env, user.username, "POST_ARTICLE", `Submitted article "${title.trim()}" in category "${category}" for review`);
+      return secureJson({ success: true });
     }
 
     // EDITOR/ADMIN: publish an article immediately, skipping the review pipeline
@@ -809,23 +915,28 @@ export default {
     // so it's clear in the audit trail that it bypassed review.
     if (url.pathname === "/api/articles/instapublish" && request.method === "POST") {
       const user = await requireEditorOrAdmin(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { title, category, content } = await request.json();
       if (!title || !content || !category) {
-        return Response.json({ error: "Title, category, and content are all required." }, { status: 400 });
+        return secureJson({ error: "Title, category, and content are all required." }, { status: 400 });
       }
+      if (!VALID_CATEGORIES.has(category)) return secureJson({ error: "Invalid category." }, { status: 400 });
+      if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
+      if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
 
       await env.DB.prepare(
         "INSERT INTO articles (title, category, content, author, status) VALUES (?, ?, ?, ?, 'published')"
-      ).bind(title, category, content, user.username).run();
-      await log(env, user.username, "INSTAPUBLISH_ARTICLE", `Published article "${title}" in category "${category}" directly, bypassing review`);
-      return Response.json({ success: true });
+      ).bind(title.trim(), category, content.trim(), user.username).run();
+      await log(env, user.username, "INSTAPUBLISH_ARTICLE", `Published article "${title.trim()}" in category "${category}" directly, bypassing review`);
+      return secureJson({ success: true });
     }
 
     // API: Get published articles by category (public-facing pages)
     if (url.pathname === "/api/articles" && request.method === "GET") {
       const category = url.searchParams.get("category");
+      if (!VALID_CATEGORIES.has(category)) return secureJson([], { status: 200 });
+
       const results = await env.DB.prepare(
         "SELECT * FROM articles WHERE category = ? AND status = 'published' ORDER BY created_at DESC"
       ).bind(category).all();
@@ -836,11 +947,15 @@ export default {
         ...a,
         slug: `${a.id}-${slugify(a.title)}`,
       }));
-      return Response.json(articles);
+      return secureJson(articles);
     }
 
     // PUBLIC: fetch ALL published articles across every category, newest first.
     if (url.pathname === "/api/articles/all" && request.method === "GET") {
+      pruneRateLimitStore();
+      if (isRateLimited(`articles_all:${clientIp}`, 30, 60_000)) {
+        return secureJson({ error: "Too many requests" }, { status: 429 });
+      }
       const results = await env.DB.prepare(
         "SELECT * FROM articles WHERE status = 'published' ORDER BY created_at DESC"
       ).all();
@@ -848,7 +963,7 @@ export default {
         ...a,
         slug: `${a.id}-${slugify(a.title)}`,
       }));
-      return Response.json(articles);
+      return secureJson(articles);
     }
 
     // PUBLIC: fetch one published article by its id-slug for the /article/* page.
@@ -860,14 +975,14 @@ export default {
     if (url.pathname.startsWith("/api/article/") && request.method === "GET") {
       const param = url.pathname.slice("/api/article/".length);
       const id = parseInt(param.split("-")[0], 10);
-      if (!id || isNaN(id)) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!id || isNaN(id)) return secureJson({ error: "Not found" }, { status: 404 });
 
       const article = await env.DB.prepare(
         "SELECT * FROM articles WHERE id = ? AND status = 'published'"
       ).bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
-      return Response.json({ ...article, slug: `${article.id}-${slugify(article.title)}` });
+      return secureJson({ ...article, slug: `${article.id}-${slugify(article.title)}` });
     }
 
     // API: Lightweight integrity check for an open article (public, no auth).
@@ -878,7 +993,7 @@ export default {
     // article modal; cheap enough on D1 to call frequently.
     if (url.pathname === "/api/article-hash" && request.method === "GET") {
       const id = url.searchParams.get("id");
-      if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
+      if (!id) return secureJson({ error: "Missing id" }, { status: 400 });
 
       const article = await env.DB.prepare(
         "SELECT title, content FROM articles WHERE id = ? AND status = 'published'"
@@ -886,10 +1001,10 @@ export default {
 
       // Article was deleted, censored, or never existed — tell the client
       // explicitly rather than letting a hash mismatch imply "edited".
-      if (!article) return Response.json({ exists: false });
+      if (!article) return secureJson({ exists: false });
 
       const hash = await hashArticleText(article.title, article.content);
-      return Response.json({ exists: true, hash });
+      return secureJson({ exists: true, hash });
     }
 
     // ---------------- SHARED: article detail (powers the click-to-expand overlay) ----------------
@@ -900,18 +1015,18 @@ export default {
     // frontend shows still re-validates against its own route exactly as before.
     if (url.pathname === "/api/article-detail" && request.method === "POST") {
       const user = await getSessionUser(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
       const isPrivileged = user.role === "editor" || user.role === "admin";
       if (!isPrivileged && article.author !== user.username) {
-        return Response.json({ error: "Unauthorized" }, { status: 403 });
+        return secureJson({ error: "Unauthorized" }, { status: 403 });
       }
 
-      return Response.json(article);
+      return secureJson(article);
     }
 
     // ---------------- WRITER: "My Articles" ----------------
@@ -921,12 +1036,12 @@ export default {
     // on articles that are in the 'returned' state.
     if (url.pathname === "/api/my-articles" && request.method === "POST") {
       const user = await getSessionUser(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const results = await env.DB.prepare(
         "SELECT id, title, category, content, status, claimed_by, review_notes, created_at, updated_at FROM articles WHERE author = ? ORDER BY updated_at DESC"
       ).bind(user.username).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // WRITER: resubmit a 'returned' article with revised content.
@@ -934,23 +1049,23 @@ export default {
     // it does not re-enter the open pending_review pool.
     if (url.pathname === "/api/my-articles/resubmit" && request.method === "POST") {
       const user = await getSessionUser(env, request);
-      if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const { id, title, content } = await request.json();
       const article = await env.DB.prepare(
         "SELECT * FROM articles WHERE id = ? AND author = ?"
       ).bind(id, user.username).first();
 
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.status !== "returned") {
-        return Response.json({ error: "This article isn't awaiting revision." }, { status: 400 });
+        return secureJson({ error: "This article isn't awaiting revision." }, { status: 400 });
       }
 
       await env.DB.prepare(
         "UPDATE articles SET title = ?, content = ?, status = 'claimed', review_notes = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(title, content, id).run();
       await log(env, user.username, "RESUBMIT_ARTICLE", `Resubmitted article "${title}" (ID ${id}) to ${article.claimed_by} after revision`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ---------------- EDITOR (and admin): review queue ----------------
@@ -958,44 +1073,44 @@ export default {
     // EDITOR/ADMIN: pending_review queue (open pool, nothing claimed yet)
     if (url.pathname === "/api/editor/pending" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const results = await env.DB.prepare(
         "SELECT id, title, category, author, status, created_at FROM articles WHERE status = 'pending_review' ORDER BY created_at ASC"
       ).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // EDITOR/ADMIN: claim a pending article. Once claimed, it disappears from
     // other editors' pending queue, but admins still see it (with claimed_by shown).
     if (url.pathname === "/api/editor/claim" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.status !== "pending_review") {
-        return Response.json({ error: "This article has already been claimed or is no longer pending." }, { status: 409 });
+        return secureJson({ error: "This article has already been claimed or is no longer pending." }, { status: 409 });
       }
 
       await env.DB.prepare(
         "UPDATE articles SET status = 'claimed', claimed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(reviewer.username, id).run();
       await log(env, reviewer.username, "CLAIM_ARTICLE", `Claimed article "${article.title}" (ID ${id}) for review`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // EDITOR/ADMIN: "My Review Box" — articles claimed by the logged-in reviewer
     // (includes ones returned-and-not-yet-resubmitted, since they stay claimed).
     if (url.pathname === "/api/editor/my-claims" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const results = await env.DB.prepare(
         "SELECT id, title, category, author, content, status, review_notes, created_at, updated_at FROM articles WHERE claimed_by = ? AND status IN ('claimed', 'returned') ORDER BY updated_at DESC"
       ).bind(reviewer.username).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // ADMIN-ONLY: full view of every claimed/in-progress article across all editors,
@@ -1005,12 +1120,12 @@ export default {
     // needing to claim it first.
     if (url.pathname === "/api/admin/all-claimed" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const results = await env.DB.prepare(
         "SELECT id, title, category, author, content, status, claimed_by, review_notes, created_at, updated_at FROM articles WHERE status IN ('claimed', 'returned') ORDER BY updated_at DESC"
       ).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // ADMIN-ONLY: take over ("steal") any in-progress article, regardless of who
@@ -1019,13 +1134,13 @@ export default {
     // visible in the audit trail that it was taken from another reviewer.
     if (url.pathname === "/api/admin/steal-claim" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (!["pending_review", "claimed", "returned"].includes(article.status)) {
-        return Response.json({ error: "This article isn't in a reviewable state." }, { status: 400 });
+        return secureJson({ error: "This article isn't in a reviewable state." }, { status: 400 });
       }
 
       const previousOwner = article.claimed_by; // null if it was still in the open pool
@@ -1043,17 +1158,17 @@ export default {
           ? `Took over article "${article.title}" (ID ${id}) from ${previousOwner}`
           : `Claimed article "${article.title}" (ID ${id}) directly from the pending pool`
       );
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // EDITOR/ADMIN: approve a claimed (or, for admins, returned) article -> published
     if (url.pathname === "/api/editor/approve" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
       // Editors may only act on their own 'claimed' articles. Admins may also act
       // directly on a 'returned' article (bypassing the writer's revision step)
@@ -1062,36 +1177,36 @@ export default {
       const editorCanAct = reviewer.role !== "admin" && article.status === "claimed" && article.claimed_by === reviewer.username;
       if (!adminCanAct && !editorCanAct) {
         if (article.status !== "claimed" && article.status !== "returned") {
-          return Response.json({ error: "Only claimed or returned articles can be approved." }, { status: 400 });
+          return secureJson({ error: "Only claimed or returned articles can be approved." }, { status: 400 });
         }
-        return Response.json({ error: "This article is claimed by another editor." }, { status: 403 });
+        return secureJson({ error: "This article is claimed by another editor." }, { status: 403 });
       }
 
       await env.DB.prepare(
         "UPDATE articles SET status = 'published', reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(reviewer.username, id).run();
       await log(env, reviewer.username, "APPROVE_ARTICLE", `Approved and published article "${article.title}" (ID ${id}) by ${article.author}`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // EDITOR/ADMIN: return a claimed article to the writer with instructions.
     // Stays claimed by the same reviewer.
     if (url.pathname === "/api/editor/return" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id, notes } = await request.json();
       if (!notes || !notes.trim()) {
-        return Response.json({ error: "Instructions are required when returning an article." }, { status: 400 });
+        return secureJson({ error: "Instructions are required when returning an article." }, { status: 400 });
       }
 
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.status !== "claimed") {
-        return Response.json({ error: "Only claimed articles can be returned." }, { status: 400 });
+        return secureJson({ error: "Only claimed articles can be returned." }, { status: 400 });
       }
       if (reviewer.role !== "admin" && article.claimed_by !== reviewer.username) {
-        return Response.json({ error: "This article is claimed by another editor." }, { status: 403 });
+        return secureJson({ error: "This article is claimed by another editor." }, { status: 403 });
       }
 
       // Admins keep the existing claimed_by as-is unless they've already stolen the
@@ -1100,33 +1215,33 @@ export default {
         "UPDATE articles SET status = 'returned', review_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(notes, id).run();
       await log(env, reviewer.username, "RETURN_ARTICLE", `Returned article "${article.title}" (ID ${id}) to ${article.author} with revision notes`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // EDITOR/ADMIN: deny a claimed (or, for admins, returned) article. Permanent —
     // kept in DB, writer can see why.
     if (url.pathname === "/api/editor/deny" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id, notes } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
-      if (!article) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
       const adminCanAct = reviewer.role === "admin" && (article.status === "claimed" || article.status === "returned");
       const editorCanAct = reviewer.role !== "admin" && article.status === "claimed" && article.claimed_by === reviewer.username;
       if (!adminCanAct && !editorCanAct) {
         if (article.status !== "claimed" && article.status !== "returned") {
-          return Response.json({ error: "Only claimed or returned articles can be denied." }, { status: 400 });
+          return secureJson({ error: "Only claimed or returned articles can be denied." }, { status: 400 });
         }
-        return Response.json({ error: "This article is claimed by another editor." }, { status: 403 });
+        return secureJson({ error: "This article is claimed by another editor." }, { status: 403 });
       }
 
       await env.DB.prepare(
         "UPDATE articles SET status = 'denied', review_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(notes || null, id).run();
       await log(env, reviewer.username, "DENY_ARTICLE", `Denied article "${article.title}" (ID ${id}) by ${article.author}`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ---------------- ADMIN: published-article moderation (unchanged) ----------------
@@ -1134,7 +1249,7 @@ export default {
     // ADMIN: Get all articles (any status)
     if (url.pathname === "/api/admin/articles" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { filter } = await request.json();
       let query = "SELECT * FROM articles ORDER BY created_at DESC";
@@ -1142,43 +1257,48 @@ export default {
       if (filter === "published") query = "SELECT * FROM articles WHERE status = 'published' ORDER BY created_at DESC";
 
       const results = await env.DB.prepare(query).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // ADMIN: Edit article
     if (url.pathname === "/api/admin/edit" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id, title, content } = await request.json();
-      await env.DB.prepare("UPDATE articles SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(title, content, id).run();
-      await log(env, admin.username, "EDIT_ARTICLE", `Edited article ID ${id} — new title: "${title}"`);
-      return Response.json({ success: true });
+      if (!title || !title.trim()) return secureJson({ error: "Title is required." }, { status: 400 });
+      if (!content || !content.trim()) return secureJson({ error: "Content is required." }, { status: 400 });
+      if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
+      if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
+
+      await env.DB.prepare("UPDATE articles SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(title.trim(), content.trim(), id).run();
+      await log(env, admin.username, "EDIT_ARTICLE", `Edited article ID ${id} — new title: "${title.trim()}"`);
+      return secureJson({ success: true });
     }
 
     // ADMIN: Censor/uncensor a PUBLISHED article (post-publish takedown — separate from the review pipeline)
     if (url.pathname === "/api/admin/censor" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT status FROM articles WHERE id = ?").bind(id).first();
       const newStatus = article.status === "censored" ? "published" : "censored";
       await env.DB.prepare("UPDATE articles SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(newStatus, id).run();
       await log(env, admin.username, newStatus === "censored" ? "CENSOR_ARTICLE" : "UNCENSOR_ARTICLE", `Article ID ${id} set to ${newStatus}`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ADMIN: Delete article
     if (url.pathname === "/api/admin/delete" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT title FROM articles WHERE id = ?").bind(id).first();
       await env.DB.prepare("DELETE FROM articles WHERE id = ?").bind(id).run();
       await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${id} — "${article?.title}"`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ---------------- ADMIN: user management (unchanged) ----------------
@@ -1186,87 +1306,92 @@ export default {
     // ADMIN: Get all users
     if (url.pathname === "/api/admin/users" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const results = await env.DB.prepare(
         "SELECT id, username, role, status, created_at, last_login_at FROM users ORDER BY role ASC"
       ).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // ADMIN: Get single user's full (non-credential) profile
     if (url.pathname === "/api/admin/user-detail" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { targetId } = await request.json();
       const target = await env.DB.prepare(
         "SELECT id, username, role, status, created_at, last_login_at FROM users WHERE id = ?"
       ).bind(targetId).first();
-      if (!target) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!target) return secureJson({ error: "Not found" }, { status: 404 });
 
       const articleCount = await env.DB.prepare(
         "SELECT COUNT(*) as count FROM articles WHERE author = ?"
       ).bind(target.username).first();
 
-      return Response.json({ ...target, article_count: articleCount.count });
+      return secureJson({ ...target, article_count: articleCount.count });
     }
 
     // ADMIN: Get a single user's complete action history
     if (url.pathname === "/api/admin/user-history" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { targetId } = await request.json();
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
-      if (!target) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!target) return secureJson({ error: "Not found" }, { status: 404 });
 
       const results = await env.DB.prepare(
         "SELECT id, action, details, created_at FROM logs WHERE username = ? ORDER BY created_at DESC LIMIT 500"
       ).bind(target.username).all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // ADMIN: Create user
     if (url.pathname === "/api/admin/create-user" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { newUsername, newPassword, role } = await request.json();
-      const existing = await env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(newUsername).first();
-      if (existing) return Response.json({ error: "Username already exists" });
+      if (!newUsername || !newUsername.trim()) return secureJson({ error: "Username is required." }, { status: 400 });
+      if (!newPassword || newPassword.length < 8) return secureJson({ error: "Password must be at least 8 characters." }, { status: 400 });
+      if (!["writer", "editor", "admin"].includes(role)) return secureJson({ error: "Invalid role." }, { status: 400 });
+      if (newUsername.trim().length > 64) return secureJson({ error: "Username too long." }, { status: 400 });
+
+      const existing = await env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(newUsername.trim()).first();
+      if (existing) return secureJson({ error: "Username already exists" });
 
       const { hash, salt } = await hashPassword(newPassword);
       await env.DB.prepare(
         "INSERT INTO users (username, password, password_salt, role, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(newUsername, hash, salt, role).run();
-      await log(env, admin.username, "CREATE_USER", `Created user "${newUsername}" with role "${role}"`);
-      return Response.json({ success: true });
+      ).bind(newUsername.trim(), hash, salt, role).run();
+      await log(env, admin.username, "CREATE_USER", `Created user "${newUsername.trim()}" with role "${role}"`);
+      return secureJson({ success: true });
     }
 
     // ADMIN: Change user role (writer | editor | admin)
     if (url.pathname === "/api/admin/change-role" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { targetId, role } = await request.json();
       if (!["writer", "editor", "admin"].includes(role)) {
-        return Response.json({ error: "Invalid role" }, { status: 400 });
+        return secureJson({ error: "Invalid role" }, { status: 400 });
       }
 
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       await env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, targetId).run();
       await log(env, admin.username, "CHANGE_ROLE", `Changed role of "${target?.username}" to "${role}"`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ADMIN: Suspend / reactivate user
     if (url.pathname === "/api/admin/set-status" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { targetId, status } = await request.json();
-      if (!["active", "suspended"].includes(status)) return Response.json({ error: "Invalid status" }, { status: 400 });
+      if (!["active", "suspended"].includes(status)) return secureJson({ error: "Invalid status" }, { status: 400 });
 
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       await env.DB.prepare("UPDATE users SET status = ? WHERE id = ?").bind(status, targetId).run();
@@ -1274,45 +1399,45 @@ export default {
         await env.DB.prepare("DELETE FROM sessions WHERE username = ?").bind(target.username).run();
       }
       await log(env, admin.username, "SET_USER_STATUS", `Set status of "${target?.username}" to "${status}"`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ADMIN: Reset a user's password (admin sets a new one; old one is never shown)
     if (url.pathname === "/api/admin/reset-password" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { targetId, newPassword } = await request.json();
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
-      if (!target) return Response.json({ error: "Not found" }, { status: 404 });
+      if (!target) return secureJson({ error: "Not found" }, { status: 404 });
 
       const { hash, salt } = await hashPassword(newPassword);
       await env.DB.prepare("UPDATE users SET password = ?, password_salt = ? WHERE id = ?").bind(hash, salt, targetId).run();
       await env.DB.prepare("DELETE FROM sessions WHERE username = ?").bind(target.username).run();
       await log(env, admin.username, "RESET_PASSWORD", `Reset password for "${target.username}"`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ADMIN: Delete user
     if (url.pathname === "/api/admin/delete-user" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { targetId } = await request.json();
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(targetId).run();
       if (target) await env.DB.prepare("DELETE FROM sessions WHERE username = ?").bind(target.username).run();
       await log(env, admin.username, "DELETE_USER", `Deleted user "${target?.username}"`);
-      return Response.json({ success: true });
+      return secureJson({ success: true });
     }
 
     // ADMIN: Get logs (global)
     if (url.pathname === "/api/admin/logs" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 403 });
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const results = await env.DB.prepare("SELECT * FROM logs ORDER BY created_at DESC LIMIT 500").all();
-      return Response.json(results.results);
+      return secureJson(results.results);
     }
 
     // Serve static files
@@ -1333,10 +1458,12 @@ export default {
     if (url.pathname === "/articles") {
       const articlesUrl = new URL("/articles.html", url.origin);
       try {
-        return await getAssetFromKV(
+        const ar = await getAssetFromKV(
           { request: new Request(articlesUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
+        const arH = new Headers(ar.headers); for (const [k,v] of Object.entries(securityHeaders())) arH.set(k,v);
+        return new Response(ar.body, { status: ar.status, headers: arH });
       } catch (e) {
         return new Response("Not found", { status: 404 });
       }
@@ -1346,10 +1473,12 @@ export default {
     if (url.pathname === "/favorites") {
       const favUrl = new URL("/favorites.html", url.origin);
       try {
-        return await getAssetFromKV(
+        const fv = await getAssetFromKV(
           { request: new Request(favUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
+        const fvH = new Headers(fv.headers); for (const [k,v] of Object.entries(securityHeaders())) fvH.set(k,v);
+        return new Response(fv.body, { status: fv.status, headers: fvH });
       } catch (e) {
         return new Response("Not found", { status: 404 });
       }
@@ -1359,10 +1488,12 @@ export default {
       const articleUrl = new URL("/article.html", url.origin);
       const articleRequest = new Request(articleUrl.toString(), request);
       try {
-        return await getAssetFromKV(
+        const ar2 = await getAssetFromKV(
           { request: articleRequest, waitUntil(promise) { return ctx.waitUntil(promise); } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
+        const ar2H = new Headers(ar2.headers); for (const [k,v] of Object.entries(securityHeaders())) ar2H.set(k,v);
+        return new Response(ar2.body, { status: ar2.status, headers: ar2H });
       } catch (e) {
         return new Response("Article page not found", { status: 404 });
       }
@@ -1373,10 +1504,12 @@ export default {
       try {
         const htmlUrl = new URL(url.pathname.replace(/\/$/, "") + ".html", url.origin);
         const htmlRequest = new Request(htmlUrl.toString(), request);
-        return await getAssetFromKV(
+        const htmlAsset = await getAssetFromKV(
           { request: htmlRequest, waitUntil(promise) { return ctx.waitUntil(promise); } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
+        const htmlH = new Headers(htmlAsset.headers); for (const [k,v] of Object.entries(securityHeaders())) htmlH.set(k,v);
+        return new Response(htmlAsset.body, { status: htmlAsset.status, headers: htmlH });
       } catch (e) {
         // No matching .html file — fall through to the normal lookup below
         // (covers extensionless static assets, if any, and produces the
@@ -1385,10 +1518,14 @@ export default {
     }
 
     try {
-      return await getAssetFromKV(
+      const assetResponse = await getAssetFromKV(
         { request, waitUntil(promise) { return ctx.waitUntil(promise); } },
         { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
       );
+      // Inject security headers on every served HTML/JS/CSS asset.
+      const newHeaders = new Headers(assetResponse.headers);
+      for (const [k, v] of Object.entries(securityHeaders())) newHeaders.set(k, v);
+      return new Response(assetResponse.body, { status: assetResponse.status, headers: newHeaders });
     } catch (e) {
       return new Response("404 Not Found", { status: 404 });
     }
