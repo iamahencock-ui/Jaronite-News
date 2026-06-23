@@ -109,6 +109,103 @@ function secureJson(data, init = {}) {
   return new Response(res.body, { status: res.status, headers });
 }
 
+
+// ================================================================
+// Resend email helper
+// Uses the Resend API (https://resend.com) — free tier, no smtp config.
+// Requires: RESEND_API_KEY secret  (npx wrangler secret put RESEND_API_KEY)
+//           RESEND_FROM_EMAIL env var in wrangler.toml, e.g. "ads@jaronitenews.com"
+// ================================================================
+async function sendEmail(env, { to, subject, html }) {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) { console.warn('RESEND_API_KEY not set — email skipped'); return; }
+  const from = env.RESEND_FROM_EMAIL || 'Jaronite News <ads@jaronitenews.com>';
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Resend error:', res.status, err);
+    }
+  } catch (e) {
+    console.error('Resend fetch failed:', e);
+  }
+}
+
+function winEmailHtml(bid, slotLabel) {
+  const totalEstimate = (bid.bid_amount * 100).toFixed(2); // rough estimate: 100 views/day
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#5b3fa0;">🎉 You won an ad slot on Jaronite News!</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>Your bid of <strong>${Number(bid.bid_amount).toFixed(2)} ℐ/view</strong> won the
+     <strong>${slotLabel}</strong> slot for <strong>${bid.target_date}</strong>.</p>
+  <h3 style="color:#5b3fa0;">How to pay</h3>
+  <p>Transfer payment to the <strong>Jaronite News Inc.</strong> firm account in-game using:</p>
+  <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
+    /pay JaroniteNews &lt;amount&gt; bid:${bid.id}
+  </div>
+  <p style="color:#666;font-size:0.9em;">
+    Include <strong>bid:${bid.id}</strong> exactly as shown in the memo/message field so we can match your payment automatically.<br>
+    You pay based on actual views — we'll send a final invoice after your ad runs.
+  </p>
+  <h3 style="color:#5b3fa0;">Your bid details</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;">
+    <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Rate</td><td><strong>${Number(bid.bid_amount).toFixed(2)} ℐ/view</strong></td></tr>
+  </table>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">
+    Questions? Reply to this email or contact us on Discord.<br>
+    — Jaronite News Inc.
+  </p>
+</div>`;
+}
+
+function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#27ae60;">✅ Payment received — your ad is confirmed!</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>We received your payment of <strong>${Number(amount).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
+     (${slotLabel}, ${bid.target_date}). Your ad is confirmed and will run as scheduled.</p>
+  <p>After your ad runs you'll receive a performance report with impressions, clicks, and your final cost.</p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+</div>`;
+}
+
+function reminderEmailHtml(bid, slotLabel, daysOverdue) {
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#e67e22;">⏰ Reminder: payment pending for your ad slot</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>This is a friendly reminder that payment for your winning ad bid is still outstanding.</p>
+  <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
+    /pay JaroniteNews &lt;amount&gt; bid:${bid.id}
+  </div>
+  <p style="color:#666;font-size:0.9em;">
+    Include <strong>bid:${bid.id}</strong> in the memo. If payment isn't received before your ad date (${bid.target_date}),
+    your slot may be forfeited.
+  </p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin-top:12px;">
+    <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Rate</td><td><strong>${Number(bid.bid_amount).toFixed(2)} ℐ/view</strong></td></tr>
+  </table>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+</div>`;
+}
+
+const SLOT_LABELS = { 1: 'Bottom Leaderboard (728×90)', 2: 'Left Skyscraper (160×600)', 3: 'Right Skyscraper (160×600)' };
+
 // ---------- in-memory rate limiting ----------
 //
 // Simple token-bucket per key (IP-based for login; user-id-based for comments).
@@ -1569,7 +1666,7 @@ export default {
     if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
       let body;
       try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
-      const { advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number } = body;
+      const { advertiser_name, contact, email, image_url, dest_url, bid_amount, target_date, slot_number } = body;
       if (!advertiser_name || !contact || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
         return new Response(JSON.stringify({ error: 'Missing required fields' }), {
           status: 400, headers: { 'Content-Type': 'application/json' }
@@ -1592,9 +1689,9 @@ export default {
         });
       }
       await env.DB.prepare(
-        `INSERT INTO ad_bids (advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(advertiser_name, contact, image_url, dest_url, Number(bid_amount), target_date, Number(slot_number)).run();
+        `INSERT INTO ad_bids (advertiser_name, contact, email, image_url, dest_url, bid_amount, target_date, slot_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(advertiser_name, contact, email || '', image_url, dest_url, Number(bid_amount), target_date, Number(slot_number)).run();
       return new Response(JSON.stringify({ ok: true, message: 'Bid received. Winners notified after 8 PM UTC.' }), {
         headers: { 'Content-Type': 'application/json', ...securityHeaders() }
       });
@@ -1762,6 +1859,17 @@ export default {
       ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), amount, bidId).run();
 
       console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (expected ${bid.bid_amount}, received ${amount})`);
+
+      // Send payment confirmation email if we have an address
+      if ((paymentStatus === 'paid' || paymentStatus === 'overpaid') && bid.email) {
+        const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+        await sendEmail(env, {
+          to: bid.email,
+          subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
+          html: paymentConfirmedEmailHtml(bid, slotLabel, amount),
+        });
+      }
+
       return new Response('ok', { status: 200 });
     }
 
@@ -1870,15 +1978,6 @@ export default {
       }
     }
 
-    // API routes that fell through to here have no handler — return 404 JSON
-    // rather than letting the asset handler try to serve them as HTML files.
-    if (url.pathname.startsWith('/api/')) {
-      return new Response(JSON.stringify({ error: 'Not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(url.pathname);
     if (!hasExtension && url.pathname !== "/") {
       try {
@@ -1953,6 +2052,16 @@ export default {
           `UPDATE ad_bids SET status = 'won', payment_status = 'awaiting_payment' WHERE id = ?`
         ).bind(winner.id).run();
 
+        // Send win + payment instructions email
+        if (winner.email) {
+          const slotLabel = SLOT_LABELS[slot] || `Slot ${slot}`;
+          await sendEmail(env, {
+            to: winner.email,
+            subject: `🎉 You won a Jaronite News ad slot for ${targetDate}!`,
+            html: winEmailHtml(winner, slotLabel),
+          });
+        }
+
         // Mark all other pending bids for this slot/date as lost
         await env.DB.prepare(
           `UPDATE ad_bids SET status = 'lost'
@@ -1961,13 +2070,33 @@ export default {
       }
     }
 
-    // ---- Midnight UTC: clean up any still-pending bids for today (edge case) ----
+    // ---- Midnight UTC: clean up pending bids + send payment reminders ----
     if (hour === 0) {
       const today = new Date().toISOString().slice(0, 10);
       await env.DB.prepare(
         `UPDATE ad_bids SET status = 'lost'
          WHERE target_date <= ? AND status = 'pending'`
       ).bind(today).run();
+
+      // Send reminder emails for won-but-unpaid bids where the ad date is still upcoming
+      const unpaid = await env.DB.prepare(
+        `SELECT * FROM ad_bids
+         WHERE status = 'won'
+           AND payment_status IN ('awaiting_payment', 'underpaid')
+           AND target_date > ?
+           AND email IS NOT NULL AND email != ''`
+      ).bind(today).all();
+
+      for (const bid of (unpaid.results || [])) {
+        const wonAt = new Date(bid.updated_at || bid.created_at);
+        const daysOverdue = Math.floor((Date.now() - wonAt.getTime()) / 86400000);
+        const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+        await sendEmail(env, {
+          to: bid.email,
+          subject: `⏰ Reminder: payment pending for your Jaronite News ad #${bid.id}`,
+          html: reminderEmailHtml(bid, slotLabel, daysOverdue),
+        });
+      }
     }
   },
 };

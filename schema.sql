@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS ad_bids (
   bid_amount REAL NOT NULL,             -- amount in server currency
   target_date TEXT NOT NULL,            -- YYYY-MM-DD
   slot_number INTEGER NOT NULL CHECK(slot_number IN (1,2,3)),
+  email TEXT,                           -- advertiser email for automated notifications
   status TEXT DEFAULT 'pending',        -- 'pending' | 'won' | 'lost'
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -229,3 +230,6 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_delivery_id ON webhook_deliveries(delivery_id);
+
+-- Add email column to ad_bids for existing installs:
+--   ALTER TABLE ad_bids ADD COLUMN email TEXT;
