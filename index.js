@@ -1870,6 +1870,15 @@ export default {
       }
     }
 
+    // API routes that fell through to here have no handler — return 404 JSON
+    // rather than letting the asset handler try to serve them as HTML files.
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(url.pathname);
     if (!hasExtension && url.pathname !== "/") {
       try {
