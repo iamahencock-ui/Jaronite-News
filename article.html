@@ -151,6 +151,39 @@
       font-size: 0.88rem;
       color: #856404;
     }
+
+    /* ---- Dark reading mode ---- */
+    body.reader-dark-mode { background: #12121f; }
+    body.reader-dark-mode main { background: #12121f; }
+    body.reader-dark-mode .article-page-wrap { background: #12121f; }
+    body.reader-dark-mode .article-page-stamp { color: #a78bfa; }
+    body.reader-dark-mode .article-page-title { color: #e8e7f8; }
+    body.reader-dark-mode .article-page-meta { color: #9090b8; border-color: rgba(255,255,255,0.1); }
+    body.reader-dark-mode .article-page-body,
+    body.reader-dark-mode .article-page-body p,
+    body.reader-dark-mode .article-page-body li { color: #d0cfe8; }
+    body.reader-dark-mode .article-page-body h2,
+    body.reader-dark-mode .article-page-body h3,
+    body.reader-dark-mode .article-page-body h4 { color: #e8e7f8; }
+    body.reader-dark-mode .article-page-body a { color: #a78bfa; }
+    body.reader-dark-mode .article-page-body blockquote { border-left-color: #7c5cbf; background: rgba(124,92,191,0.15); color: #c4b5fd; }
+    body.reader-dark-mode .article-page-body code { background: rgba(255,255,255,0.08); color: #c4b5fd; }
+    body.reader-dark-mode .article-page-body hr { border-color: rgba(255,255,255,0.1); }
+    body.reader-dark-mode .article-page-body p:first-child::first-letter { color: #a78bfa; }
+    body.reader-dark-mode .article-share-bar { border-top-color: rgba(255,255,255,0.1); }
+    body.reader-dark-mode .share-btn { background: #1e1e38; border-color: rgba(255,255,255,0.12); color: #d0cfe8; }
+    body.reader-dark-mode .share-btn:hover { background: #26263e; }
+    body.reader-dark-mode .article-back-link { color: #a78bfa; }
+    body.reader-dark-mode #article-comments { background: #12121f; }
+    body.reader-dark-mode .comment-item { border-bottom-color: rgba(255,255,255,0.07); }
+    body.reader-dark-mode .comment-body,
+    body.reader-dark-mode .comment-author { color: #c0bfd8; }
+    body.reader-dark-mode .comment-date { color: #6060a0; }
+    body.reader-dark-mode .comment-input-area textarea { background: #1e1e38; color: #e0dff0; border-color: rgba(255,255,255,0.12); }
+
+    body, main, .article-page-wrap, .article-page-title,
+    .article-page-body, .article-page-meta, .article-page-stamp,
+    .share-btn, .article-share-bar { transition: background 0.3s, color 0.3s, border-color 0.3s; }
   </style>
 </head>
 <body>
@@ -412,6 +445,12 @@
 
   loadArticle();
   renderReaderAuthWidget(document.getElementById('reader-auth'));
+
+  // Apply dark reading mode from saved settings
+  try {
+    const s = JSON.parse(localStorage.getItem('jni_reader_settings') || '{}');
+    if (s.dark) document.body.classList.add('reader-dark-mode');
+  } catch {}
 </script>
 
 </body>

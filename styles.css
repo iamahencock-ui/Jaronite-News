@@ -1767,3 +1767,22 @@ body.reader-dark-mode .comment-date { color: #7070a0; }
 #modal-comments {
   transition: background 0.25s, color 0.25s, border-color 0.25s;
 }
+
+/* Dark mode for article modal (category pages) */
+body.reader-dark-mode .article-modal-overlay.open { background: rgba(0,0,0,0.85); }
+body.reader-dark-mode .article-modal { background: #1a1a2e; }
+body.reader-dark-mode .article-modal-body { color: #d0cfe8; }
+body.reader-dark-mode .article-modal-body p,
+body.reader-dark-mode .article-modal-body li { color: #d0cfe8; }
+body.reader-dark-mode .article-modal-body h2,
+body.reader-dark-mode .article-modal-body h3 { color: #e8e7f8; }
+body.reader-dark-mode .article-modal-body a { color: #a78bfa; }
+body.reader-dark-mode .article-modal-body blockquote { background: rgba(124,92,191,0.15); border-left-color: #7c5cbf; color: #c4b5fd; }
+body.reader-dark-mode .article-modal-body code { background: rgba(255,255,255,0.08); color: #c4b5fd; }
+body.reader-dark-mode .article-modal-meta { color: #9090b8; }
+body.reader-dark-mode #modal-comments { background: #16162a; }
+body.reader-dark-mode .comment-item { border-bottom-color: rgba(255,255,255,0.07); }
+body.reader-dark-mode .comment-body { color: #c0bfd8; }
+body.reader-dark-mode .comment-author { color: #e0dff0; }
+body.reader-dark-mode .comment-date { color: #6060a0; }
+body.reader-dark-mode .comment-input-area textarea { background: #1e1e38; color: #e0dff0; border-color: rgba(255,255,255,0.12); }

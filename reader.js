@@ -206,10 +206,6 @@ async function readerSettingChanged(key, value) {
 
 function applyDarkReadingMode(on) {
   document.body.classList.toggle("reader-dark-mode", on);
-  // Persist the modal/article bodies too if any are open
-  document.querySelectorAll(".article-modal-body, .article-page-body").forEach(el => {
-    el.classList.toggle("reader-dark-mode", on);
-  });
 }
 
 async function applyNotificationSetting(on) {
