@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advertise — Jaronite News Inc.</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .advertise-wrap {
+      max-width: 640px;
+      margin: 48px auto;
+      padding: 0 24px 64px;
+    }
+    .advertise-wrap h1 {
+      font-size: 2rem;
+      color: var(--deep-purple);
+      margin-bottom: 6px;
+    }
+    .advertise-wrap .subtitle {
+      color: var(--ink-muted);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+    .ad-info-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 32px;
+    }
+    .ad-info-box h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-muted);
+      margin: 0 0 12px;
+    }
+    .ad-info-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .ad-info-item {
+      flex: 1;
+      min-width: 140px;
+      background: var(--paper);
+      border-radius: 8px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+    }
+    .ad-info-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--ink-muted);
+      margin-bottom: 4px;
+    }
+    .ad-info-item .value {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--deep-purple);
+    }
+    .ad-form-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 28px;
+    }
+    .ad-form-card h2 {
+      font-size: 1.1rem;
+      margin: 0 0 20px;
+      color: var(--ink);
+    }
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--ink-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--mid-purple);
+    }
+    .form-group .hint {
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      margin-top: 5px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .ad-preview-box {
+      background: var(--paper);
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      width: 300px;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 12px 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .ad-preview-box img {
+      width: 300px;
+      height: 250px;
+      object-fit: contain;
+    }
+    .ad-preview-placeholder {
+      color: var(--ink-muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--deep-purple);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background .15s, opacity .15s;
+    }
+    .submit-btn:hover { background: var(--mid-purple); }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .form-notice {
+      display: none;
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-top: 16px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .form-notice.success {
+      background: #e8f5e9;
+      border: 1px solid #a5d6a7;
+      color: #2e7d32;
+      display: block;
+    }
+    .form-notice.error {
+      background: #ffebee;
+      border: 1px solid #ef9a9a;
+      color: #c62828;
+      display: block;
+    }
+    .timeline-box {
+      margin-top: 32px;
+      padding: 20px 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .timeline-box h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-muted);
+      margin: 0 0 14px;
+    }
+    .timeline-step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .timeline-step:last-child { margin-bottom: 0; }
+    .tl-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--deep-purple);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .tl-text strong { display: block; font-size: 0.9rem; color: var(--ink); }
+    .tl-text span { font-size: 0.82rem; color: var(--ink-muted); }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div class="masthead">
+      <a href="/"><img src="/logo.png" alt="Jaronite News Logo" style="display:block;"></a>
+      <div class="masthead-text">
+        <h1>Jaronite <span>News</span> Inc.</h1>
+        <div class="tagline">DemocracyCraft's Official Press — Est. 2024</div>
+      </div>
+    </div>
+    <nav class="site-nav">
+      <a href="/">Home</a>
+      <a href="/articles">All Articles</a>
+      <a href="/politics">Politics</a>
+      <a href="/economy">Economy</a>
+      <a href="/guides">Guides</a>
+      <a href="/miscellaneous">Misc</a>
+      <a href="/favorites" class="nav-favorites-btn">♡ Favorites</a>
+      <div class="reader-auth" id="reader-auth"></div>
+    </nav>
+  </div>
+</header>
+
+<div class="advertise-wrap">
+  <h1>Advertise with Us</h1>
+  <p class="subtitle">
+    Reach the DemocracyCraft community directly. We run <strong>3 ad slots per day</strong>,
+    awarded each evening to the highest bidders. Ads appear on every article page as a
+    300×250 image with your link.
+  </p>
+
+  <div class="ad-info-box">
+    <h3>Slot Details</h3>
+    <div class="ad-info-row">
+      <div class="ad-info-item">
+        <div class="label">Ad Size</div>
+        <div class="value">300 × 250 px</div>
+      </div>
+      <div class="ad-info-item">
+        <div class="label">Slots Per Day</div>
+        <div class="value">3</div>
+      </div>
+      <div class="ad-info-item">
+        <div class="label">Bidding Closes</div>
+        <div class="value">8 PM UTC</div>
+      </div>
+      <div class="ad-info-item">
+        <div class="label">Currency</div>
+        <div class="value">Jeronies</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ad-form-card">
+    <h2>Submit a Bid</h2>
+
+    <div class="form-group">
+      <label>Your Name / Business</label>
+      <input type="text" id="f-name" placeholder="e.g. JaroMart, BuildCo Inc.">
+    </div>
+
+    <div class="form-group">
+      <label>Contact (Discord tag or in-game name)</label>
+      <input type="text" id="f-contact" placeholder="e.g. username#0000 or YourIGN">
+      <div class="hint">We'll use this to notify you if you win, and for billing.</div>
+    </div>
+
+    <div class="form-group">
+      <label>Ad Image URL <span style="font-weight:400;text-transform:none;">(300×250 px)</span></label>
+      <input type="url" id="f-image" placeholder="https://i.imgur.com/yourimage.png" oninput="previewImage()">
+      <div class="hint">Host your image on Imgur, Discord CDN, or any public URL. Must be exactly 300×250 px.</div>
+      <div class="ad-preview-box" id="ad-preview-box">
+        <div class="ad-preview-placeholder" id="ad-preview-placeholder">Preview will appear here</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Click-Through URL</label>
+      <input type="url" id="f-dest" placeholder="https://your-destination.com">
+      <div class="hint">Where readers go when they click your ad.</div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Target Date</label>
+        <input type="date" id="f-date">
+        <div class="hint">The day you want your ad to run.</div>
+      </div>
+      <div class="form-group">
+        <label>Slot</label>
+        <select id="f-slot">
+          <option value="1">Slot 1</option>
+          <option value="2">Slot 2</option>
+          <option value="3">Slot 3</option>
+        </select>
+        <div class="hint">3 slots available per day.</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Bid Amount (Jeronies)</label>
+      <input type="number" id="f-bid" min="1" step="1" placeholder="e.g. 500">
+      <div class="hint">Highest 3 bids per day win their respective slots. Ties go to earliest submission.</div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitBid()">Submit Bid</button>
+    <div class="form-notice" id="form-notice"></div>
+  </div>
+
+  <div class="timeline-box">
+    <h3>How It Works</h3>
+    <div class="timeline-step">
+      <div class="tl-num">1</div>
+      <div class="tl-text">
+        <strong>Submit your bid</strong>
+        <span>Fill out the form above any time before 8 PM UTC on the day before your target date.</span>
+      </div>
+    </div>
+    <div class="timeline-step">
+      <div class="tl-num">2</div>
+      <div class="tl-text">
+        <strong>Bids are awarded automatically at 8 PM UTC</strong>
+        <span>The 3 highest bids for each date win their slots. You'll be notified via Discord.</span>
+      </div>
+    </div>
+    <div class="timeline-step">
+      <div class="tl-num">3</div>
+      <div class="tl-text">
+        <strong>Your ad runs all day</strong>
+        <span>It appears on every article page on your target date, with a live click counter.</span>
+      </div>
+    </div>
+    <div class="timeline-step">
+      <div class="tl-num">4</div>
+      <div class="tl-text">
+        <strong>Pay after the fact</strong>
+        <span>We'll send you a report with impressions, clicks, and your total owed.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity
+</footer>
+
+<script src="/reader.js"></script>
+<script>
+  // Set minimum date to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('f-date').min = tomorrow.toISOString().slice(0, 10);
+  document.getElementById('f-date').value = tomorrow.toISOString().slice(0, 10);
+
+  function previewImage() {
+    const url = document.getElementById('f-image').value.trim();
+    const box = document.getElementById('ad-preview-box');
+    const placeholder = document.getElementById('ad-preview-placeholder');
+    if (!url) {
+      box.innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
+      return;
+    }
+    box.innerHTML = `<img src="${url}" alt="Ad preview" onerror="this.parentNode.innerHTML='<div class=\\'ad-preview-placeholder\\' style=\\'color:#c62828\\'>Could not load image — check the URL</div>'">`; 
+  }
+
+  async function submitBid() {
+    const btn = document.getElementById('submit-btn');
+    const notice = document.getElementById('form-notice');
+    notice.className = 'form-notice';
+    notice.textContent = '';
+
+    const name    = document.getElementById('f-name').value.trim();
+    const contact = document.getElementById('f-contact').value.trim();
+    const image   = document.getElementById('f-image').value.trim();
+    const dest    = document.getElementById('f-dest').value.trim();
+    const date    = document.getElementById('f-date').value;
+    const slot    = document.getElementById('f-slot').value;
+    const bid     = parseFloat(document.getElementById('f-bid').value);
+
+    if (!name || !contact || !image || !dest || !date || !bid || bid <= 0) {
+      notice.className = 'form-notice error';
+      notice.textContent = 'Please fill in all fields with valid values.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    try {
+      const res = await fetch('/api/ads/bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          advertiser_name: name,
+          contact,
+          image_url: image,
+          dest_url: dest,
+          bid_amount: bid,
+          target_date: date,
+          slot_number: parseInt(slot)
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        notice.className = 'form-notice success';
+        notice.innerHTML = `✓ Bid received! Winners are notified after 8 PM UTC. Good luck!`;
+        // Reset form
+        ['f-name','f-contact','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('ad-preview-box').innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
+      } else {
+        notice.className = 'form-notice error';
+        notice.textContent = data.error || 'Something went wrong. Please try again.';
+      }
+    } catch (e) {
+      notice.className = 'form-notice error';
+      notice.textContent = 'Network error — please try again.';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Submit Bid';
+  }
+
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
+  try { const s = JSON.parse(localStorage.getItem('jni_reader_settings')||'{}'); if(s.dark) document.body.classList.add('reader-dark-mode'); } catch{}
+</script>
+
+</body>
+</html>

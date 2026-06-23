@@ -148,3 +148,53 @@ CREATE INDEX IF NOT EXISTS idx_page_views_visitor_id ON page_views(visitor_id);
 -- For new installs the column is included in the CREATE TABLE.
 -- For existing installs run:
 --   ALTER TABLE articles ADD COLUMN image_url TEXT;
+
+-- ============================================================
+-- Ad System (Step 1)
+-- Run: wrangler d1 execute jaronite-news-db --remote --file=./schema.sql
+-- ============================================================
+
+-- Bids submitted by advertisers via the public /advertise page.
+CREATE TABLE IF NOT EXISTS ad_bids (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  advertiser_name TEXT NOT NULL,
+  contact TEXT NOT NULL,                -- Discord tag, in-game name, etc.
+  image_url TEXT NOT NULL,              -- URL to their 300x250 ad image
+  dest_url TEXT NOT NULL,               -- click-through URL
+  bid_amount REAL NOT NULL,             -- amount in server currency
+  target_date TEXT NOT NULL,            -- YYYY-MM-DD
+  slot_number INTEGER NOT NULL CHECK(slot_number IN (1,2,3)),
+  status TEXT DEFAULT 'pending',        -- 'pending' | 'won' | 'lost'
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Winning ads scheduled per day per slot.
+-- Populated by the 8PM cron after awarding bids.
+CREATE TABLE IF NOT EXISTS ad_slots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slot_number INTEGER NOT NULL CHECK(slot_number IN (1,2,3)),
+  run_date TEXT NOT NULL,               -- YYYY-MM-DD
+  bid_id INTEGER NOT NULL REFERENCES ad_bids(id),
+  advertiser_name TEXT NOT NULL,
+  contact TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  dest_url TEXT NOT NULL,
+  bid_amount REAL NOT NULL,
+  impressions INTEGER DEFAULT 0,
+  clicks INTEGER DEFAULT 0,
+  UNIQUE(slot_number, run_date)
+);
+
+-- Per-event log for impressions and clicks (billing evidence).
+CREATE TABLE IF NOT EXISTS ad_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ad_slot_id INTEGER NOT NULL REFERENCES ad_slots(id),
+  event_type TEXT NOT NULL CHECK(event_type IN ('impression','click')),
+  visitor_id TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ad_bids_target_date ON ad_bids(target_date);
+CREATE INDEX IF NOT EXISTS idx_ad_bids_status ON ad_bids(status);
+CREATE INDEX IF NOT EXISTS idx_ad_slots_run_date ON ad_slots(run_date);
+CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);

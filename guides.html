@@ -78,16 +78,22 @@
   const CATEGORY_LABEL = 'Guides';
 
 
-  // ---- Ad slot ----
-  // To use a real image, replace AD_IMAGE_URL with the URL of your 300×250 ad image.
-  // Leave it as an empty string to show the placeholder.
-  const AD_IMAGE_URL = '';
-  const AD_LINK_URL  = '';  // Optional: URL to open when the ad is clicked
+  // ---- Ad slot — fetched live from /api/ads/current ----
+  let _liveAds = null;
 
-  function adSlotHtml() {
-    const inner = AD_IMAGE_URL
-      ? `<a href="${AD_LINK_URL || '#'}" target="_blank" rel="noopener noreferrer" style="display:block;">
-           <img class="article-ad-image" src="${AD_IMAGE_URL}" alt="Advertisement">
+  async function fetchLiveAds() {
+    if (_liveAds) return _liveAds;
+    try {
+      const res = await fetch('/api/ads/current');
+      _liveAds = await res.json();
+    } catch (e) { _liveAds = []; }
+    return _liveAds;
+  }
+
+  function adSlotHtml(slotAd) {
+    const inner = slotAd
+      ? `<a href="/api/ads/click/${slotAd.id}" target="_blank" rel="noopener noreferrer" style="display:block;">
+           <img class="article-ad-image" src="${escapeHtml(slotAd.image_url)}" alt="Advertisement">
          </a>`
       : `<div class="article-ad-placeholder">Advertisement<br>300 × 250</div>`;
     return `<div class="article-ad-slot"><span class="article-ad-label">Advertisement</span>${inner}</div>`;
@@ -225,7 +231,10 @@
   let renderedTitle   = null;
   let renderedContent = null;
 
-  function renderArticle(a) {
+  async function renderArticle(a) {
+    // Fetch today's live ads — slot 1 shown in modal
+    const ads = await fetchLiveAds();
+    const slotAd = ads.find(x => x.slot_number === 1) || null;
     document.getElementById('modal-stamp').textContent = `${CATEGORY_LABEL} · Jaronite News Inc.`;
     document.getElementById('modal-title').textContent = a.title;
     document.getElementById('modal-meta').innerHTML = buildBylineMeta(a) + favButtonHtml(a.id, false);
@@ -249,7 +258,7 @@
     if (existingAd) existingAd.remove();
     const adEl = document.createElement('div');
     adEl.id = 'modal-ad-slot';
-    adEl.innerHTML = adSlotHtml();
+    adEl.innerHTML = adSlotHtml(slotAd);
     document.getElementById('modal-comments').before(adEl);
     document.getElementById('modal-comments').innerHTML = commentsSectionHtml(a.id);
     loadComments(a.id, document.getElementById('comments-list'));

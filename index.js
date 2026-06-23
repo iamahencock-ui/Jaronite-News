@@ -1490,6 +1490,143 @@ export default {
 
     // Serve static files
     //
+    // ================================================================
+    // AD SYSTEM — Step 1 routes
+    // ================================================================
+
+    // ---- PAYMENT MODULE (stub — implement separately later) --------
+    // Receives the winning bid object. Replace with real payment logic.
+    // Must return a Promise resolving to { ok: true } or throw on failure.
+    async function processAdPayment(bid) {
+      // TODO: integrate Minecraft server currency payment here.
+      // bid = { id, advertiser_name, contact, bid_amount, target_date, slot_number }
+      return { ok: true, note: 'payment_pending_implementation' };
+    }
+    // ----------------------------------------------------------------
+
+    // POST /api/ads/bid  — public, no auth required
+    // Body: { advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number }
+    if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
+      const { advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number } = body;
+      if (!advertiser_name || !contact || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
+        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (![1, 2, 3].includes(Number(slot_number))) {
+        return new Response(JSON.stringify({ error: 'slot_number must be 1, 2, or 3' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (target_date <= todayStr) {
+        return new Response(JSON.stringify({ error: 'target_date must be a future date' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (Number(bid_amount) <= 0) {
+        return new Response(JSON.stringify({ error: 'bid_amount must be positive' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      await env.DB.prepare(
+        `INSERT INTO ad_bids (advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(advertiser_name, contact, image_url, dest_url, Number(bid_amount), target_date, Number(slot_number)).run();
+      return new Response(JSON.stringify({ ok: true, message: 'Bid received. Winners notified after 8 PM UTC.' }), {
+        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      });
+    }
+
+    // GET /api/ads/current
+    // Returns the 3 active ad slots for today. Article pages call this on load
+    // instead of using hardcoded AD_IMAGE_URL constants.
+    // Also records one impression per slot per request.
+    if (url.pathname === '/api/ads/current' && request.method === 'GET') {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await env.DB.prepare(
+        `SELECT id, slot_number, image_url, dest_url, advertiser_name
+         FROM ad_slots WHERE run_date = ? ORDER BY slot_number`
+      ).bind(today).all();
+      const visitorId = request.headers.get('Cookie')?.match(/jni_vid=([^;]+)/)?.[1] || null;
+      for (const row of (rows.results || [])) {
+        await env.DB.prepare(
+          `INSERT INTO ad_events (ad_slot_id, event_type, visitor_id) VALUES (?, 'impression', ?)`
+        ).bind(row.id, visitorId).run();
+        await env.DB.prepare(
+          `UPDATE ad_slots SET impressions = impressions + 1 WHERE id = ?`
+        ).bind(row.id).run();
+      }
+      return new Response(JSON.stringify(rows.results || []), {
+        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      });
+    }
+
+    // GET /api/ads/click/:slotId
+    // Records the click then redirects to the ad's destination URL.
+    if (url.pathname.startsWith('/api/ads/click/') && request.method === 'GET') {
+      const slotId = parseInt(url.pathname.slice('/api/ads/click/'.length));
+      if (!slotId) return new Response('Bad request', { status: 400 });
+      const row = await env.DB.prepare(
+        `SELECT dest_url FROM ad_slots WHERE id = ?`
+      ).bind(slotId).first();
+      if (!row) return new Response('Ad not found', { status: 404 });
+      const visitorId = request.headers.get('Cookie')?.match(/jni_vid=([^;]+)/)?.[1] || null;
+      await env.DB.prepare(
+        `INSERT INTO ad_events (ad_slot_id, event_type, visitor_id) VALUES (?, 'click', ?)`
+      ).bind(slotId, visitorId).run();
+      await env.DB.prepare(
+        `UPDATE ad_slots SET clicks = clicks + 1 WHERE id = ?`
+      ).bind(slotId).run();
+      return Response.redirect(row.dest_url, 302);
+    }
+
+    // POST /api/ads/report  — editor/admin only
+    // Body: { token, from_date?, to_date? }
+    if (url.pathname === '/api/ads/report' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
+      const { token, from_date, to_date } = body;
+      const session = token ? await env.DB.prepare(
+        `SELECT u.role FROM sessions s JOIN users u ON u.username = s.username
+         WHERE s.token = ? AND s.expires_at > datetime('now')`
+      ).bind(token).first() : null;
+      if (!session || !['admin', 'editor'].includes(session.role)) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+      }
+      const from = from_date || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const to   = to_date   || new Date().toISOString().slice(0, 10);
+      const rows = await env.DB.prepare(
+        `SELECT s.id, s.slot_number, s.run_date, s.advertiser_name, s.contact,
+                s.bid_amount, s.impressions, s.clicks,
+                CASE WHEN s.impressions > 0 THEN ROUND(100.0*s.clicks/s.impressions,2) ELSE 0 END AS ctr
+         FROM ad_slots s
+         WHERE s.run_date BETWEEN ? AND ?
+         ORDER BY s.run_date DESC, s.slot_number`
+      ).bind(from, to).all();
+      return new Response(JSON.stringify(rows.results || []), {
+        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      });
+    }
+
+    // /advertise → advertise.html (public bid form)
+    if (url.pathname === '/advertise') {
+      const advUrl = new URL('/advertise.html', url.origin);
+      try {
+        const advAsset = await getAssetFromKV(
+          { request: new Request(advUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
+          { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
+        );
+        const advH = new Headers(advAsset.headers);
+        for (const [k, v] of Object.entries(securityHeaders())) advH.set(k, v);
+        return new Response(advAsset.body, { status: advAsset.status, headers: advH });
+      } catch (e) {
+        return new Response('Not found', { status: 404 });
+      }
+    }
+
     // Clean-URL support: getAssetFromKV matches the exact pathname in the KV
     // manifest, so "/portal" would 404 even though "/portal.html" exists.
     // If the requested path has no file extension (and isn't the root "/"),
@@ -1576,6 +1713,71 @@ export default {
       return new Response(assetResponse.body, { status: assetResponse.status, headers: newHeaders });
     } catch (e) {
       return new Response("404 Not Found", { status: 404 });
+    }
+  },
+
+  // ================================================================
+  // CRON — Ad system automation
+  // Runs at 8 PM UTC (award bids) and midnight UTC (safety check).
+  // ================================================================
+  async scheduled(event, env, ctx) {
+    const hour = new Date().getUTCHours();
+
+    // ---- 8 PM UTC: award tomorrow's bids ----
+    if (hour === 20) {
+      const tomorrow = new Date();
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      const targetDate = tomorrow.toISOString().slice(0, 10);
+
+      // For each of the 3 slots, find the highest bid for tomorrow.
+      // Ties broken by earliest submission (lowest id).
+      for (let slot = 1; slot <= 3; slot++) {
+        const winner = await env.DB.prepare(
+          `SELECT * FROM ad_bids
+           WHERE target_date = ? AND slot_number = ? AND status = 'pending'
+           ORDER BY bid_amount DESC, id ASC LIMIT 1`
+        ).bind(targetDate, slot).first();
+
+        if (!winner) continue;
+
+        // ---- PAYMENT HOOK (stub) ----
+        // When payment is implemented, call it here before inserting the slot.
+        // try { await processAdPayment(winner); } catch { continue; }
+        // ----------------------------
+
+        // Insert into ad_slots (or update if already exists from a re-run)
+        await env.DB.prepare(
+          `INSERT INTO ad_slots (slot_number, run_date, bid_id, advertiser_name, contact, image_url, dest_url, bid_amount)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(slot_number, run_date) DO UPDATE SET
+             bid_id = excluded.bid_id,
+             advertiser_name = excluded.advertiser_name,
+             contact = excluded.contact,
+             image_url = excluded.image_url,
+             dest_url = excluded.dest_url,
+             bid_amount = excluded.bid_amount`
+        ).bind(slot, targetDate, winner.id, winner.advertiser_name, winner.contact, winner.image_url, winner.dest_url, winner.bid_amount).run();
+
+        // Mark winner
+        await env.DB.prepare(
+          `UPDATE ad_bids SET status = 'won' WHERE id = ?`
+        ).bind(winner.id).run();
+
+        // Mark all other pending bids for this slot/date as lost
+        await env.DB.prepare(
+          `UPDATE ad_bids SET status = 'lost'
+           WHERE target_date = ? AND slot_number = ? AND status = 'pending' AND id != ?`
+        ).bind(targetDate, slot, winner.id).run();
+      }
+    }
+
+    // ---- Midnight UTC: clean up any still-pending bids for today (edge case) ----
+    if (hour === 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      await env.DB.prepare(
+        `UPDATE ad_bids SET status = 'lost'
+         WHERE target_date <= ? AND status = 'pending'`
+      ).bind(today).run();
     }
   },
 };

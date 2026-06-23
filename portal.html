@@ -636,6 +636,20 @@
       <div id="analytics-summary-list">Loading...</div>
     </div>
 
+    <!-- ADMIN/EDITOR: AD REPORT -->
+    <div class="card" id="ad-report-section" style="display:none;">
+      <h2>Ad Report</h2>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Impressions, clicks, and billing summary for all ad slots.</p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+        <label style="font-size:0.82rem; color:#aaa;">From</label>
+        <input type="date" id="ad-report-from" style="padding:6px 10px; border-radius:6px; border:1px solid #333; background:#1a1a2e; color:#e0dff0; font-size:0.85rem;">
+        <label style="font-size:0.82rem; color:#aaa;">To</label>
+        <input type="date" id="ad-report-to" style="padding:6px 10px; border-radius:6px; border:1px solid #333; background:#1a1a2e; color:#e0dff0; font-size:0.85rem;">
+        <button onclick="loadAdReport()" style="padding:6px 16px; border-radius:6px; background:var(--mid-purple,#7c5cbf); color:#fff; border:none; cursor:pointer; font-size:0.85rem;">Run Report</button>
+      </div>
+      <div id="ad-report-list">Select a date range and click Run Report.</div>
+    </div>
+
     <!-- EDITOR (and admin): REVIEW QUEUE + REVIEW BOX -->
     <div class="card" id="editor-section" style="display:none;">
       <h2>Editorial Review</h2>
@@ -924,6 +938,9 @@
     loadAnalyticsSummary();
 
     if (role === 'editor' || role === 'admin') {
+      document.getElementById('ad-report-section').style.display = 'block';
+      initAdReportDates();
+
       document.getElementById('editor-section').style.display = 'block';
       loadPendingQueue();
       loadMyClaims();
@@ -1770,6 +1787,89 @@
       document.getElementById('admin-articles-list').style.display = 'block';
       loadAdminArticles(filter);
     }
+  }
+
+  // ---------- ad report (editor/admin) ----------
+
+  function initAdReportDates() {
+    const to = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    document.getElementById('ad-report-from').value = from;
+    document.getElementById('ad-report-to').value   = to;
+  }
+
+  async function loadAdReport() {
+    const container = document.getElementById('ad-report-list');
+    const from = document.getElementById('ad-report-from').value;
+    const to   = document.getElementById('ad-report-to').value;
+    container.textContent = 'Loading…';
+
+    let rows;
+    try {
+      const res = await fetch('/api/ads/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ from_date: from, to_date: to })
+      });
+      rows = await res.json();
+    } catch (e) {
+      container.textContent = 'Failed to load report.';
+      return;
+    }
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      container.innerHTML = '<p style="color:#888; font-size:0.9rem;">No ad slots ran in this date range.</p>';
+      return;
+    }
+
+    // Totals row
+    const totalImpressions = rows.reduce((s, r) => s + (r.impressions || 0), 0);
+    const totalClicks      = rows.reduce((s, r) => s + (r.clicks || 0), 0);
+    const totalRevenue     = rows.reduce((s, r) => s + (r.bid_amount || 0), 0);
+    const avgCtr           = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0.00';
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;">
+        ${[
+          ['Total Impressions', totalImpressions.toLocaleString()],
+          ['Total Clicks', totalClicks.toLocaleString()],
+          ['Avg CTR', avgCtr + '%'],
+          ['Total Revenue', totalRevenue.toLocaleString() + ' J'],
+        ].map(([label, val]) => `
+          <div style="background:#1a1a2e; border:1px solid #2a2a4a; border-radius:8px; padding:14px 16px;">
+            <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:.08em; color:#888; margin-bottom:4px;">${label}</div>
+            <div style="font-size:1.2rem; font-weight:700; color:#e0dff0;">${val}</div>
+          </div>`).join('')}
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+          <thead>
+            <tr style="border-bottom:1px solid #2a2a4a; color:#888; text-align:left;">
+              <th style="padding:8px 10px;">Date</th>
+              <th style="padding:8px 10px;">Slot</th>
+              <th style="padding:8px 10px;">Advertiser</th>
+              <th style="padding:8px 10px;">Contact</th>
+              <th style="padding:8px 10px; text-align:right;">Bid</th>
+              <th style="padding:8px 10px; text-align:right;">Impressions</th>
+              <th style="padding:8px 10px; text-align:right;">Clicks</th>
+              <th style="padding:8px 10px; text-align:right;">CTR</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr style="border-bottom:1px solid #1e1e36; color:#c0bfd8;">
+                <td style="padding:8px 10px;">${r.run_date}</td>
+                <td style="padding:8px 10px;">Slot ${r.slot_number}</td>
+                <td style="padding:8px 10px;">${r.advertiser_name}</td>
+                <td style="padding:8px 10px; color:#888;">${r.contact}</td>
+                <td style="padding:8px 10px; text-align:right; color:#c9a84c;">${Number(r.bid_amount).toLocaleString()} J</td>
+                <td style="padding:8px 10px; text-align:right;">${r.impressions}</td>
+                <td style="padding:8px 10px; text-align:right;">${r.clicks}</td>
+                <td style="padding:8px 10px; text-align:right;">${r.ctr}%</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
   }
 
   // ---------- logs (global) ----------
