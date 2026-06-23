@@ -361,6 +361,178 @@
       font-size: 0.85rem;
       font-style: italic;
     }
+
+    /* ============================================================
+       RICH TEXT EDITOR
+       ============================================================ */
+
+    .rte-wrap {
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #111;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .rte-wrap:focus-within {
+      border-color: #c9a84c;
+    }
+
+    .rte-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 6px 8px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2e2e2e;
+      align-items: center;
+    }
+
+    .rte-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px !important;
+      height: 28px !important;
+      padding: 0 !important;
+      border-radius: 5px !important;
+      background: transparent !important;
+      color: #bbb !important;
+      border: 1px solid transparent !important;
+      font-size: 0.82rem !important;
+      font-weight: bold !important;
+      cursor: pointer !important;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      line-height: 1 !important;
+      flex-shrink: 0;
+    }
+
+    .rte-btn:hover {
+      background: #2a2a2a !important;
+      color: #f0f0f0 !important;
+      border-color: #444 !important;
+    }
+
+    .rte-btn.active {
+      background: #2a2010 !important;
+      color: #c9a84c !important;
+      border-color: #c9a84c !important;
+    }
+
+    .rte-btn-wide {
+      width: auto !important;
+      padding: 0 8px !important;
+      font-size: 0.75rem !important;
+    }
+
+    .rte-sep {
+      width: 1px;
+      height: 22px;
+      background: #333;
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+
+    .rte-select {
+      background: #111 !important;
+      border: 1px solid #333 !important;
+      color: #bbb !important;
+      padding: 2px 6px !important;
+      border-radius: 5px !important;
+      font-size: 0.78rem !important;
+      width: auto !important;
+      height: 28px !important;
+      cursor: pointer;
+      outline: none !important;
+    }
+
+    .rte-select:focus {
+      border-color: #c9a84c !important;
+    }
+
+    .rte-wordcount {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: #555;
+      white-space: nowrap;
+      padding-right: 4px;
+    }
+
+    .rte-body {
+      flex: 1;
+      min-height: 320px;
+      max-height: 600px;
+      overflow-y: auto;
+      padding: 18px 20px;
+      outline: none;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #f0f0f0;
+      caret-color: #c9a84c;
+    }
+
+    /* Editor content styles */
+    .rte-body p { margin: 0 0 1em; }
+    .rte-body p:last-child { margin-bottom: 0; }
+    .rte-body h2 { font-size: 1.45rem; font-weight: 700; color: #e0bc6a; margin: 1.2em 0 0.5em; line-height: 1.25; }
+    .rte-body h3 { font-size: 1.15rem; font-weight: 700; color: #c9a84c; margin: 1em 0 0.4em; line-height: 1.3; }
+    .rte-body h4 { font-size: 1rem; font-weight: 700; color: #aaa; margin: 0.8em 0 0.3em; }
+    .rte-body blockquote {
+      border-left: 3px solid #c9a84c;
+      margin: 1em 0;
+      padding: 8px 16px;
+      color: #bbb;
+      font-style: italic;
+      background: #1a1a1a;
+      border-radius: 0 6px 6px 0;
+    }
+    .rte-body ul, .rte-body ol { margin: 0.8em 0 0.8em 1.5em; }
+    .rte-body li { margin-bottom: 0.3em; }
+    .rte-body a { color: #a987d8; text-decoration: underline; }
+    .rte-body hr { border: none; border-top: 1px solid #333; margin: 1.5em 0; }
+    .rte-body strong { color: #f5f5f5; }
+    .rte-body code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.88em;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: #e0bc6a;
+    }
+
+    /* Link tooltip popup */
+    .rte-link-popup {
+      display: none;
+      position: fixed;
+      z-index: 200;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 10px 12px;
+      gap: 6px;
+      flex-direction: column;
+      min-width: 280px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .rte-link-popup.open { display: flex; }
+    .rte-link-popup input {
+      background: #111 !important;
+      border: 1px solid #333 !important;
+      color: #f0f0f0 !important;
+      padding: 6px 10px !important;
+      border-radius: 5px !important;
+      font-size: 0.85rem !important;
+      width: 100% !important;
+    }
+    .rte-link-popup-btns { display: flex; gap: 6px; }
+    .rte-link-popup-btns button {
+      width: auto !important;
+      padding: 6px 12px !important;
+      font-size: 0.8rem !important;
+    }
   </style>
 </head>
 <body class="portal">
@@ -402,7 +574,12 @@
           <option value="guides">Guides</option>
           <option value="miscellaneous">Miscellaneous</option>
         </select>
-        <textarea id="content" placeholder="Write your article here..."></textarea>
+        <div class="rte-wrap" id="rte-main-wrap">
+          <div class="rte-toolbar" id="rte-main-toolbar"></div>
+          <div class="rte-body" id="rte-main" contenteditable="true" data-placeholder="Write your article here…"></div>
+        </div>
+        <!-- Hidden field keeps plain-text fallback for any JS still referencing #content -->
+        <textarea id="content" style="display:none;"></textarea>
         <div style="display:flex;flex-direction:column;gap:6px;">
           <label style="color:#888;font-size:0.82rem;">Article Photo <span style="color:#555;">(optional — JPEG, PNG, WebP or GIF, max ~600 KB)</span></label>
           <input type="file" id="article-photo" accept="image/jpeg,image/png,image/webp,image/gif"
@@ -570,7 +747,11 @@
     <div class="article-detail-body" id="article-detail-body"></div>
     <div id="article-detail-edit-form" style="display:none; margin-bottom:20px;">
       <input type="text" id="article-detail-edit-title" style="margin-bottom:10px;">
-      <textarea id="article-detail-edit-content"></textarea>
+      <div class="rte-wrap" id="rte-detail-wrap">
+        <div class="rte-toolbar" id="rte-detail-toolbar"></div>
+        <div class="rte-body" id="rte-detail" contenteditable="true" data-placeholder="Edit article content…"></div>
+      </div>
+      <textarea id="article-detail-edit-content" style="display:none;"></textarea>
       <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
         <label style="color:#888;font-size:0.82rem;">Article Photo <span style="color:#555;">(optional)</span></label>
         <input type="file" id="article-detail-edit-photo" accept="image/jpeg,image/png,image/webp,image/gif"
@@ -861,7 +1042,7 @@
       <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
-        <div class="preview">${escapeHtml(a.content).substring(0, 150)}...</div>
+        <div class="preview">${(/^s*</.test(a.content) ? (()=>{const t=document.createElement('div');t.innerHTML=a.content;return t.textContent;})() : a.content).substring(0,150)}...</div>
         ${a.status === 'returned' ? `<div class="review-tag" style="margin-top:8px;">Click to revise & resubmit</div>` : ''}
       </div>
     `).join('');
@@ -1131,7 +1312,7 @@
       <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.updated_at).toLocaleString()}</div>
-        <div class="preview">${escapeHtml(a.content).substring(0, 250)}...</div>
+        <div class="preview">${(/^s*</.test(a.content) ? (()=>{const t=document.createElement('div');t.innerHTML=a.content;return t.textContent;})() : a.content).substring(0,250)}...</div>
         ${a.status === 'returned' ? `<div class="review-tag" style="margin-top:8px;">Awaiting writer revision</div>` : `<div class="review-tag" style="margin-top:8px;">Click to approve, return, or deny</div>`}
       </div>
     `).join('');
@@ -1200,7 +1381,13 @@
       `${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span>`;
     document.getElementById('article-detail-meta').textContent =
       `By ${a.author} · ${a.category} · Submitted ${new Date(a.created_at).toLocaleDateString()} · Updated ${new Date(a.updated_at).toLocaleString()}`;
-    document.getElementById('article-detail-body').textContent = a.content;
+    // Render HTML content if it starts with a tag, otherwise fall back to plain text
+    const bodyEl = document.getElementById('article-detail-body');
+    if (a.content && /^\s*</.test(a.content)) {
+      bodyEl.innerHTML = a.content;
+    } else {
+      bodyEl.textContent = a.content;
+    }
 
     let notesHtml = '';
     if ((a.status === 'claimed' || a.status === 'returned') && a.claimed_by) {
@@ -1537,7 +1724,7 @@
       <div class="article-item article-card" onclick="openArticleDetail(${a.id})">
         <h3>${escapeHtml(a.title)} <span class="status-pill ${a.status}">${a.status.replace('_', ' ')}</span></h3>
         <div class="meta">By ${escapeHtml(a.author)} · ${a.category} · ${new Date(a.created_at).toLocaleDateString()}</div>
-        <div class="preview">${escapeHtml(a.content).substring(0, 150)}...</div>
+        <div class="preview">${(/^s*</.test(a.content) ? (()=>{const t=document.createElement('div');t.innerHTML=a.content;return t.textContent;})() : a.content).substring(0,150)}...</div>
         ${a.claimed_by && (a.status === 'claimed' || a.status === 'returned') ? `<div class="review-tag" style="margin-top:8px;">Under review by <strong>${escapeHtml(a.claimed_by)}</strong></div>` : ''}
       </div>
     `).join('');
@@ -1868,6 +2055,537 @@
     if (img)   img.src = '';
     if (wrap)  wrap.style.display = 'none';
   }
+
+  /* ============================================================
+     RICH TEXT EDITOR ENGINE
+     ============================================================
+     Two instances: rteMain (new post form) and rteDetail (edit/resubmit overlay).
+     Each instance wraps a contenteditable div with its own toolbar.
+     Content is stored as sanitised HTML; the hidden <textarea> siblings
+     are kept in sync so all existing submit/save code can call .value on them
+     without any changes.
+     ============================================================ */
+
+  class RichEditor {
+    constructor(bodyId, toolbarId) {
+      this.body    = document.getElementById(bodyId);
+      this.toolbar = document.getElementById(toolbarId);
+      this._saved  = null; // saved selection range for link insertion
+      this._buildToolbar();
+      this._bindEvents();
+      this._updateToolbarState();
+    }
+
+    /* ---- Public API ---- */
+
+    getHTML() {
+      // Return inner HTML, stripping any trailing empty <br> or empty <p>
+      let html = this.body.innerHTML;
+      // Normalise trailing whitespace nodes
+      html = html.replace(/<p><br><\/p>$/i, '').replace(/<br>$/i, '').trim();
+      return html;
+    }
+
+    setHTML(html) {
+      this.body.innerHTML = html || '';
+      this._updateWordCount();
+    }
+
+    getText() {
+      return this.body.innerText || '';
+    }
+
+    clear() {
+      this.body.innerHTML = '';
+      this._updateWordCount();
+    }
+
+    focus() {
+      this.body.focus();
+    }
+
+    /* ---- Toolbar construction ---- */
+
+    _buildToolbar() {
+      const tb = this.toolbar;
+      tb.innerHTML = '';
+
+      const groups = [
+        // [label, title, action, extraClass]
+        { type: 'select', id: 'heading', options: [
+            ['Paragraph', 'p'],
+            ['Heading 2', 'h2'],
+            ['Heading 3', 'h3'],
+            ['Heading 4', 'h4'],
+          ]
+        },
+        { type: 'sep' },
+        { type: 'btn', label: 'B',      title: 'Bold (Ctrl+B)',           cmd: 'bold',           icon: '<strong>B</strong>' },
+        { type: 'btn', label: 'I',      title: 'Italic (Ctrl+I)',         cmd: 'italic',         icon: '<em>I</em>' },
+        { type: 'btn', label: 'U',      title: 'Underline (Ctrl+U)',      cmd: 'underline',      icon: '<u>U</u>' },
+        { type: 'btn', label: 'S',      title: 'Strikethrough',           cmd: 'strikeThrough',  icon: '<s>S</s>' },
+        { type: 'sep' },
+        { type: 'btn', label: '❝',     title: 'Blockquote',              cmd: 'blockquote',     icon: '❝' },
+        { type: 'btn', label: '≡',     title: 'Unordered list',          cmd: 'insertUnorderedList', icon: '≡' },
+        { type: 'btn', label: '1.',     title: 'Ordered list',            cmd: 'insertOrderedList',   icon: '1.', wide: true },
+        { type: 'sep' },
+        { type: 'btn', label: '🔗',    title: 'Insert / edit link',      cmd: 'link',           icon: '🔗' },
+        { type: 'btn', label: '✂🔗',   title: 'Remove link',             cmd: 'unlink',         icon: '✂', wide: true },
+        { type: 'sep' },
+        { type: 'btn', label: '—',     title: 'Horizontal rule',         cmd: 'hr',             icon: '—' },
+        { type: 'btn', label: '⌫T',   title: 'Clear formatting',        cmd: 'removeFormat',   icon: '⌫T', wide: true },
+        { type: 'sep' },
+        { type: 'btn', label: '↩',    title: 'Undo (Ctrl+Z)',           cmd: 'undo',           icon: '↩' },
+        { type: 'btn', label: '↪',    title: 'Redo (Ctrl+Y)',           cmd: 'redo',           icon: '↪' },
+        { type: 'wc' },
+      ];
+
+      for (const g of groups) {
+        if (g.type === 'sep') {
+          const s = document.createElement('div');
+          s.className = 'rte-sep';
+          tb.appendChild(s);
+          continue;
+        }
+
+        if (g.type === 'wc') {
+          const wc = document.createElement('span');
+          wc.className = 'rte-wordcount';
+          wc.id = this.toolbar.id + '-wc';
+          tb.appendChild(wc);
+          continue;
+        }
+
+        if (g.type === 'select') {
+          const sel = document.createElement('select');
+          sel.className = 'rte-select';
+          sel.title = 'Paragraph style';
+          sel.id = this.toolbar.id + '-heading-sel';
+          for (const [label, val] of g.options) {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = label;
+            sel.appendChild(opt);
+          }
+          sel.addEventListener('mousedown', e => e.stopPropagation());
+          sel.addEventListener('change', () => {
+            this.body.focus();
+            this._applyHeading(sel.value);
+            sel.blur();
+          });
+          tb.appendChild(sel);
+          continue;
+        }
+
+        if (g.type === 'btn') {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'rte-btn' + (g.wide ? ' rte-btn-wide' : '');
+          btn.title = g.title;
+          btn.dataset.cmd = g.cmd;
+          btn.innerHTML = g.icon;
+          btn.addEventListener('mousedown', e => {
+            e.preventDefault(); // prevent editor losing focus
+            this.body.focus();
+            this._execCmd(g.cmd, btn);
+          });
+          tb.appendChild(btn);
+        }
+      }
+    }
+
+    /* ---- Command dispatcher ---- */
+
+    _execCmd(cmd, btn) {
+      switch (cmd) {
+        case 'blockquote':
+          this._toggleBlockquote();
+          break;
+        case 'hr':
+          document.execCommand('insertHorizontalRule', false, null);
+          break;
+        case 'link':
+          this._openLinkPopup(btn);
+          break;
+        case 'unlink':
+          document.execCommand('unlink', false, null);
+          break;
+        default:
+          document.execCommand(cmd, false, null);
+      }
+      this._updateToolbarState();
+      this._syncHidden();
+    }
+
+    /* ---- Heading / paragraph style ---- */
+
+    _applyHeading(tag) {
+      if (tag === 'p') {
+        document.execCommand('formatBlock', false, 'p');
+      } else {
+        document.execCommand('formatBlock', false, tag);
+      }
+      this._updateToolbarState();
+      this._syncHidden();
+    }
+
+    /* ---- Blockquote toggle ---- */
+
+    _toggleBlockquote() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const node = sel.getRangeAt(0).commonAncestorContainer;
+      const bq = this._closest(node instanceof Element ? node : node.parentElement, 'blockquote');
+      if (bq) {
+        // unwrap: move children out and remove the blockquote
+        const frag = document.createDocumentFragment();
+        while (bq.firstChild) frag.appendChild(bq.firstChild);
+        bq.parentNode.replaceChild(frag, bq);
+      } else {
+        document.execCommand('formatBlock', false, 'blockquote');
+      }
+    }
+
+    /* ---- Link popup ---- */
+
+    _openLinkPopup(btn) {
+      // Save the selection before the popup steals focus
+      const sel = window.getSelection();
+      if (sel.rangeCount) this._saved = sel.getRangeAt(0).cloneRange();
+
+      // Find or create the shared popup
+      let popup = document.getElementById('rte-link-popup');
+      if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'rte-link-popup';
+        popup.className = 'rte-link-popup';
+        popup.innerHTML = `
+          <input id="rte-link-url" type="url" placeholder="https://…">
+          <div class="rte-link-popup-btns">
+            <button id="rte-link-ok" type="button">Insert Link</button>
+            <button id="rte-link-cancel" type="button" style="background:#1a1a1a!important;color:#aaa!important;border:1px solid #333!important;">Cancel</button>
+          </div>`;
+        document.body.appendChild(popup);
+
+        document.getElementById('rte-link-ok').addEventListener('click', () => this._insertLink());
+        document.getElementById('rte-link-cancel').addEventListener('click', () => this._closeLinkPopup());
+        document.getElementById('rte-link-url').addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); this._insertLink(); }
+          if (e.key === 'Escape') this._closeLinkPopup();
+        });
+      }
+
+      // Pre-fill if selection is inside a link
+      const anchorNode = this._closest(
+        sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement,
+        'a'
+      );
+      document.getElementById('rte-link-url').value = anchorNode ? anchorNode.href : '';
+
+      // Position popup below the button
+      const rect = btn.getBoundingClientRect();
+      popup.style.top  = (rect.bottom + 6) + 'px';
+      popup.style.left = Math.min(rect.left, window.innerWidth - 310) + 'px';
+      popup.classList.add('open');
+      setTimeout(() => document.getElementById('rte-link-url').focus(), 10);
+    }
+
+    _insertLink() {
+      const url = document.getElementById('rte-link-url').value.trim();
+      this._closeLinkPopup();
+      if (!url) return;
+      const safe = url.startsWith('http://') || url.startsWith('https://') ? url : 'https://' + url;
+      // Restore saved selection
+      if (this._saved) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(this._saved);
+      }
+      this.body.focus();
+      document.execCommand('createLink', false, safe);
+      // Make links open in new tab by setting target on newly created <a>
+      this.body.querySelectorAll('a:not([target])').forEach(a => {
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      });
+      this._updateToolbarState();
+      this._syncHidden();
+    }
+
+    _closeLinkPopup() {
+      const popup = document.getElementById('rte-link-popup');
+      if (popup) popup.classList.remove('open');
+    }
+
+    /* ---- Toolbar state (bold/italic active state, heading dropdown) ---- */
+
+    _updateToolbarState() {
+      const cmds = ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'];
+      for (const cmd of cmds) {
+        const btn = this.toolbar.querySelector(`[data-cmd="${cmd}"]`);
+        if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
+      }
+
+      // Blockquote active state
+      const bqBtn = this.toolbar.querySelector('[data-cmd="blockquote"]');
+      if (bqBtn) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount) {
+          const node = sel.getRangeAt(0).commonAncestorContainer;
+          const inBq = !!this._closest(node instanceof Element ? node : node.parentElement, 'blockquote', this.body);
+          bqBtn.classList.toggle('active', inBq);
+        }
+      }
+
+      // Heading select
+      const sel2 = this.toolbar.querySelector('select');
+      if (sel2) {
+        const block = document.queryCommandValue('formatBlock').toLowerCase();
+        const map = { h2: 'h2', h3: 'h3', h4: 'h4' };
+        sel2.value = map[block] || 'p';
+      }
+
+      this._updateWordCount();
+    }
+
+    _updateWordCount() {
+      const wc = document.getElementById(this.toolbar.id + '-wc');
+      if (!wc) return;
+      const text = this.body.innerText || '';
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
+    }
+
+    /* ---- Events ---- */
+
+    _bindEvents() {
+      this.body.addEventListener('keyup',       () => { this._updateToolbarState(); this._syncHidden(); });
+      this.body.addEventListener('mouseup',     () => this._updateToolbarState());
+      this.body.addEventListener('input',       () => { this._updateToolbarState(); this._syncHidden(); });
+      this.body.addEventListener('paste',       e  => this._onPaste(e));
+      // Ensure the body always has at least a <p> wrapper
+      this.body.addEventListener('focus',       () => {
+        if (!this.body.firstChild || (this.body.innerHTML === '' || this.body.innerHTML === '<br>')) {
+          document.execCommand('formatBlock', false, 'p');
+        }
+      });
+      // Close link popup on outside click
+      document.addEventListener('mousedown', e => {
+        const popup = document.getElementById('rte-link-popup');
+        if (popup && popup.classList.contains('open') && !popup.contains(e.target)) {
+          this._closeLinkPopup();
+        }
+      });
+    }
+
+    /* ---- Paste: strip rich formatting from external sources, keep structure ---- */
+
+    _onPaste(e) {
+      e.preventDefault();
+      const html = e.clipboardData.getData('text/html');
+      const text = e.clipboardData.getData('text/plain');
+
+      if (html) {
+        // Strip to safe subset: keep block elements + inline formatting
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        // Remove scripts, styles, iframes
+        tmp.querySelectorAll('script,style,iframe,object,embed').forEach(n => n.remove());
+        // Remove all attributes except href on <a> and src on <img>
+        tmp.querySelectorAll('*').forEach(el => {
+          const keep = [];
+          if (el.tagName === 'A' && el.getAttribute('href')) keep.push(['href', el.getAttribute('href')]);
+          // Strip all attributes
+          while (el.attributes.length) el.removeAttribute(el.attributes[0].name);
+          keep.forEach(([k, v]) => el.setAttribute(k, v));
+        });
+        document.execCommand('insertHTML', false, tmp.innerHTML);
+      } else if (text) {
+        // Convert plain text: split on double newlines → paragraphs
+        const paras = text.split(/\n{2,}/).map(p => `<p>${p.trim().replace(/\n/g, '<br>')}</p>`).join('');
+        document.execCommand('insertHTML', false, paras || text);
+      }
+      this._syncHidden();
+    }
+
+    /* ---- Sync hidden textarea (keeps existing submit/save code working) ---- */
+
+    _syncHidden() {
+      // Find the hidden <textarea> sibling (next sibling of our wrap's parent)
+      const wrap = this.body.closest('.rte-wrap');
+      if (!wrap) return;
+      const ta = wrap.nextElementSibling;
+      if (ta && ta.tagName === 'TEXTAREA') ta.value = this.getHTML();
+    }
+
+    /* ---- Utility: closest ancestor matching selector, optionally stopping at root ---- */
+
+    _closest(el, selector, root) {
+      while (el && el !== root) {
+        if (el.matches && el.matches(selector)) return el;
+        el = el.parentElement;
+      }
+      return null;
+    }
+  }
+
+  /* ---- Instantiate editors after DOM is ready ---- */
+
+  let rteMain   = null;
+  let rteDetail = null;
+
+  function initEditors() {
+    rteMain   = new RichEditor('rte-main',   'rte-main-toolbar');
+    rteDetail = new RichEditor('rte-detail', 'rte-detail-toolbar');
+
+    // Placeholder behaviour
+    ['rte-main', 'rte-detail'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const ph = el.dataset.placeholder;
+      const style = document.createElement('style');
+      style.textContent = `#${id}:empty::before{content:attr(data-placeholder);color:#555;pointer-events:none;position:absolute;}`;
+      document.head.appendChild(style);
+      el.style.position = 'relative';
+    });
+  }
+
+  /* ---- Patch existing submit/save functions to read from the RTE ---- */
+
+  // Override the content reads so postArticle / instapublishArticle / save functions
+  // get HTML from the editor instead of the (hidden) textarea.
+
+  const _origPostArticle = typeof postArticle === 'function' ? postArticle : null;
+
+  // We replace content reads by patching getContent helpers that those functions call:
+  function getRteMainContent() {
+    return rteMain ? rteMain.getHTML() : (document.getElementById('content')?.value || '');
+  }
+
+  function getRteDetailContent() {
+    return rteDetail ? rteDetail.getHTML() : (document.getElementById('article-detail-edit-content')?.value || '');
+  }
+
+  // Patch postArticle and instapublishArticle to read from RTE
+  const _origPostArticleFn = window.postArticle;
+  window.postArticle = async function () {
+    // Sync content to hidden textarea first
+    if (rteMain) document.getElementById('content').value = rteMain.getHTML();
+    // Then call original (it reads #content.value)
+    return _origPostArticleFn ? _origPostArticleFn() : undefined;
+  };
+
+  const _origInstapublishFn = window.instapublishArticle;
+  window.instapublishArticle = async function () {
+    if (rteMain) document.getElementById('content').value = rteMain.getHTML();
+    return _origInstapublishFn ? _origInstapublishFn() : undefined;
+  };
+
+  // Patch startEditFromDetail to load HTML into rteDetail
+  const _origStartEdit = window.startEditFromDetail;
+  window.startEditFromDetail = function () {
+    fetch('/api/article-detail', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ id: currentDetailArticle })
+    }).then(r => r.json()).then(a => {
+      document.getElementById('article-detail-edit-title').value = a.title;
+      if (rteDetail) rteDetail.setHTML(a.content);
+      document.getElementById('article-detail-edit-content').value = a.content;
+      document.getElementById('article-detail-edit-form').style.display = 'block';
+    });
+  };
+
+  // Patch saveArticleDetailEdit to read from rteDetail
+  const _origSaveEdit = window.saveArticleDetailEdit;
+  window.saveArticleDetailEdit = async function () {
+    const title   = document.getElementById('article-detail-edit-title').value;
+    const content = rteDetail ? rteDetail.getHTML() : document.getElementById('article-detail-edit-content').value;
+    await fetch('/api/admin/edit', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ id: currentDetailArticle, title, content })
+    });
+    document.getElementById('article-detail-edit-form').style.display = 'none';
+    openArticleDetail(currentDetailArticle);
+    refreshAllOpenLists();
+  };
+
+  // Patch startResubmitFromDetail to load HTML into rteDetail and read from it on submit
+  const _origStartResubmit = window.startResubmitFromDetail;
+  window.startResubmitFromDetail = function () {
+    _pendingRemovePhoto = false;
+    fetch('/api/article-detail', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ id: currentDetailArticle })
+    }).then(r => r.json()).then(a => {
+      document.getElementById('article-detail-edit-title').value = a.title;
+      if (rteDetail) rteDetail.setHTML(a.content);
+      document.getElementById('article-detail-edit-content').value = a.content;
+
+      const existingWrap = document.getElementById('article-detail-edit-photo-current');
+      const existingImg  = document.getElementById('article-detail-edit-photo-current-img');
+      if (a.image_url) { existingImg.src = a.image_url; existingWrap.style.display = 'block'; }
+      else             { existingWrap.style.display = 'none'; }
+
+      document.getElementById('article-detail-edit-form').style.display = 'block';
+      const form    = document.getElementById('article-detail-edit-form');
+      const saveBtn = form.querySelector('button[onclick], button:last-of-type') || form.querySelector('button');
+      saveBtn.textContent = `Send Back to ${a.claimed_by}`;
+      saveBtn.onclick = async () => {
+        const title   = document.getElementById('article-detail-edit-title').value;
+        const content = rteDetail ? rteDetail.getHTML() : document.getElementById('article-detail-edit-content').value;
+        let image_url = undefined;
+        let remove_image = false;
+        const photoFile = document.getElementById('article-detail-edit-photo')?.files?.[0];
+        if (_pendingRemovePhoto) { remove_image = true; _pendingRemovePhoto = false; }
+        else if (photoFile) {
+          try { image_url = await fileToDataUrl(photoFile); }
+          catch (e) { alert(e.message || 'Photo error'); return; }
+        }
+        const res = await fetch('/api/my-articles/resubmit', {
+          method: 'POST', headers: authHeaders(),
+          body: JSON.stringify({ id: currentDetailArticle, title, content, image_url, remove_image })
+        });
+        const data = await res.json();
+        if (data.success) {
+          form.style.display = 'none';
+          saveBtn.textContent = 'Save Changes';
+          saveBtn.onclick = saveArticleDetailEdit;
+          openArticleDetail(currentDetailArticle);
+          refreshAllOpenLists();
+        } else {
+          alert(data.error || 'Failed to resubmit article.');
+        }
+      };
+    });
+  };
+
+  // After login the portal becomes visible — initialise editors then.
+  // We hook into the existing renderPortal / showPortal flow.
+  const _origShowPortal = window.showPortal;
+  document.addEventListener('DOMContentLoaded', () => {
+    // Observe the portal-screen becoming visible (set to display:block by existing login code)
+    const portalEl = document.getElementById('portal-screen');
+    if (!portalEl) return;
+    const obs = new MutationObserver(() => {
+      if (portalEl.style.display !== 'none' && !rteMain) {
+        initEditors();
+      }
+    });
+    obs.observe(portalEl, { attributes: true, attributeFilter: ['style'] });
+  });
+
+  // Also clear editors after successful post
+  // (Override the clear lines in postArticle / instapublishArticle that reference #content.value)
+  // We do this by monkey-patching the msg check:
+  const _checkAndClearRte = setInterval(() => {
+    const msg = document.getElementById('post-msg');
+    if (!msg) return;
+    const obs2 = new MutationObserver(() => {
+      if (msg.style.color === 'rgb(46, 204, 113)' || msg.style.color === '#2ecc71') {
+        if (rteMain) rteMain.clear();
+      }
+    });
+    obs2.observe(msg, { attributes: true, attributeFilter: ['style'] });
+    clearInterval(_checkAndClearRte);
+  }, 500);
 
 </script>
 

@@ -201,7 +201,31 @@
       .replace(/"/g, '&quot;');
   }
 
+  function isHtmlContent(raw) {
+    return typeof raw === 'string' && /^\s*</.test(raw);
+  }
+
+  function sanitiseHtml(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('script,style,iframe,object,embed,form').forEach(n => n.remove());
+    tmp.querySelectorAll('*').forEach(el => {
+      const tag = el.tagName.toLowerCase();
+      const allowed = ['p','br','strong','b','em','i','u','s','strike','h2','h3','h4','ul','ol','li','blockquote','hr','a','code','span','div'];
+      if (!allowed.includes(tag)) { el.replaceWith(...el.childNodes); }
+    });
+    tmp.querySelectorAll('a').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      while (a.attributes.length) a.removeAttribute(a.attributes[0].name);
+      if (href) a.setAttribute('href', escapeHtml(href));
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    });
+    return tmp.innerHTML;
+  }
+
   function contentToHtml(raw) {
+    if (isHtmlContent(raw)) return sanitiseHtml(raw);
     const paragraphs = raw.split(/\n{2,}/);
     if (paragraphs.length <= 1) {
       return `<p>${escapeHtml(raw.trim()).replace(/\n/g, '<br>')}</p>`;
@@ -210,6 +234,8 @@
   }
 
   function normaliseContent(raw) {
+    // For HTML content, tamper detection compares sanitised innerHTML directly
+    if (isHtmlContent(raw)) return sanitiseHtml(raw).replace(/\s+/g, ' ').trim();
     const blocks = raw.split(/\n{2,}/);
     return blocks.length > 1 ? blocks.map(b => b.trim()).join('\n\n') : raw.trim();
   }
@@ -269,21 +295,30 @@
   let renderedTitle  = null;
   let renderedContent = null;
 
-  function normaliseBody(raw) {
-    const blocks = raw.split(/\n{2,}/);
-    return blocks.length > 1 ? blocks.map(b => b.trim()).join('\n\n') : raw.trim();
-  }
-
   function startTamperDetection(article) {
     renderedTitle   = article.title;
     renderedContent = article.content;
+    const isHtml = isHtmlContent(renderedContent);
+    // Snapshot the rendered innerHTML (already sanitised) at paint time
+    const renderedBodySnapshot = document.getElementById('article-body')?.innerHTML || '';
+
     if (integrityTimer) clearInterval(integrityTimer);
     integrityTimer = setInterval(() => {
       const liveTitle = document.getElementById('article-title')?.textContent;
-      const liveBody  = [...(document.getElementById('article-body')?.querySelectorAll('p') || [])]
-                          .map(p => p.textContent).join('\n\n');
-      if (!liveTitle) return; // element gone, ignore
-      if (liveTitle !== renderedTitle || liveBody !== normaliseBody(renderedContent)) {
+      const bodyEl    = document.getElementById('article-body');
+      if (!liveTitle || !bodyEl) return;
+
+      let bodyMatch;
+      if (isHtml) {
+        // For HTML content compare normalised innerHTML
+        bodyMatch = bodyEl.innerHTML.replace(/\s+/g, ' ').trim() === renderedBodySnapshot.replace(/\s+/g, ' ').trim();
+      } else {
+        const liveBody = [...bodyEl.querySelectorAll('p')].map(p => p.textContent).join('\n\n');
+        const expected = normaliseContent(renderedContent);
+        bodyMatch = liveBody === expected;
+      }
+
+      if (liveTitle !== renderedTitle || !bodyMatch) {
         clearInterval(integrityTimer);
         alert("This article's content doesn't match what was published. You'll be returned to the homepage.");
         window.location.href = '/';

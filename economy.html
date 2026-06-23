@@ -87,10 +87,33 @@
 
   // Convert plain-text content to HTML paragraphs (split on blank lines),
   // escaping everything so no raw markup ever executes.
+  function isHtmlContent(raw) {
+    return typeof raw === 'string' && /^\s*</.test(raw);
+  }
+  function sanitiseHtml(html) {
+    // Light sanitise: strip script/style/iframe but pass through safe rich HTML
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('script,style,iframe,object,embed,form').forEach(n => n.remove());
+    tmp.querySelectorAll('*').forEach(el => {
+      const tag = el.tagName.toLowerCase();
+      const allowed = ['p','br','strong','b','em','i','u','s','strike','h2','h3','h4','ul','ol','li','blockquote','hr','a','code','span','div'];
+      if (!allowed.includes(tag)) { el.replaceWith(...el.childNodes); }
+    });
+    // Only keep href on <a>
+    tmp.querySelectorAll('a').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      while (a.attributes.length) a.removeAttribute(a.attributes[0].name);
+      if (href) a.setAttribute('href', escapeHtml(href));
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    });
+    return tmp.innerHTML;
+  }
   function contentToHtml(raw) {
+    if (isHtmlContent(raw)) return sanitiseHtml(raw);
     const paragraphs = raw.split(/\n{2,}/);
     if (paragraphs.length <= 1) {
-      // Single block — trim (matches normaliseContent) then split on single newlines into <br> instead
       return `<p>${escapeHtml(raw.trim()).replace(/\n/g, '<br>')}</p>`;
     }
     return paragraphs
