@@ -75,6 +75,102 @@
     .form-group {
       margin-bottom: 18px;
     }
+    .bid-board {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: 20px 0 4px;
+      overflow: hidden;
+    }
+    .bid-board-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .bid-board-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--ink-muted);
+    }
+    .bid-board-slot-tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: var(--deep-purple);
+      color: #fff;
+      letter-spacing: .04em;
+    }
+    .bid-board-body {
+      padding: 6px 0;
+      min-height: 48px;
+    }
+    .bid-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 16px;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .bid-row:last-child { border-bottom: none; }
+    .bid-rank {
+      font-size: 0.72rem;
+      font-weight: 800;
+      width: 18px;
+      color: var(--ink-muted);
+      flex-shrink: 0;
+    }
+    .bid-rank.top { color: #f0a500; }
+    .bid-name {
+      flex: 1;
+      font-size: 0.88rem;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bid-amount {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--deep-purple);
+      white-space: nowrap;
+    }
+    .bid-board-empty {
+      padding: 14px 16px;
+      font-size: 0.83rem;
+      color: var(--ink-muted);
+      text-align: center;
+    }
+    .bid-board-loading {
+      padding: 14px 16px;
+      font-size: 0.83rem;
+      color: var(--ink-muted);
+      text-align: center;
+      font-style: italic;
+    }
+    .bid-board-yours {
+      padding: 8px 16px 6px;
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      border-top: 1px solid var(--border);
+      background: var(--card-bg);
+    }
+    .bid-board-yours strong { color: var(--ink); }
+    .bid-beat-msg {
+      color: #2e7d32;
+      font-weight: 700;
+    }
+    .bid-lose-msg {
+      color: #c62828;
+      font-weight: 700;
+    }
+
     .form-group label {
       display: block;
       font-size: 0.82rem;
@@ -311,6 +407,18 @@
       </div>
     </div>
 
+
+    <div class="bid-board" id="bid-board">
+      <div class="bid-board-header">
+        <span class="bid-board-title">Current Top Bids</span>
+        <span class="bid-board-slot-tag" id="bid-board-slot-tag">Slot 1</span>
+      </div>
+      <div class="bid-board-body" id="bid-board-body">
+        <div class="bid-board-loading">Loading…</div>
+      </div>
+      <div class="bid-board-yours" id="bid-board-yours" style="display:none;"></div>
+    </div>
+
     <div class="form-group">
       <label>Bid Amount</label>
       <input type="number" id="f-bid" min="1" step="1" placeholder="e.g. 500">
@@ -450,6 +558,7 @@
         // Reset form
         ['f-name','f-contact','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('ad-preview-box').innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
+        loadBidBoard(); // refresh board after bid submitted
       } else {
         notice.className = 'form-notice error';
         notice.textContent = data.error || 'Something went wrong. Please try again.';
@@ -463,7 +572,70 @@
     btn.textContent = 'Submit Bid';
   }
 
+  // ── Live bid board ──────────────────────────────────────────────────────────
+  const SLOT_LABELS = { bottom: 'Slot 1 — Leaderboard', left: 'Slot 2 — Left Sky', right: 'Slot 3 — Right Sky' };
+
+  async function loadBidBoard() {
+    const date    = document.getElementById('f-date').value;
+    const slotVal = document.getElementById('f-slot').value;
+    const info    = SLOT_INFO[slotVal];
+    const myBid   = parseFloat(document.getElementById('f-bid').value) || 0;
+
+    const tag  = document.getElementById('bid-board-slot-tag');
+    const body = document.getElementById('bid-board-body');
+    const yours = document.getElementById('bid-board-yours');
+
+    tag.textContent = SLOT_LABELS[slotVal] || 'Slot';
+    body.innerHTML  = '<div class="bid-board-loading">Loading…</div>';
+    yours.style.display = 'none';
+
+    if (!date) { body.innerHTML = '<div class="bid-board-empty">Pick a date to see current bids.</div>'; return; }
+
+    let bids = [];
+    try {
+      const res = await fetch(`/api/ads/bids?date=${encodeURIComponent(date)}&slot=${info.slot_number}`);
+      bids = await res.json();
+    } catch {
+      body.innerHTML = '<div class="bid-board-empty">Could not load bids.</div>';
+      return;
+    }
+
+    if (!Array.isArray(bids) || bids.length === 0) {
+      body.innerHTML = '<div class="bid-board-empty">No bids yet for this slot — be the first!</div>';
+    } else {
+      const medals = ['🥇','🥈','🥉'];
+      body.innerHTML = bids.map((b, i) => `
+        <div class="bid-row">
+          <span class="bid-rank${i === 0 ? ' top' : ''}">${medals[i] || (i+1)}</span>
+          <span class="bid-name">${escStr(b.advertiser_name)}</span>
+          <span class="bid-amount">${Number(b.bid_amount).toLocaleString()} ℐ</span>
+        </div>`).join('');
+    }
+
+    // Show "what you need to beat" hint if user has typed a bid
+    if (myBid > 0) {
+      const top = bids[0] ? bids[0].bid_amount : 0;
+      const winning = bids.length < 1 || myBid > top;
+      const msg = winning
+        ? `<span class="bid-beat-msg">✓ Your bid of ${myBid.toLocaleString()} ℐ would currently win this slot!</span>`
+        : `<span class="bid-lose-msg">✗ Top bid is ${Number(top).toLocaleString()} ℐ — bid more than that to win.</span>`;
+      yours.innerHTML = msg;
+      yours.style.display = 'block';
+    }
+  }
+
+  function escStr(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Reload bid board when date, slot, or bid amount changes
+  document.getElementById('f-date').addEventListener('input', loadBidBoard);
+  document.getElementById('f-slot').addEventListener('change', loadBidBoard);
+  document.getElementById('f-bid').addEventListener('input', loadBidBoard);
+  // ────────────────────────────────────────────────────────────────────────────
+
   onSlotTypeChange(); // init preview box size and labels on load
+  loadBidBoard();        // load initial bid board
   renderReaderAuthWidget(document.getElementById('reader-auth'));
   try { const s = JSON.parse(localStorage.getItem('jni_reader_settings')||'{}'); if(s.dark) document.body.classList.add('reader-dark-mode'); } catch{}
 </script>

@@ -1541,6 +1541,29 @@ export default {
     }
     // ----------------------------------------------------------------
 
+    // GET /api/ads/bids?date=YYYY-MM-DD&slot=1  — public
+    // Returns top 3 current bids for a given date+slot so advertisers can
+    // see what they need to beat. Advertiser names are shown, contacts hidden.
+    if (url.pathname === '/api/ads/bids' && request.method === 'GET') {
+      const date = url.searchParams.get('date');
+      const slot = parseInt(url.searchParams.get('slot') || '1');
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || ![1,2,3].includes(slot)) {
+        return new Response(JSON.stringify({ error: 'Invalid date or slot' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      const rows = await env.DB.prepare(
+        `SELECT advertiser_name, bid_amount, created_at
+         FROM ad_bids
+         WHERE target_date = ? AND slot_number = ? AND status = 'pending'
+         ORDER BY bid_amount DESC, id ASC
+         LIMIT 3`
+      ).bind(date, slot).all();
+      return new Response(JSON.stringify(rows.results || []), {
+        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      });
+    }
+
     // POST /api/ads/bid  — public, no auth required
     // Body: { advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number }
     if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
