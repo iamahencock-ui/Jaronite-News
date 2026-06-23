@@ -404,8 +404,6 @@
     box.innerHTML = '';
     box.appendChild(img);
   }
-    box.innerHTML = `<img src="${url}" alt="Ad preview" onerror="this.parentNode.innerHTML='<div class=\\'ad-preview-placeholder\\' style=\\'color:#c62828\\'>Could not load image — check the URL</div>'">`; 
-  }
 
   async function submitBid() {
     const btn = document.getElementById('submit-btn');
