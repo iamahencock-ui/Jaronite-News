@@ -121,12 +121,44 @@ async function renderReaderAuthWidget(container) {
     <div class="reader-account" id="reader-account-toggle">
       <img src="${avatarSrc}" alt="">
       <span class="reader-name">${escapeHtmlGlobal(me.username)}</span>
+      <svg class="reader-chevron" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <div class="reader-menu" id="reader-menu">
-      <div class="reader-menu-header">Logged in as ${escapeHtmlGlobal(me.username)}</div>
-      <a class="reader-menu-item" href="/favorites">♡ My Favorites</a>
+      <div class="reader-menu-profile">
+        <img class="reader-menu-avatar" src="${avatarSrc}" alt="">
+        <div class="reader-menu-profile-text">
+          <div class="reader-menu-display-name">${escapeHtmlGlobal(me.username)}</div>
+          <div class="reader-menu-sub">Discord Reader</div>
+        </div>
+      </div>
       <div class="reader-menu-divider"></div>
-      <a class="reader-menu-item reader-menu-logout" onclick="discordLogout()">Log out</a>
+      <a class="reader-menu-item" href="/favorites">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M10 17s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 17 8c0 4.65-7 9-7 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        My Favorites
+      </a>
+      <div class="reader-menu-divider"></div>
+      <div class="reader-menu-section-label">Settings</div>
+      <label class="reader-menu-toggle-item" title="Get notified about new articles">
+        <span>
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 2a6 6 0 0 1 6 6c0 3.5 1 5 1 5H3s1-1.5 1-5a6 6 0 0 1 6-6z" stroke="currentColor" stroke-width="1.5"/><path d="M8 15a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.5"/></svg>
+          Notifications
+        </span>
+        <input type="checkbox" id="reader-setting-notifs" onchange="readerSettingChanged('notifs', this.checked)">
+        <span class="reader-toggle-track"><span class="reader-toggle-thumb"></span></span>
+      </label>
+      <label class="reader-menu-toggle-item" title="Use dark theme when reading articles">
+        <span>
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 1 0 8 8A8 8 0 0 0 10 2zm0 14A6 6 0 0 1 10 4v12z" stroke="currentColor" stroke-width="1.5"/></svg>
+          Dark reading mode
+        </span>
+        <input type="checkbox" id="reader-setting-dark" onchange="readerSettingChanged('dark', this.checked)">
+        <span class="reader-toggle-track"><span class="reader-toggle-thumb"></span></span>
+      </label>
+      <div class="reader-menu-divider"></div>
+      <button class="reader-menu-logout-btn" onclick="discordLogout()">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M13 7l3 3-3 3M16 10H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Log out
+      </button>
     </div>`;
 
   const toggle = document.getElementById("reader-account-toggle");
@@ -135,8 +167,35 @@ async function renderReaderAuthWidget(container) {
     e.stopPropagation();
     menu.classList.toggle("open");
   });
-  document.addEventListener("click", () => menu.classList.remove("open"));
+  document.addEventListener("click", () => {
+    menu.classList.remove("open");
+    toggle.classList.remove("open");
+  });
   menu.addEventListener("click", (e) => e.stopPropagation());
+
+  // Apply saved settings
+  const savedSettings = getReaderSettings();
+  const notifCb = document.getElementById("reader-setting-notifs");
+  const darkCb  = document.getElementById("reader-setting-dark");
+  if (notifCb) notifCb.checked = !!savedSettings.notifs;
+  if (darkCb)  darkCb.checked  = !!savedSettings.dark;
+  if (savedSettings.dark) document.body.classList.add("reader-dark-mode");
+
+  // Chevron flip on open
+  toggle.addEventListener("click", () => toggle.classList.toggle("open"));
+}
+
+function getReaderSettings() {
+  try { return JSON.parse(localStorage.getItem("jni_reader_settings") || "{}"); } catch { return {}; }
+}
+
+function readerSettingChanged(key, value) {
+  const s = getReaderSettings();
+  s[key] = value;
+  try { localStorage.setItem("jni_reader_settings", JSON.stringify(s)); } catch {}
+  if (key === "dark") {
+    document.body.classList.toggle("reader-dark-mode", value);
+  }
 }
 
 async function loadFavoritesIntoMenu() {
