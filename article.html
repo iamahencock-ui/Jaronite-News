@@ -361,9 +361,8 @@
     const catLabel = categoryLabel(article.category);
 
     // Build banner HTML only when an image exists — falls back to text-only layout otherwise
-    const bannerHtml = article.image_url
-      ? `<img class="article-page-banner" src="${escapeHtml(article.image_url)}" alt="${escapeHtml(article.title)}" loading="lazy">`
-      : '';
+    const articleImgSrc = article.image_url || '/logo.png';
+    const bannerHtml = `<img class="article-page-banner" src="${escapeHtml(articleImgSrc)}" alt="${escapeHtml(article.title)}" loading="lazy">`;  
 
     wrap.innerHTML = `
       <a class="article-back-link" href="/${escapeHtml(article.category)}">← Back to ${escapeHtml(catLabel)}</a>

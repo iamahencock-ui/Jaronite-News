@@ -135,11 +135,10 @@
     container.innerHTML = filtered.map(a => {
       const catLabel = CATEGORY_LABELS[a.category] || a.category;
       const slug = `${a.id}-${slugify(a.title)}`;
-      const thumbHtml = a.image_url
-        ? `<img class="card-thumb" src="${escapeHtml(a.image_url)}" alt="${escapeHtml(a.title)}" loading="lazy">`
-        : '';
+      const imgSrc = a.image_url || '/logo.png';
+      const thumbHtml = `<img class="card-thumb" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(a.title)}" loading="lazy">`;  
       return `
-        <a class="article-summary-card${a.image_url ? ' has-thumb' : ''}" style="position:relative;text-decoration:none;display:block;" href="/article/${slug}">
+        <a class="article-summary-card has-thumb" style="position:relative;text-decoration:none;display:block;" href="/article/${slug}">
           ${favButtonHtml(a.id, false, 'card-fav-btn')}
           ${thumbHtml}
           <div class="card-text">
