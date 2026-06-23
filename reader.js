@@ -134,7 +134,7 @@ async function renderReaderAuthWidget(container) {
       <div class="reader-menu-divider"></div>
       <a class="reader-menu-item" href="/favorites">
         <svg viewBox="0 0 20 20" fill="none"><path d="M10 17s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 17 8c0 4.65-7 9-7 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        My Favorites
+        <span>My Favorites</span>
       </a>
       <div class="reader-menu-divider"></div>
       <div class="reader-menu-section-label">Settings</div>
@@ -189,13 +189,64 @@ function getReaderSettings() {
   try { return JSON.parse(localStorage.getItem("jni_reader_settings") || "{}"); } catch { return {}; }
 }
 
-function readerSettingChanged(key, value) {
+async function readerSettingChanged(key, value) {
+  // Persist first
   const s = getReaderSettings();
   s[key] = value;
   try { localStorage.setItem("jni_reader_settings", JSON.stringify(s)); } catch {}
+
   if (key === "dark") {
-    document.body.classList.toggle("reader-dark-mode", value);
+    applyDarkReadingMode(value);
   }
+
+  if (key === "notifs") {
+    await applyNotificationSetting(value);
+  }
+}
+
+function applyDarkReadingMode(on) {
+  document.body.classList.toggle("reader-dark-mode", on);
+  // Persist the modal/article bodies too if any are open
+  document.querySelectorAll(".article-modal-body, .article-page-body").forEach(el => {
+    el.classList.toggle("reader-dark-mode", on);
+  });
+}
+
+async function applyNotificationSetting(on) {
+  const cb = document.getElementById("reader-setting-notifs");
+  if (!on) {
+    // User turned it off — nothing to revoke client-side, just save the preference
+    return;
+  }
+  // Check if the browser supports notifications
+  if (!("Notification" in window)) {
+    alert("Your browser doesn't support notifications.");
+    if (cb) cb.checked = false;
+    const s = getReaderSettings(); s.notifs = false;
+    try { localStorage.setItem("jni_reader_settings", JSON.stringify(s)); } catch {}
+    return;
+  }
+  // Request permission if not already granted
+  if (Notification.permission === "granted") return; // already good
+  if (Notification.permission === "denied") {
+    alert("Notifications are blocked in your browser. Please enable them in your browser settings for this site, then try again.");
+    if (cb) cb.checked = false;
+    const s = getReaderSettings(); s.notifs = false;
+    try { localStorage.setItem("jni_reader_settings", JSON.stringify(s)); } catch {}
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    if (cb) cb.checked = false;
+    const s = getReaderSettings(); s.notifs = false;
+    try { localStorage.setItem("jni_reader_settings", JSON.stringify(s)); } catch {}
+    return;
+  }
+  // Show a confirmation notification
+  new Notification("Jaronite News", {
+    body: "You'll be notified when new articles are published.",
+    icon: "/logo.png",
+  });
 }
 
 async function loadFavoritesIntoMenu() {

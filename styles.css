@@ -807,13 +807,14 @@ body {
   gap: 8px;
   padding: 9px 10px;
   border-radius: 7px;
-  color: var(--ink);
-  text-decoration: none;
+  color: var(--ink) !important;
+  text-decoration: none !important;
   font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.12s;
 }
 .reader-menu-item svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--ink-muted); }
+.reader-menu-item span { color: var(--ink); }
 .reader-menu-item:hover { background: var(--paper-dim); }
 
 .reader-menu-item .fav-cat {
@@ -1695,3 +1696,74 @@ body.portal textarea { resize: vertical; min-height: 160px; font-family: Georgia
 }
 
 .analytics-link-btn:hover { border-color: #c9a84c !important; }
+/* ============================================================
+   DARK READING MODE
+   Applied to <body> via .reader-dark-mode when the reader
+   toggles the setting. Only affects reading surfaces —
+   the site header/nav stays unchanged.
+   ============================================================ */
+
+body.reader-dark-mode .article-modal {
+  background: #1a1a2e;
+  color: #e0dff0;
+}
+body.reader-dark-mode .article-modal-header {
+  background: #16162a;
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+body.reader-dark-mode .article-modal-title,
+body.reader-dark-mode .article-modal-stamp {
+  color: #e0dff0;
+}
+body.reader-dark-mode .article-modal-meta { color: #a0a0c0; }
+body.reader-dark-mode .article-modal-body {
+  color: #d4d3e8;
+}
+body.reader-dark-mode .article-modal-body p,
+body.reader-dark-mode .article-modal-body li,
+body.reader-dark-mode .article-modal-body blockquote {
+  color: #d4d3e8;
+}
+body.reader-dark-mode .article-modal-body h2,
+body.reader-dark-mode .article-modal-body h3,
+body.reader-dark-mode .article-modal-body h4 {
+  color: #e8e7f8;
+}
+body.reader-dark-mode .article-modal-body a { color: #a78bfa; }
+body.reader-dark-mode .article-modal-body blockquote {
+  border-left-color: #7c5cbf;
+  background: rgba(124,92,191,0.12);
+}
+body.reader-dark-mode .article-modal-body code {
+  background: rgba(255,255,255,0.08);
+  color: #c4b5fd;
+}
+body.reader-dark-mode .article-modal-body hr { border-color: rgba(255,255,255,0.1); }
+
+/* Article standalone page dark mode */
+body.reader-dark-mode .article-page-wrap {
+  background: #1a1a2e;
+  color: #d4d3e8;
+}
+
+/* Comments section in dark mode */
+body.reader-dark-mode #modal-comments { background: #16162a; }
+body.reader-dark-mode .comment-item { border-bottom-color: rgba(255,255,255,0.07); }
+body.reader-dark-mode .comment-body { color: #c8c7e0; }
+body.reader-dark-mode .comment-input-area textarea {
+  background: #22223a;
+  color: #e0dff0;
+  border-color: rgba(255,255,255,0.12);
+}
+body.reader-dark-mode .comment-author { color: #e0dff0; }
+body.reader-dark-mode .comment-date { color: #7070a0; }
+
+/* Smooth transition */
+.article-modal,
+.article-modal-header,
+.article-modal-body,
+.article-modal-title,
+.article-modal-meta,
+#modal-comments {
+  transition: background 0.25s, color 0.25s, border-color 0.25s;
+}
