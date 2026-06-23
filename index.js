@@ -90,7 +90,7 @@ async function hashArticleText(title, content) {
 function securityHeaders(extraHeaders = {}) {
   return {
     "Content-Security-Policy":
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com data:; connect-src 'self' https://discord.com; font-src 'self'; frame-ancestors 'none';",
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none';",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
