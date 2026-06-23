@@ -116,18 +116,20 @@
       background: var(--paper);
       border: 2px dashed var(--border);
       border-radius: 10px;
-      width: 300px;
-      height: 250px;
+      width: 100%;
+      max-width: 728px;
+      height: 90px;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 12px 0;
       overflow: hidden;
       position: relative;
+      transition: height 0.2s ease;
     }
     .ad-preview-box img {
-      width: 300px;
-      height: 250px;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
     }
     .ad-preview-placeholder {
@@ -227,7 +229,6 @@
       <a href="/economy">Economy</a>
       <a href="/guides">Guides</a>
       <a href="/miscellaneous">Misc</a>
-      <a href="/advertise" class="nav-advertise-btn active">📢 Advertise</a>
       <a href="/favorites" class="nav-favorites-btn">♡ Favorites</a>
       <div class="reader-auth" id="reader-auth"></div>
     </nav>
@@ -237,17 +238,21 @@
 <div class="advertise-wrap">
   <h1>Advertise with Us</h1>
   <p class="subtitle">
-    Reach the DemocracyCraft community directly. We run <strong>3 ad slots per day</strong>,
-    awarded each evening to the highest bidders. Ads appear on every article page as a
-    300×250 image with your link.
+    Reach the DemocracyCraft community directly. We run <strong>3 ad placements per day</strong>,
+    awarded each evening to the highest bidders. Ads appear on every article page —
+    choose a bottom leaderboard (728×90) or a side skyscraper (160×600).
   </p>
 
   <div class="ad-info-box">
     <h3>Slot Details</h3>
     <div class="ad-info-row">
       <div class="ad-info-item">
-        <div class="label">Ad Size</div>
-        <div class="value">300 × 250 px</div>
+        <div class="label">Bottom Leaderboard</div>
+        <div class="value">728 × 90 px</div>
+      </div>
+      <div class="ad-info-item">
+        <div class="label">Side Skyscrapers (×2)</div>
+        <div class="value">160 × 600 px</div>
       </div>
       <div class="ad-info-item">
         <div class="label">Slots Per Day</div>
@@ -256,10 +261,6 @@
       <div class="ad-info-item">
         <div class="label">Bidding Closes</div>
         <div class="value">8 PM UTC</div>
-      </div>
-      <div class="ad-info-item">
-        <div class="label">Currency</div>
-        <div class="value">Jeronies</div>
       </div>
     </div>
   </div>
@@ -279,9 +280,9 @@
     </div>
 
     <div class="form-group">
-      <label>Ad Image URL <span style="font-weight:400;text-transform:none;">(300×250 px)</span></label>
+      <label>Ad Image URL <span style="font-weight:400;text-transform:none;" id="img-size-label">(728×90 px)</span></label>
       <input type="url" id="f-image" placeholder="https://i.imgur.com/yourimage.png" oninput="previewImage()">
-      <div class="hint">Host your image on Imgur, Discord CDN, or any public URL. Must be exactly 300×250 px.</div>
+      <div class="hint" id="img-size-hint">Host your image on Imgur, Discord CDN, or any public URL. Must be exactly 728×90 px for the leaderboard slot.</div>
       <div class="ad-preview-box" id="ad-preview-box">
         <div class="ad-preview-placeholder" id="ad-preview-placeholder">Preview will appear here</div>
       </div>
@@ -300,20 +301,20 @@
         <div class="hint">The day you want your ad to run.</div>
       </div>
       <div class="form-group">
-        <label>Slot</label>
-        <select id="f-slot">
-          <option value="1">Slot 1</option>
-          <option value="2">Slot 2</option>
-          <option value="3">Slot 3</option>
+        <label>Ad Placement</label>
+        <select id="f-slot" onchange="onSlotTypeChange()">
+          <option value="bottom">Bottom Leaderboard (728×90) — Slot 1</option>
+          <option value="left">Left Skyscraper (160×600) — Slot 2</option>
+          <option value="right">Right Skyscraper (160×600) — Slot 3</option>
         </select>
-        <div class="hint">3 slots available per day.</div>
+        <div class="hint" id="slot-hint">Appears below the article body on every article page.</div>
       </div>
     </div>
 
     <div class="form-group">
-      <label>Bid Amount (Jeronies)</label>
+      <label>Bid Amount</label>
       <input type="number" id="f-bid" min="1" step="1" placeholder="e.g. 500">
-      <div class="hint">Highest 3 bids per day win their respective slots. Ties go to earliest submission.</div>
+      <div class="hint">Highest bid per placement per day wins. Ties go to earliest submission.</div>
     </div>
 
     <button class="submit-btn" id="submit-btn" onclick="submitBid()">Submit Bid</button>
@@ -365,14 +366,44 @@
   document.getElementById('f-date').min = tomorrow.toISOString().slice(0, 10);
   document.getElementById('f-date').value = tomorrow.toISOString().slice(0, 10);
 
+  const SLOT_INFO = {
+    bottom: { slot_number: 1, w: 728, h: 90,  label: '728×90 px',  hint: 'Appears below the article body on every article page.' },
+    left:   { slot_number: 2, w: 160, h: 600, label: '160×600 px', hint: 'Sticky skyscraper on the left side rail (visible on wide screens).' },
+    right:  { slot_number: 3, w: 160, h: 600, label: '160×600 px', hint: 'Sticky skyscraper on the right side rail (visible on wide screens).' }
+  };
+
+  function onSlotTypeChange() {
+    const type = document.getElementById('f-slot').value;
+    const info = SLOT_INFO[type];
+    document.getElementById('img-size-label').textContent = '(' + info.label + ')';
+    document.getElementById('img-size-hint').textContent = 'Host your image on Imgur, Discord CDN, or any public URL. Must be exactly ' + info.w + '×' + info.h + ' px for this slot.';
+    document.getElementById('slot-hint').textContent = info.hint;
+    const box = document.getElementById('ad-preview-box');
+    if (info.w === 160) {
+      box.style.maxWidth = '160px';
+      box.style.height = '300px';
+    } else {
+      box.style.maxWidth = '100%';
+      box.style.height = '90px';
+    }
+    previewImage();
+  }
+
   function previewImage() {
     const url = document.getElementById('f-image').value.trim();
     const box = document.getElementById('ad-preview-box');
-    const placeholder = document.getElementById('ad-preview-placeholder');
     if (!url) {
       box.innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
       return;
     }
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Ad preview';
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+    img.onerror = () => { box.innerHTML = '<div class="ad-preview-placeholder" style="color:#c62828">Could not load image — check the URL</div>'; };
+    box.innerHTML = '';
+    box.appendChild(img);
+  }
     box.innerHTML = `<img src="${url}" alt="Ad preview" onerror="this.parentNode.innerHTML='<div class=\\'ad-preview-placeholder\\' style=\\'color:#c62828\\'>Could not load image — check the URL</div>'">`; 
   }
 
@@ -387,7 +418,8 @@
     const image   = document.getElementById('f-image').value.trim();
     const dest    = document.getElementById('f-dest').value.trim();
     const date    = document.getElementById('f-date').value;
-    const slot    = document.getElementById('f-slot').value;
+    const slotType = document.getElementById('f-slot').value;
+    const slot    = SLOT_INFO[slotType].slot_number;
     const bid     = parseFloat(document.getElementById('f-bid').value);
 
     if (!name || !contact || !image || !dest || !date || !bid || bid <= 0) {
