@@ -198,3 +198,34 @@ CREATE INDEX IF NOT EXISTS idx_ad_bids_target_date ON ad_bids(target_date);
 CREATE INDEX IF NOT EXISTS idx_ad_bids_status ON ad_bids(status);
 CREATE INDEX IF NOT EXISTS idx_ad_slots_run_date ON ad_slots(run_date);
 CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
+
+-- ============================================================
+-- Payment tracking (webhook integration with DC Economy API)
+-- Run after deploying the webhook receiver in index.js:
+--   npx wrangler d1 execute jaronite-news-db --remote --file=./schema.sql
+-- ============================================================
+
+-- Add payment columns to ad_bids (safe to re-run — uses ALTER TABLE IF NOT EXISTS pattern)
+-- payment_status: 'unpaid' | 'awaiting_payment' | 'paid' | 'overpaid' | 'underpaid'
+-- These are added as separate ALTER TABLE statements for existing installs.
+-- New installs: these columns are present via the schema additions below.
+-- For existing installs run each ALTER TABLE manually if the column doesn't exist.
+
+-- (For clean installs the ad_bids CREATE TABLE above already has these via migration;
+--  for existing installs apply these ALTER TABLEs):
+-- ALTER TABLE ad_bids ADD COLUMN payment_status TEXT DEFAULT 'unpaid';
+-- ALTER TABLE ad_bids ADD COLUMN payment_txn_id TEXT;         -- DC Economy txnId
+-- ALTER TABLE ad_bids ADD COLUMN payment_received_at DATETIME;
+-- ALTER TABLE ad_bids ADD COLUMN payment_amount_received REAL;
+
+-- Deduplication table for incoming webhook deliveries.
+-- DC Economy uses at-least-once delivery; we store every deliveryId we've
+-- already processed so duplicate POSTs are safely ignored.
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  delivery_id TEXT UNIQUE NOT NULL,   -- X-Treasury-Delivery-Id header value
+  txn_id TEXT,                        -- transaction id from payload
+  processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_delivery_id ON webhook_deliveries(delivery_id);

@@ -1494,13 +1494,50 @@ export default {
     // AD SYSTEM — Step 1 routes
     // ================================================================
 
-    // ---- PAYMENT MODULE (stub — implement separately later) --------
-    // Receives the winning bid object. Replace with real payment logic.
-    // Must return a Promise resolving to { ok: true } or throw on failure.
-    async function processAdPayment(bid) {
-      // TODO: integrate Minecraft server currency payment here.
-      // bid = { id, advertiser_name, contact, bid_amount, target_date, slot_number }
-      return { ok: true, note: 'payment_pending_implementation' };
+    // ================================================================
+    // PAYMENT MODULE — DC Economy webhook-based payment verification
+    // ================================================================
+    //
+    // Flow:
+    //   1. Cron awards winner → sets payment_status = 'awaiting_payment'
+    //   2. Staff notifies advertiser (Discord) with their bid ID & amount
+    //   3. Advertiser pays your firm account in-game with memo = "bid:<id>"
+    //   4. DC Economy POSTs to POST /api/ads/webhook/payment
+    //   5. Worker verifies HMAC, parses memo, matches bid, marks paid
+    //
+    // Setup (one-time):
+    //   a. In Minecraft: /treasuryapi business issue <YourFirmName>  → copy token
+    //   b. Set Cloudflare secret:
+    //        npx wrangler secret put DC_WEBHOOK_SECRET
+    //      (paste the HMAC signing secret from economy.democracycraft.net/me/webhooks)
+    //   c. On economy.democracycraft.net/me/webhooks, add endpoint:
+    //        https://<your-worker>.workers.dev/api/ads/webhook/payment
+    //      Scope it to your firm account so you only receive inbound transfers.
+
+    // Verify the HMAC-SHA256 signature DC Economy attaches to every webhook.
+    // Must run against the raw request body bytes, not re-serialised JSON.
+    async function verifyDcWebhookSignature(rawBody, signatureHeader, secret) {
+      if (!signatureHeader || !signatureHeader.startsWith('sha256=')) return false;
+      const expected = signatureHeader.slice(7); // strip 'sha256='
+      const key = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+      );
+      const sig = await crypto.subtle.sign('HMAC', key, rawBody);
+      const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+      // Constant-time comparison
+      if (hex.length !== expected.length) return false;
+      let diff = 0;
+      for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ expected.charCodeAt(i);
+      return diff === 0;
+    }
+
+    // Parse the memo field from a DC Economy transaction.
+    // Advertisers must pay with memo = "bid:<id>" (e.g. "bid:42").
+    // Returns the bid id as a number, or null if memo doesn't match.
+    function parseBidIdFromMemo(memo) {
+      if (!memo || typeof memo !== 'string') return null;
+      const m = memo.trim().match(/^bid:(\d+)$/i);
+      return m ? parseInt(m[1], 10) : null;
     }
     // ----------------------------------------------------------------
 
@@ -1605,6 +1642,132 @@ export default {
          FROM ad_slots s
          WHERE s.run_date BETWEEN ? AND ?
          ORDER BY s.run_date DESC, s.slot_number`
+      ).bind(from, to).all();
+      return new Response(JSON.stringify(rows.results || []), {
+        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      });
+    }
+
+    // ================================================================
+    // POST /api/ads/webhook/payment  — DC Economy webhook receiver
+    // ================================================================
+    // Called by DC Economy server when money arrives in the JNI firm account.
+    // Verifies the HMAC signature, deduplicates by deliveryId, parses the
+    // memo to find the matching bid, and marks it paid (or flags over/underpay).
+    if (url.pathname === '/api/ads/webhook/payment' && request.method === 'POST') {
+      const secret = env.DC_WEBHOOK_SECRET;
+      if (!secret) {
+        // Secret not configured — log and return 200 so DC doesn't retry forever
+        console.error('DC_WEBHOOK_SECRET not set — webhook ignored');
+        return new Response('ok', { status: 200 });
+      }
+
+      // Read raw bytes for signature verification
+      const rawBody = await request.arrayBuffer();
+      const sigHeader = request.headers.get('X-Treasury-Signature') || '';
+      const deliveryId = request.headers.get('X-Treasury-Delivery-Id') || String(Date.now());
+
+      // Verify signature
+      const valid = await verifyDcWebhookSignature(rawBody, sigHeader, secret);
+      if (!valid) {
+        console.warn('DC webhook: invalid signature, rejecting');
+        return new Response('Forbidden', { status: 403 });
+      }
+
+      // Deduplicate: if we've already processed this deliveryId, return 200 silently
+      const alreadyProcessed = await env.DB.prepare(
+        `SELECT id FROM webhook_deliveries WHERE delivery_id = ?`
+      ).bind(deliveryId).first();
+      if (alreadyProcessed) {
+        return new Response('ok', { status: 200 }); // idempotent replay
+      }
+
+      // Parse payload
+      let payload;
+      try { payload = JSON.parse(new TextDecoder().decode(rawBody)); }
+      catch { return new Response('Bad JSON', { status: 400 }); }
+
+      const txn = payload.transaction;
+      if (!txn) return new Response('ok', { status: 200 }); // not a transaction event
+
+      // Only care about incoming money (positive amount)
+      const amount = parseFloat(txn.amount);
+      if (!amount || amount <= 0) return new Response('ok', { status: 200 });
+
+      // Record delivery for deduplication regardless of outcome
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO webhook_deliveries (delivery_id, txn_id) VALUES (?, ?)`
+      ).bind(deliveryId, String(txn.txnId || '')).run();
+
+      // Parse bid ID from memo
+      const bidId = parseBidIdFromMemo(txn.memo || txn.message || '');
+      if (!bidId) {
+        // Payment with no recognisable bid ID — log but don't error (might be unrelated)
+        console.log(`DC webhook: unrecognised memo "${txn.memo}" — ignoring`);
+        return new Response('ok', { status: 200 });
+      }
+
+      // Look up the bid
+      const bid = await env.DB.prepare(
+        `SELECT * FROM ad_bids WHERE id = ?`
+      ).bind(bidId).first();
+
+      if (!bid) {
+        console.warn(`DC webhook: bid ${bidId} not found`);
+        return new Response('ok', { status: 200 });
+      }
+
+      // Determine payment status
+      let paymentStatus;
+      const tolerance = 0.01; // float rounding tolerance
+      if (Math.abs(amount - bid.bid_amount) <= tolerance) {
+        paymentStatus = 'paid';
+      } else if (amount > bid.bid_amount) {
+        paymentStatus = 'overpaid';
+      } else {
+        paymentStatus = 'underpaid';
+      }
+
+      // Update bid with payment details
+      await env.DB.prepare(
+        `UPDATE ad_bids
+         SET payment_status = ?,
+             payment_txn_id = ?,
+             payment_amount_received = ?,
+             payment_received_at = datetime('now')
+         WHERE id = ?`
+      ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), amount, bidId).run();
+
+      console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (expected ${bid.bid_amount}, received ${amount})`);
+      return new Response('ok', { status: 200 });
+    }
+
+    // ================================================================
+    // GET /api/ads/payment-status  — editor/admin only
+    // Returns payment status for all won bids, optionally filtered by date range.
+    // Query params: token (required), from_date, to_date
+    // ================================================================
+    if (url.pathname === '/api/ads/payment-status' && request.method === 'GET') {
+      const token = url.searchParams.get('token');
+      const session = token ? await env.DB.prepare(
+        `SELECT u.role FROM sessions s JOIN users u ON u.username = s.username
+         WHERE s.token = ? AND s.expires_at > datetime('now')`
+      ).bind(token).first() : null;
+      if (!session || !['admin', 'editor'].includes(session.role)) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 403, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      const from = url.searchParams.get('from_date') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const to   = url.searchParams.get('to_date')   || new Date().toISOString().slice(0, 10);
+      const rows = await env.DB.prepare(
+        `SELECT b.id, b.advertiser_name, b.contact, b.bid_amount,
+                b.target_date, b.slot_number, b.status AS bid_status,
+                b.payment_status, b.payment_amount_received,
+                b.payment_txn_id, b.payment_received_at
+         FROM ad_bids b
+         WHERE b.status = 'won' AND b.target_date BETWEEN ? AND ?
+         ORDER BY b.target_date DESC, b.slot_number`
       ).bind(from, to).all();
       return new Response(JSON.stringify(rows.results || []), {
         headers: { 'Content-Type': 'application/json', ...securityHeaders() }
@@ -1740,11 +1903,6 @@ export default {
 
         if (!winner) continue;
 
-        // ---- PAYMENT HOOK (stub) ----
-        // When payment is implemented, call it here before inserting the slot.
-        // try { await processAdPayment(winner); } catch { continue; }
-        // ----------------------------
-
         // Insert into ad_slots (or update if already exists from a re-run)
         await env.DB.prepare(
           `INSERT INTO ad_slots (slot_number, run_date, bid_id, advertiser_name, contact, image_url, dest_url, bid_amount)
@@ -1758,9 +1916,9 @@ export default {
              bid_amount = excluded.bid_amount`
         ).bind(slot, targetDate, winner.id, winner.advertiser_name, winner.contact, winner.image_url, winner.dest_url, winner.bid_amount).run();
 
-        // Mark winner
+        // Mark winner and set payment_status to awaiting_payment
         await env.DB.prepare(
-          `UPDATE ad_bids SET status = 'won' WHERE id = ?`
+          `UPDATE ad_bids SET status = 'won', payment_status = 'awaiting_payment' WHERE id = ?`
         ).bind(winner.id).run();
 
         // Mark all other pending bids for this slot/date as lost
