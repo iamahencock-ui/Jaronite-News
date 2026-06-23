@@ -21,3 +21,4 @@ crons = ["0 20 * * *", "0 0 * * *"]
 
 [vars]
 RESEND_FROM_EMAIL = "Jaronite News <onboarding@resend.dev>"
+DISCORD_GUILD_ID = "1513015724455628940"

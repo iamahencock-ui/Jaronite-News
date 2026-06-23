@@ -138,6 +138,114 @@ async function sendEmail(env, { to, subject, html }) {
   }
 }
 
+
+// ================================================================
+// Discord DM helper — sends a DM to a user by username via bot
+// Requires: DISCORD_BOT_TOKEN secret  (npx wrangler secret put DISCORD_BOT_TOKEN)
+// Flow: search for user by username → open DM channel → send message
+// Note: the bot must share a server with the recipient, or have
+//       the MESSAGE_CONTENT intent enabled in the Developer Portal.
+// ================================================================
+async function sendDiscordDm(env, discordUsername, message) {
+  const token = env.DISCORD_BOT_TOKEN;
+  if (!token) { console.warn('DISCORD_BOT_TOKEN not set — Discord DM skipped'); return; }
+  if (!discordUsername) return;
+
+  try {
+    // Strip any #discriminator suffix (legacy tags like user#1234)
+    const username = discordUsername.replace(/#\d{4}$/, '').trim();
+
+    // Search for the user via the bot's guild member search.
+    // We search the configured guild (server) for the username.
+    const guildId = env.DISCORD_GUILD_ID;
+    if (!guildId) { console.warn('DISCORD_GUILD_ID not set — Discord DM skipped'); return; }
+
+    const searchRes = await fetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members/search?query=${encodeURIComponent(username)}&limit=5`,
+      { headers: { Authorization: `Bot ${token}` } }
+    );
+    if (!searchRes.ok) {
+      console.error('Discord member search failed:', searchRes.status, await searchRes.text());
+      return;
+    }
+    const members = await searchRes.json();
+    // Find the closest match — prefer exact username match
+    const member = members.find(m =>
+      m.user.username.toLowerCase() === username.toLowerCase() ||
+      (m.nick && m.nick.toLowerCase() === username.toLowerCase())
+    ) || members[0];
+
+    if (!member) {
+      console.warn(`Discord: could not find user "${username}" in guild`);
+      return;
+    }
+    const userId = member.user.id;
+
+    // Open a DM channel
+    const dmRes = await fetch('https://discord.com/api/v10/users/@me/channels', {
+      method: 'POST',
+      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipient_id: userId }),
+    });
+    if (!dmRes.ok) {
+      console.error('Discord DM channel open failed:', dmRes.status, await dmRes.text());
+      return;
+    }
+    const dmChannel = await dmRes.json();
+
+    // Send the message
+    const msgRes = await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message }),
+    });
+    if (!msgRes.ok) {
+      console.error('Discord message send failed:', msgRes.status, await msgRes.text());
+    }
+  } catch (e) {
+    console.error('Discord DM failed:', e);
+  }
+}
+
+function winDiscordMsg(bid, slotLabel) {
+  return `🎉 **You won a Jaronite News ad slot!**
+
+Hi **${bid.advertiser_name}** — your bid of **${Number(bid.bid_amount).toFixed(2)} ℐ/view** won the **${slotLabel}** slot for **${bid.target_date}**.
+
+**How to pay:**
+Send payment in-game to the Jaronite News firm account with this exact memo:
+\`\`\`
+bid:${bid.id}
+\`\`\`
+Include \`bid:${bid.id}\` in the memo/message so we match your payment automatically.
+
+Questions? Reply here or contact us on the DemocracyCraft Discord.
+— Jaronite News Inc.`;
+}
+
+function confirmedDiscordMsg(bid, slotLabel, amount) {
+  return `✅ **Payment received — your ad is confirmed!**
+
+Hi **${bid.advertiser_name}** — we received your payment of **${Number(amount).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ${bid.target_date}).
+
+Your ad is confirmed and will run as scheduled. You'll receive a performance report after it runs.
+— Jaronite News Inc.`;
+}
+
+function reminderDiscordMsg(bid, slotLabel) {
+  return `⏰ **Reminder: payment pending for your Jaronite News ad**
+
+Hi **${bid.advertiser_name}** — your winning ad bid is still awaiting payment.
+
+**Slot:** ${slotLabel}  
+**Date:** ${bid.target_date}  
+**Rate:** ${Number(bid.bid_amount).toFixed(2)} ℐ/view  
+**Bid ID:** #${bid.id}
+
+Pay in-game with memo \`bid:${bid.id}\` to the Jaronite News firm account. If payment isn't received before ${bid.target_date}, your slot may be forfeited.
+— Jaronite News Inc.`;
+}
+
 function winEmailHtml(bid, slotLabel) {
   const totalEstimate = (bid.bid_amount * 100).toFixed(2); // rough estimate: 100 views/day
   return `
@@ -1666,7 +1774,7 @@ export default {
     if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
       let body;
       try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
-      const { advertiser_name, contact, email, image_url, dest_url, bid_amount, target_date, slot_number } = body;
+      const { advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number } = body;
       if (!advertiser_name || !contact || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
         return new Response(JSON.stringify({ error: 'Missing required fields' }), {
           status: 400, headers: { 'Content-Type': 'application/json' }
@@ -1689,9 +1797,9 @@ export default {
         });
       }
       await env.DB.prepare(
-        `INSERT INTO ad_bids (advertiser_name, contact, email, image_url, dest_url, bid_amount, target_date, slot_number)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(advertiser_name, contact, email || '', image_url, dest_url, Number(bid_amount), target_date, Number(slot_number)).run();
+        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(advertiser_name, contact, email || '', discord_username || '', image_url, dest_url, Number(bid_amount), target_date, Number(slot_number)).run();
       return new Response(JSON.stringify({ ok: true, message: 'Bid received. Winners notified after 8 PM UTC.' }), {
         headers: { 'Content-Type': 'application/json', ...securityHeaders() }
       });
@@ -1860,14 +1968,19 @@ export default {
 
       console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (expected ${bid.bid_amount}, received ${amount})`);
 
-      // Send payment confirmation email if we have an address
-      if ((paymentStatus === 'paid' || paymentStatus === 'overpaid') && bid.email) {
-        const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
-        await sendEmail(env, {
-          to: bid.email,
-          subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
-          html: paymentConfirmedEmailHtml(bid, slotLabel, amount),
-        });
+      // Send payment confirmation (email + Discord DM)
+      if (paymentStatus === 'paid' || paymentStatus === 'overpaid') {
+        const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+        if (bid.email) {
+          await sendEmail(env, {
+            to: bid.email,
+            subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
+            html: paymentConfirmedEmailHtml(bid, slotLabel, amount),
+          });
+        }
+        if (bid.discord_username) {
+          await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, amount));
+        }
       }
 
       return new Response('ok', { status: 200 });
@@ -2052,14 +2165,17 @@ export default {
           `UPDATE ad_bids SET status = 'won', payment_status = 'awaiting_payment' WHERE id = ?`
         ).bind(winner.id).run();
 
-        // Send win + payment instructions email
+        // Send win notifications (email + Discord DM)
+        const slotLabelWin = SLOT_LABELS[slot] || `Slot ${slot}`;
         if (winner.email) {
-          const slotLabel = SLOT_LABELS[slot] || `Slot ${slot}`;
           await sendEmail(env, {
             to: winner.email,
             subject: `🎉 You won a Jaronite News ad slot for ${targetDate}!`,
-            html: winEmailHtml(winner, slotLabel),
+            html: winEmailHtml(winner, slotLabelWin),
           });
+        }
+        if (winner.discord_username) {
+          await sendDiscordDm(env, winner.discord_username, winDiscordMsg(winner, slotLabelWin));
         }
 
         // Mark all other pending bids for this slot/date as lost
@@ -2091,11 +2207,16 @@ export default {
         const wonAt = new Date(bid.updated_at || bid.created_at);
         const daysOverdue = Math.floor((Date.now() - wonAt.getTime()) / 86400000);
         const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
-        await sendEmail(env, {
-          to: bid.email,
-          subject: `⏰ Reminder: payment pending for your Jaronite News ad #${bid.id}`,
-          html: reminderEmailHtml(bid, slotLabel, daysOverdue),
-        });
+        if (bid.email) {
+          await sendEmail(env, {
+            to: bid.email,
+            subject: `⏰ Reminder: payment pending for your Jaronite News ad #${bid.id}`,
+            html: reminderEmailHtml(bid, slotLabel, daysOverdue),
+          });
+        }
+        if (bid.discord_username) {
+          await sendDiscordDm(env, bid.discord_username, reminderDiscordMsg(bid, slotLabel));
+        }
       }
     }
   },

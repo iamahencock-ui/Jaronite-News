@@ -382,6 +382,12 @@
     </div>
 
     <div class="form-group">
+      <label>Discord Username <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(optional)</span></label>
+      <input type="text" id="f-discord" placeholder="e.g. yourname or yourname#1234">
+      <div class="hint">If provided, our bot will DM you directly on Discord with win notifications and payment reminders.</div>
+    </div>
+
+    <div class="form-group">
       <label>Ad Image URL <span style="font-weight:400;text-transform:none;" id="img-size-label">(728×90 px)</span></label>
       <input type="url" id="f-image" placeholder="https://i.imgur.com/yourimage.png" oninput="previewImage()">
       <div class="hint" id="img-size-hint">Host your image on Imgur, Discord CDN, or any public URL. Must be exactly 728×90 px for the leaderboard slot.</div>
@@ -528,6 +534,7 @@
     const name    = document.getElementById('f-name').value.trim();
     const contact = document.getElementById('f-contact').value.trim();
     const email   = document.getElementById('f-email').value.trim();
+    const discord_username = document.getElementById('f-discord').value.trim();
     const image   = document.getElementById('f-image').value.trim();
     const dest    = document.getElementById('f-dest').value.trim();
     const date    = document.getElementById('f-date').value;
@@ -552,6 +559,7 @@
           advertiser_name: name,
           contact,
           email,
+          discord_username,
           image_url: image,
           dest_url: dest,
           bid_amount: bid,
@@ -564,7 +572,7 @@
         notice.className = 'form-notice success';
         notice.innerHTML = `✓ Bid received! Winners are notified after 8 PM UTC. Good luck!`;
         // Reset form
-        ['f-name','f-contact','f-email','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
+        ['f-name','f-contact','f-email','f-discord','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('ad-preview-box').innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
         loadBidBoard(); // refresh board after bid submitted
       } else {
