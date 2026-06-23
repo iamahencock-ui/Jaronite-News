@@ -35,6 +35,56 @@
   --font-mono:     'Courier New', Courier, monospace;
 }
 
+/* ============================================================
+   DARK READING MODE — override CSS variables so every element
+   that uses them automatically adapts. The site header/nav
+   keeps its dark purple so it looks unchanged.
+   ============================================================ */
+body.reader-dark-mode {
+  --paper:         #12121f;
+  --paper-dim:     #1e1e32;
+  --ink:           #e0dff0;
+  --ink-soft:      #a8a8cc;
+  --ink-muted:     #7070a0;
+  --rule:          rgba(255,255,255,0.10);
+  --card-bg:       #1a1a2e;
+  --card-shadow:   0 2px 12px rgba(0,0,0,0.4);
+  --card-shadow-h: 0 8px 28px rgba(0,0,0,0.5);
+  --mid-purple:    #a78bfa;
+  --light-purple:  #c4b5fd;
+  background: #12121f;
+}
+
+/* Reader menu itself stays light so it's readable */
+body.reader-dark-mode .reader-menu {
+  background: #ffffff;
+  --ink: #1a1a2e;
+  --ink-soft: #4a4a6a;
+  --ink-muted: #7a7a9a;
+  --rule: #d4cce8;
+  --paper-dim: #ede9f8;
+  --mid-purple: #7c5cbf;
+}
+body.reader-dark-mode .reader-menu * { color: inherit; }
+body.reader-dark-mode .reader-menu .reader-menu-display-name { color: #1a1a2e; }
+body.reader-dark-mode .reader-menu .reader-menu-sub { color: #7a7a9a; }
+body.reader-dark-mode .reader-menu .reader-menu-item,
+body.reader-dark-mode .reader-menu .reader-menu-item span { color: #1a1a2e !important; }
+body.reader-dark-mode .reader-menu .reader-menu-section-label { color: #7a7a9a; }
+body.reader-dark-mode .reader-menu .reader-menu-toggle-item > span:first-child { color: #1a1a2e; }
+body.reader-dark-mode .reader-menu .reader-menu-logout-btn { color: #c0392b; }
+body.reader-dark-mode .reader-menu .reader-menu-divider { background: #d4cce8; }
+body.reader-dark-mode .reader-menu .reader-toggle-track { background: #d0d0d8; }
+body.reader-dark-mode .reader-menu input:checked ~ .reader-toggle-track { background: #7c5cbf; }
+
+/* Smooth transition on all surfaces */
+body, main, .hero, .categories-section, .cat-card,
+.article-modal, .article-modal-body, .article-page-wrap,
+.article-page-body, .article-page-title, .article-page-meta,
+.article-summary-card, .card-text, .site-footer {
+  transition: background 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
 html { scroll-behavior: smooth; }
 
 body {
@@ -1696,93 +1746,3 @@ body.portal textarea { resize: vertical; min-height: 160px; font-family: Georgia
 }
 
 .analytics-link-btn:hover { border-color: #c9a84c !important; }
-/* ============================================================
-   DARK READING MODE
-   Applied to <body> via .reader-dark-mode when the reader
-   toggles the setting. Only affects reading surfaces —
-   the site header/nav stays unchanged.
-   ============================================================ */
-
-body.reader-dark-mode .article-modal {
-  background: #1a1a2e;
-  color: #e0dff0;
-}
-body.reader-dark-mode .article-modal-header {
-  background: #16162a;
-  border-bottom-color: rgba(255,255,255,0.08);
-}
-body.reader-dark-mode .article-modal-title,
-body.reader-dark-mode .article-modal-stamp {
-  color: #e0dff0;
-}
-body.reader-dark-mode .article-modal-meta { color: #a0a0c0; }
-body.reader-dark-mode .article-modal-body {
-  color: #d4d3e8;
-}
-body.reader-dark-mode .article-modal-body p,
-body.reader-dark-mode .article-modal-body li,
-body.reader-dark-mode .article-modal-body blockquote {
-  color: #d4d3e8;
-}
-body.reader-dark-mode .article-modal-body h2,
-body.reader-dark-mode .article-modal-body h3,
-body.reader-dark-mode .article-modal-body h4 {
-  color: #e8e7f8;
-}
-body.reader-dark-mode .article-modal-body a { color: #a78bfa; }
-body.reader-dark-mode .article-modal-body blockquote {
-  border-left-color: #7c5cbf;
-  background: rgba(124,92,191,0.12);
-}
-body.reader-dark-mode .article-modal-body code {
-  background: rgba(255,255,255,0.08);
-  color: #c4b5fd;
-}
-body.reader-dark-mode .article-modal-body hr { border-color: rgba(255,255,255,0.1); }
-
-/* Article standalone page dark mode */
-body.reader-dark-mode .article-page-wrap {
-  background: #1a1a2e;
-  color: #d4d3e8;
-}
-
-/* Comments section in dark mode */
-body.reader-dark-mode #modal-comments { background: #16162a; }
-body.reader-dark-mode .comment-item { border-bottom-color: rgba(255,255,255,0.07); }
-body.reader-dark-mode .comment-body { color: #c8c7e0; }
-body.reader-dark-mode .comment-input-area textarea {
-  background: #22223a;
-  color: #e0dff0;
-  border-color: rgba(255,255,255,0.12);
-}
-body.reader-dark-mode .comment-author { color: #e0dff0; }
-body.reader-dark-mode .comment-date { color: #7070a0; }
-
-/* Smooth transition */
-.article-modal,
-.article-modal-header,
-.article-modal-body,
-.article-modal-title,
-.article-modal-meta,
-#modal-comments {
-  transition: background 0.25s, color 0.25s, border-color 0.25s;
-}
-
-/* Dark mode for article modal (category pages) */
-body.reader-dark-mode .article-modal-overlay.open { background: rgba(0,0,0,0.85); }
-body.reader-dark-mode .article-modal { background: #1a1a2e; }
-body.reader-dark-mode .article-modal-body { color: #d0cfe8; }
-body.reader-dark-mode .article-modal-body p,
-body.reader-dark-mode .article-modal-body li { color: #d0cfe8; }
-body.reader-dark-mode .article-modal-body h2,
-body.reader-dark-mode .article-modal-body h3 { color: #e8e7f8; }
-body.reader-dark-mode .article-modal-body a { color: #a78bfa; }
-body.reader-dark-mode .article-modal-body blockquote { background: rgba(124,92,191,0.15); border-left-color: #7c5cbf; color: #c4b5fd; }
-body.reader-dark-mode .article-modal-body code { background: rgba(255,255,255,0.08); color: #c4b5fd; }
-body.reader-dark-mode .article-modal-meta { color: #9090b8; }
-body.reader-dark-mode #modal-comments { background: #16162a; }
-body.reader-dark-mode .comment-item { border-bottom-color: rgba(255,255,255,0.07); }
-body.reader-dark-mode .comment-body { color: #c0bfd8; }
-body.reader-dark-mode .comment-author { color: #e0dff0; }
-body.reader-dark-mode .comment-date { color: #6060a0; }
-body.reader-dark-mode .comment-input-area textarea { background: #1e1e38; color: #e0dff0; border-color: rgba(255,255,255,0.12); }

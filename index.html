@@ -116,6 +116,7 @@
 
   loadLatestHero();
   renderReaderAuthWidget(document.getElementById('reader-auth'));
+  try { const s = JSON.parse(localStorage.getItem('jni_reader_settings')||'{}'); if(s.dark) document.body.classList.add('reader-dark-mode'); } catch{}
 </script>
 
 </body>
