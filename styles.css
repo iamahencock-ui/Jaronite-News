@@ -1129,6 +1129,21 @@ body {
   background: rgba(255,255,255,0.22);
 }
 
+.site-nav .nav-advertise-btn {
+  background: rgba(255,220,80,0.18);
+  border: 1px solid rgba(255,220,80,0.35);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-weight: 700;
+  color: #ffe566 !important;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.site-nav .nav-advertise-btn:hover {
+  background: rgba(255,220,80,0.30);
+  border-color: rgba(255,220,80,0.6);
+}
+
 /* ---------- ARTICLE SEARCH / SORT / FILTER CONTROLS ---------- */
 
 .article-controls {
