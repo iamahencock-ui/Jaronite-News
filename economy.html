@@ -77,6 +77,22 @@
   const CATEGORY_SLUG  = 'economy';
   const CATEGORY_LABEL = 'Economy';
 
+
+  // ---- Ad slot ----
+  // To use a real image, replace AD_IMAGE_URL with the URL of your 300×250 ad image.
+  // Leave it as an empty string to show the placeholder.
+  const AD_IMAGE_URL = '';
+  const AD_LINK_URL  = '';  // Optional: URL to open when the ad is clicked
+
+  function adSlotHtml() {
+    const inner = AD_IMAGE_URL
+      ? `<a href="${AD_LINK_URL || '#'}" target="_blank" rel="noopener noreferrer" style="display:block;">
+           <img class="article-ad-image" src="${AD_IMAGE_URL}" alt="Advertisement">
+         </a>`
+      : `<div class="article-ad-placeholder">Advertisement<br>300 × 250</div>`;
+    return `<div class="article-ad-slot"><span class="article-ad-label">Advertisement</span>${inner}</div>`;
+  }
+
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g,'&amp;')
@@ -228,6 +244,13 @@
       body.parentNode.insertBefore(bannerImg, body);
     }
     document.getElementById('modal-body').innerHTML = contentToHtml(a.content);
+    // Insert ad slot before comments
+    const existingAd = document.getElementById('modal-ad-slot');
+    if (existingAd) existingAd.remove();
+    const adEl = document.createElement('div');
+    adEl.id = 'modal-ad-slot';
+    adEl.innerHTML = adSlotHtml();
+    document.getElementById('modal-comments').before(adEl);
     document.getElementById('modal-comments').innerHTML = commentsSectionHtml(a.id);
     loadComments(a.id, document.getElementById('comments-list'));
     paintFavoriteStates([a.id]);
