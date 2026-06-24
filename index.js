@@ -303,12 +303,15 @@ function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
 </div>`;
 }
 
-function reminderEmailHtml(bid, slotLabel, daysOverdue) {
+function reminderEmailHtml(bid, slotLabel, daysUntilRun) {
+  const runWindow = daysUntilRun > 0
+    ? `Your ad runs in <strong>${daysUntilRun} day${daysUntilRun === 1 ? '' : 's'}</strong> (${bid.target_date}), so please pay before then to keep your slot.`
+    : `Your ad is scheduled to run today (${bid.target_date}) — please pay as soon as possible to keep your slot.`;
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
   <h2 style="color:#e67e22;">⏰ Reminder: payment pending for your ad slot</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>This is a friendly reminder that payment for your winning ad bid is still outstanding.</p>
+  <p>This is a friendly reminder that payment for your winning ad bid is still outstanding. ${runWindow}</p>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
     /pay JaroniteNews &lt;amount&gt; bid:${bid.id}
   </div>
@@ -1391,9 +1394,16 @@ export default {
         return secureJson({ error: "This article has already been claimed or is no longer pending." }, { status: 409 });
       }
 
-      await env.DB.prepare(
-        "UPDATE articles SET status = 'claimed', claimed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      // Atomic claim: the `AND status = 'pending_review'` guard means that if
+      // two editors race, only the first UPDATE matches a row — the second
+      // changes nothing. The SELECT above is just for a friendly early error;
+      // this conditional write is what actually prevents a double-claim.
+      const claimRes = await env.DB.prepare(
+        "UPDATE articles SET status = 'claimed', claimed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending_review'"
       ).bind(reviewer.username, id).run();
+      if (!claimRes.meta || claimRes.meta.changes === 0) {
+        return secureJson({ error: "This article was just claimed by someone else." }, { status: 409 });
+      }
       await log(env, reviewer.username, "CLAIM_ARTICLE", `Claimed article "${article.title}" (ID ${id}) for review`);
       return secureJson({ success: true });
     }
@@ -1912,8 +1922,17 @@ export default {
     // GET /api/ads/current
     // Returns the 3 active ad slots for today. Article pages call this on load
     // instead of using hardcoded AD_IMAGE_URL constants.
-    // Also records one impression per slot per request.
+    // Counts at most one impression per visitor per slot per day (billing is
+    // impression-based, so a page refresh must not re-bill the advertiser).
     if (url.pathname === '/api/ads/current' && request.method === 'GET') {
+      // Cap raw request volume per IP as a first line of defence against a
+      // cookie-less client trying to flood impressions.
+      pruneRateLimitStore();
+      if (isRateLimited(`ads_current:${clientIp}`, 30, 60_000)) {
+        return new Response(JSON.stringify({ error: 'Too many requests' }), {
+          status: 429, headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+        });
+      }
       const today = new Date().toISOString().slice(0, 10);
       const rows = await env.DB.prepare(
         `SELECT id, slot_number, image_url, dest_url, advertiser_name
@@ -1921,6 +1940,17 @@ export default {
       ).bind(today).all();
       const visitorId = request.headers.get('Cookie')?.match(/jni_vid=([^;]+)/)?.[1] || null;
       for (const row of (rows.results || [])) {
+        // De-duplicate per visitor per slot per day. Without a visitor cookie
+        // we can't identify a single viewer, so the per-IP rate limit above is
+        // the only guard for that (rarer) case.
+        if (visitorId) {
+          const seen = await env.DB.prepare(
+            `SELECT 1 FROM ad_events
+             WHERE ad_slot_id = ? AND visitor_id = ? AND event_type = 'impression'
+               AND DATE(created_at) = ? LIMIT 1`
+          ).bind(row.id, visitorId, today).first();
+          if (seen) continue;
+        }
         await env.DB.prepare(
           `INSERT INTO ad_events (ad_slot_id, event_type, visitor_id) VALUES (?, 'impression', ?)`
         ).bind(row.id, visitorId).run();
@@ -1934,21 +1964,41 @@ export default {
     }
 
     // GET /api/ads/click/:slotId
-    // Records the click then redirects to the ad's destination URL.
+    // Records the click (at most one per visitor per slot per day) then
+    // redirects to the ad's destination URL.
     if (url.pathname.startsWith('/api/ads/click/') && request.method === 'GET') {
+      pruneRateLimitStore();
+      if (isRateLimited(`ads_click:${clientIp}`, 20, 60_000)) {
+        return new Response('Too many requests', { status: 429 });
+      }
       const slotId = parseInt(url.pathname.slice('/api/ads/click/'.length));
       if (!slotId) return new Response('Bad request', { status: 400 });
       const row = await env.DB.prepare(
         `SELECT dest_url FROM ad_slots WHERE id = ?`
       ).bind(slotId).first();
       if (!row) return new Response('Ad not found', { status: 404 });
+      const today = new Date().toISOString().slice(0, 10);
       const visitorId = request.headers.get('Cookie')?.match(/jni_vid=([^;]+)/)?.[1] || null;
-      await env.DB.prepare(
-        `INSERT INTO ad_events (ad_slot_id, event_type, visitor_id) VALUES (?, 'click', ?)`
-      ).bind(slotId, visitorId).run();
-      await env.DB.prepare(
-        `UPDATE ad_slots SET clicks = clicks + 1 WHERE id = ?`
-      ).bind(slotId).run();
+      // Only bill one click per visitor per slot per day; repeated clicks
+      // (or a refresh of the redirect URL) shouldn't inflate the advertiser's
+      // charge. The redirect itself always happens regardless.
+      let alreadyClicked = false;
+      if (visitorId) {
+        const seen = await env.DB.prepare(
+          `SELECT 1 FROM ad_events
+           WHERE ad_slot_id = ? AND visitor_id = ? AND event_type = 'click'
+             AND DATE(created_at) = ? LIMIT 1`
+        ).bind(slotId, visitorId, today).first();
+        alreadyClicked = !!seen;
+      }
+      if (!alreadyClicked) {
+        await env.DB.prepare(
+          `INSERT INTO ad_events (ad_slot_id, event_type, visitor_id) VALUES (?, 'click', ?)`
+        ).bind(slotId, visitorId).run();
+        await env.DB.prepare(
+          `UPDATE ad_slots SET clicks = clicks + 1 WHERE id = ?`
+        ).bind(slotId).run();
+      }
       // Re-validate the stored URL before redirecting. New bids are validated
       // on submission, but this guards legacy rows and defends against an
       // open-redirect if a bad URL ever reached the table by another path.
@@ -2331,14 +2381,20 @@ export default {
       ).bind(today).all();
 
       for (const bid of (unpaid.results || [])) {
-        const wonAt = new Date(bid.updated_at || bid.created_at);
-        const daysOverdue = Math.floor((Date.now() - wonAt.getTime()) / 86400000);
+        // ad_bids has no won-at timestamp, so the old "days overdue" was
+        // computed from a non-existent column. Use the real, available field —
+        // target_date — to tell the advertiser how long they have left to pay
+        // before their ad runs.
+        const daysUntilRun = Math.max(
+          0,
+          Math.ceil((new Date(`${bid.target_date}T00:00:00Z`).getTime() - Date.now()) / 86400000)
+        );
         const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
             subject: `⏰ Reminder: payment pending for your Jaronite News ad #${bid.id}`,
-            html: reminderEmailHtml(bid, slotLabel, daysOverdue),
+            html: reminderEmailHtml(bid, slotLabel, daysUntilRun),
           });
         }
         if (bid.discord_username) {
