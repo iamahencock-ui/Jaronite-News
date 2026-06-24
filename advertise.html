@@ -656,9 +656,16 @@
     let bids = [];
     try {
       const res = await fetch(`/api/ads/bids?date=${encodeURIComponent(date)}&slot=${info.slot_number}`);
+      if (!res.ok) {
+        const txt = await res.text();
+        console.error('Bid board error:', res.status, txt);
+        body.innerHTML = `<div class="bid-board-empty">Could not load bids (${res.status}). Check browser console for details.</div>`;
+        return;
+      }
       bids = await res.json();
-    } catch {
-      body.innerHTML = '<div class="bid-board-empty">Could not load bids.</div>';
+    } catch (err) {
+      console.error('Bid board fetch error:', err);
+      body.innerHTML = '<div class="bid-board-empty">Could not load bids. Check browser console for details.</div>';
       return;
     }
 
