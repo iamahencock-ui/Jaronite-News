@@ -1547,9 +1547,19 @@
 
   async function deleteFromDetail(id) {
     if (!confirm('Are you sure you want to delete this article? This cannot be undone.')) return;
-    await fetch('/api/admin/delete', {
-      method: 'POST', headers: authHeaders(), body: JSON.stringify({ id })
-    });
+    try {
+      const res = await fetch('/api/admin/delete', {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        alert('Delete failed: ' + (data.error || `Server returned ${res.status}`));
+        return;
+      }
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+      return;
+    }
     closeArticleDetail();
     refreshAllOpenLists();
   }

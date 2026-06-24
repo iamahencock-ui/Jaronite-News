@@ -1548,9 +1548,19 @@ export default {
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
-      const article = await env.DB.prepare("SELECT title FROM articles WHERE id = ?").bind(id).first();
-      await env.DB.prepare("DELETE FROM articles WHERE id = ?").bind(id).run();
-      await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${id} — "${article?.title}"`);
+      if (!id) return secureJson({ error: "Missing article id" }, { status: 400 });
+      const articleId = parseInt(id, 10);
+      if (isNaN(articleId)) return secureJson({ error: "Invalid article id" }, { status: 400 });
+      const article = await env.DB.prepare("SELECT title FROM articles WHERE id = ?").bind(articleId).first();
+      if (!article) return secureJson({ error: "Article not found" }, { status: 404 });
+      // Delete child rows first — comments, favorites, and page_views all
+      // have a foreign-key reference to articles(id) with no ON DELETE CASCADE,
+      // so D1's FK enforcement will block the parent delete if any exist.
+      await env.DB.prepare("DELETE FROM comments   WHERE article_id = ?").bind(articleId).run();
+      await env.DB.prepare("DELETE FROM favorites  WHERE article_id = ?").bind(articleId).run();
+      await env.DB.prepare("DELETE FROM page_views WHERE article_id = ?").bind(articleId).run();
+      await env.DB.prepare("DELETE FROM articles   WHERE id = ?").bind(articleId).run();
+      await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${articleId} — "${article?.title}"`);
       return secureJson({ success: true });
     }
 
