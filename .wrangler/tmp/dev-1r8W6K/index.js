@@ -619,17 +619,20 @@ Your ad is confirmed and will run as scheduled. You'll receive a performance rep
 \u2014 Jaronite News Inc.`;
 }
 __name(confirmedDiscordMsg, "confirmedDiscordMsg");
-function reminderDiscordMsg(bid, slotLabel) {
-  return `\u23F0 **Reminder: payment pending for your Jaronite News ad**
+function reminderDiscordMsg(bid, slotLabel, total) {
+  const totalStr = Number(total).toFixed(2);
+  return `\u23F0 **Reminder: your Jaronite News invoice is unpaid**
 
-Hi **${bid.advertiser_name}** \u2014 your winning ad bid is still awaiting payment.
+Hi **${bid.advertiser_name}** \u2014 we haven't received payment for your ad in the **${slotLabel}** slot on **${bid.target_date}**.
 
-**Slot:** ${slotLabel}  
-**Date:** ${bid.target_date}  
-**Rate:** ${Number(bid.bid_amount).toFixed(2)} \u2110/view  
-**Bid ID:** #${bid.id}
+\u2022 **Amount due: ${totalStr} \u2110**
+\u2022 Bid ID: #${bid.id}
 
-Pay in-game with memo \`bid:${bid.id}\` to the Jaronite News firm account. If payment isn't received before ${bid.target_date}, your slot may be forfeited.
+**How to pay:**
+\`\`\`
+/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+\`\`\`
+Keep \`bid:${bid.id}\` in the memo so we match your payment automatically.
 \u2014 Jaronite News Inc.`;
 }
 __name(reminderDiscordMsg, "reminderDiscordMsg");
@@ -668,6 +671,57 @@ function winEmailHtml(bid, slotLabel) {
 </div>`;
 }
 __name(winEmailHtml, "winEmailHtml");
+function invoiceDiscordMsg(bid, slotLabel, views, total) {
+  const rate = Number(bid.bid_amount).toFixed(2);
+  const totalStr = Number(total).toFixed(2);
+  return `\u{1F9FE} **Your Jaronite News ad invoice**
+
+Hi **${bid.advertiser_name}** \u2014 your ad ran in the **${slotLabel}** slot on **${bid.target_date}**. Here's what you owe:
+
+\u2022 Rate: **${rate} \u2110/view**
+\u2022 Views: **${views}**
+\u2022 **Total due: ${totalStr} \u2110**
+
+**How to pay:**
+Run this in-game exactly as shown:
+\`\`\`
+/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+\`\`\`
+Keep \`bid:${bid.id}\` in the memo so we match your payment automatically.
+
+Thanks for advertising with us!
+\u2014 Jaronite News Inc.`;
+}
+__name(invoiceDiscordMsg, "invoiceDiscordMsg");
+function invoiceEmailHtml(bid, slotLabel, views, total) {
+  const rate = Number(bid.bid_amount).toFixed(2);
+  const totalStr = Number(total).toFixed(2);
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#5b3fa0;">\u{1F9FE} Your Jaronite News ad invoice</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>Your ad ran in the <strong>${slotLabel}</strong> slot on <strong>${bid.target_date}</strong>. Billing is
+     per view, so here's your final amount based on the views it actually received.</p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin:8px 0 16px;">
+    <tr><td style="padding:6px 0;color:#666;">Rate</td><td style="text-align:right;"><strong>${rate} \u2110/view</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Views</td><td style="text-align:right;"><strong>${views}</strong></td></tr>
+    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Total due</strong></td><td style="text-align:right;"><strong style="color:#5b3fa0;font-size:1.1em;">${totalStr} \u2110</strong></td></tr>
+  </table>
+  <h3 style="color:#5b3fa0;">How to pay</h3>
+  <p>Run this command in-game exactly as shown:</p>
+  <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
+    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+  </div>
+  <p style="color:#666;font-size:0.9em;">
+    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
+  </p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">
+    Questions? Reply to this email or contact us on Discord.<br>
+    \u2014 Jaronite News Inc.
+  </p>
+</div>`;
+}
+__name(invoiceEmailHtml, "invoiceEmailHtml");
 function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
@@ -680,25 +734,25 @@ function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
 </div>`;
 }
 __name(paymentConfirmedEmailHtml, "paymentConfirmedEmailHtml");
-function reminderEmailHtml(bid, slotLabel, daysUntilRun) {
-  const runWindow = daysUntilRun > 0 ? `Your ad runs in <strong>${daysUntilRun} day${daysUntilRun === 1 ? "" : "s"}</strong> (${bid.target_date}), so please pay before then to keep your slot.` : `Your ad is scheduled to run today (${bid.target_date}) \u2014 please pay as soon as possible to keep your slot.`;
+function reminderEmailHtml(bid, slotLabel, total) {
+  const totalStr = Number(total).toFixed(2);
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#e67e22;">\u23F0 Reminder: payment pending for your ad slot</h2>
+  <h2 style="color:#e67e22;">\u23F0 Reminder: your invoice is still unpaid</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>This is a friendly reminder that payment for your winning ad bid is still outstanding. ${runWindow}</p>
+  <p>We haven't yet received payment for your ad in the <strong>${slotLabel}</strong> slot on
+     <strong>${bid.target_date}</strong>. Your outstanding balance is <strong>${totalStr} \u2110</strong>.</p>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay JaroniteNews &lt;amount&gt; bid:${bid.id}
+    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
-    Include <strong>bid:${bid.id}</strong> in the memo. If payment isn't received before your ad date (${bid.target_date}),
-    your slot may be forfeited.
+    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
   </p>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin-top:12px;">
     <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
-    <tr><td style="padding:6px 0;color:#666;">Rate</td><td><strong>${Number(bid.bid_amount).toFixed(2)} \u2110/view</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Amount due</td><td><strong>${totalStr} \u2110</strong></td></tr>
   </table>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">\u2014 Jaronite News Inc.</p>
 </div>`;
@@ -706,6 +760,15 @@ function reminderEmailHtml(bid, slotLabel, daysUntilRun) {
 __name(reminderEmailHtml, "reminderEmailHtml");
 var SLOT_LABELS = { 1: "Bottom Leaderboard (728\xD790)", 2: "Left Skyscraper (160\xD7600)", 3: "Right Skyscraper (160\xD7600)" };
 var FIRM_PAY_NAME = "JaroniteNews";
+async function computeAmountOwed(env, bid) {
+  const slot = await env.DB.prepare(
+    `SELECT impressions FROM ad_slots WHERE bid_id = ? ORDER BY run_date DESC LIMIT 1`
+  ).bind(bid.id).first();
+  const views = slot ? slot.impressions || 0 : 0;
+  const total = Math.round(Number(bid.bid_amount) * views * 100) / 100;
+  return { views, total };
+}
+__name(computeAmountOwed, "computeAmountOwed");
 var rateLimitStore = /* @__PURE__ */ new Map();
 function isRateLimited(key, maxCalls, windowMs) {
   const now = Date.now();
@@ -1902,11 +1965,16 @@ var index_default = {
         console.warn(`DC webhook: bid ${bidId} not found`);
         return new Response("ok", { status: 200 });
       }
+      let amountOwed = bid.amount_owed != null ? Number(bid.amount_owed) : null;
+      if (amountOwed == null) {
+        const owed = await computeAmountOwed(env, bid);
+        amountOwed = owed.total;
+      }
       let paymentStatus;
       const tolerance = 0.01;
-      if (Math.abs(amount - bid.bid_amount) <= tolerance) {
+      if (Math.abs(amount - amountOwed) <= tolerance) {
         paymentStatus = "paid";
-      } else if (amount > bid.bid_amount) {
+      } else if (amount > amountOwed) {
         paymentStatus = "overpaid";
       } else {
         paymentStatus = "underpaid";
@@ -1919,7 +1987,7 @@ var index_default = {
              payment_received_at = datetime('now')
          WHERE id = ?`
       ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), amount, bidId).run();
-      console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (expected ${bid.bid_amount}, received ${amount})`);
+      console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (owed ${amountOwed}, received ${amount})`);
       if (paymentStatus === "paid" || paymentStatus === "overpaid") {
         const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
         if (bid.email) {
@@ -2156,28 +2224,46 @@ var index_default = {
         `UPDATE ad_bids SET status = 'lost'
          WHERE target_date <= ? AND status = 'pending'`
       ).bind(today).run();
-      const unpaid = await env.DB.prepare(
+      const toInvoice = await env.DB.prepare(
         `SELECT * FROM ad_bids
-         WHERE status = 'won'
-           AND payment_status IN ('awaiting_payment', 'underpaid')
-           AND target_date > ?
-           AND email IS NOT NULL AND email != ''`
+         WHERE status = 'won' AND payment_status = 'awaiting_payment'
+           AND invoiced_at IS NULL AND target_date < ?`
       ).bind(today).all();
-      for (const bid of unpaid.results || []) {
-        const daysUntilRun = Math.max(
-          0,
-          Math.ceil(((/* @__PURE__ */ new Date(`${bid.target_date}T00:00:00Z`)).getTime() - Date.now()) / 864e5)
-        );
+      for (const bid of toInvoice.results || []) {
+        const { views, total } = await computeAmountOwed(env, bid);
+        await env.DB.prepare(
+          `UPDATE ad_bids SET amount_owed = ?, invoiced_at = datetime('now') WHERE id = ?`
+        ).bind(total, bid.id).run();
         const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
-            subject: `\u23F0 Reminder: payment pending for your Jaronite News ad #${bid.id}`,
-            html: reminderEmailHtml(bid, slotLabel, daysUntilRun)
+            subject: `\u{1F9FE} Your Jaronite News ad invoice \u2014 ${total.toFixed(2)} \u2110 (#${bid.id})`,
+            html: invoiceEmailHtml(bid, slotLabel, views, total)
           });
         }
         if (bid.discord_username) {
-          await sendDiscordDm(env, bid.discord_username, reminderDiscordMsg(bid, slotLabel));
+          await sendDiscordDm(env, bid.discord_username, invoiceDiscordMsg(bid, slotLabel, views, total));
+        }
+      }
+      const unpaid = await env.DB.prepare(
+        `SELECT * FROM ad_bids
+         WHERE status = 'won'
+           AND invoiced_at IS NOT NULL AND date(invoiced_at) < ?
+           AND payment_status IN ('awaiting_payment', 'underpaid')`
+      ).bind(today).all();
+      for (const bid of unpaid.results || []) {
+        const total = bid.amount_owed != null ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
+        const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+        if (bid.email) {
+          await sendEmail(env, {
+            to: bid.email,
+            subject: `\u23F0 Reminder: invoice unpaid for your Jaronite News ad #${bid.id}`,
+            html: reminderEmailHtml(bid, slotLabel, total)
+          });
+        }
+        if (bid.discord_username) {
+          await sendDiscordDm(env, bid.discord_username, reminderDiscordMsg(bid, slotLabel, total));
         }
       }
     }

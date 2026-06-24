@@ -177,6 +177,13 @@ CREATE TABLE IF NOT EXISTS ad_bids (
   -- delivered for this bid — by the award cron or the manual re-send action.
   -- NULL means the winner has not been successfully notified yet.
   notified_at DATETIME,
+  -- Billing is per-view: the advertiser owes bid_amount (the per-view rate)
+  -- multiplied by the views (ad_slots.impressions) the ad actually got.
+  -- After the ad runs, the invoice cron computes and stores that total here
+  -- and stamps invoiced_at when the invoice email/DM is sent. The payment
+  -- webhook matches an incoming payment against amount_owed.
+  amount_owed REAL,
+  invoiced_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -239,6 +246,8 @@ CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email TEXT"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_username TEXT"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN notified_at DATETIME"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN amount_owed REAL"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN invoiced_at DATETIME"
 --
 -- Verify afterward with:
 --   npx wrangler d1 execute jaronite-news-db --remote --command "PRAGMA table_info(ad_bids)"
