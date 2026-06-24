@@ -390,6 +390,33 @@ function validateImageUrl(val) {
   return val;
 }
 
+/**
+ * Validate a public-facing http(s) URL submitted by an untrusted advertiser
+ * (ad image URL or click-through destination). Rejects anything that isn't a
+ * well-formed http/https URL — in particular javascript:, data:, vbscript:,
+ * and file: schemes that could execute or exfiltrate when later rendered as
+ * an <img src> or used as a redirect target.
+ * @param {any} val
+ * @param {number} maxLen
+ * @returns {string|null} the normalised URL, or null if invalid
+ */
+function validateHttpUrl(val, maxLen = 2048) {
+  if (!val || typeof val !== "string") return null;
+  const trimmed = val.trim();
+  if (trimmed.length === 0 || trimmed.length > maxLen) return null;
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null; // not a parseable absolute URL
+  }
+  // Only allow http/https. This blocks javascript:, data:, vbscript:, file:, etc.
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+  // Require a real hostname (blocks http:/// and similar)
+  if (!parsed.hostname) return null;
+  return parsed.toString();
+}
+
 async function verifyPassword(password, storedHash, storedSaltHex) {
   const { hash } = await hashPassword(password, storedSaltHex);
   if (hash.length !== storedHash.length) return false;
@@ -1791,37 +1818,71 @@ export default {
     // POST /api/ads/bid  — public, no auth required
     // Body: { advertiser_name, contact, image_url, dest_url, bid_amount, target_date, slot_number }
     if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
+      // Rate limit: this endpoint is unauthenticated and feeds the auto-award
+      // cron, so cap submissions per IP to stop flooding / bid-stuffing.
+      pruneRateLimitStore();
+      if (isRateLimited(`bid:${clientIp}`, 5, 60_000)) {
+        return secureJson({ error: "Too many bid submissions — please wait a minute and try again." }, { status: 429 });
+      }
+
       let body;
       try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
       const { advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number } = body;
+
       if (!advertiser_name || !contact || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
-        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
+        return secureJson({ error: 'Missing required fields' }, { status: 400 });
       }
+
+      // --- Length caps on free-text fields (defence against oversized payloads) ---
+      const adv = String(advertiser_name).trim();
+      const con = String(contact).trim();
+      const eml = email ? String(email).trim() : '';
+      const dsc = discord_username ? String(discord_username).trim() : '';
+      if (adv.length < 1 || adv.length > 100) return secureJson({ error: 'advertiser_name must be 1–100 characters' }, { status: 400 });
+      if (con.length < 1 || con.length > 100) return secureJson({ error: 'contact must be 1–100 characters' }, { status: 400 });
+      if (eml.length > 254) return secureJson({ error: 'email is too long' }, { status: 400 });
+      if (dsc.length > 100) return secureJson({ error: 'discord_username is too long' }, { status: 400 });
+      if (eml && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: 'email is not a valid address' }, { status: 400 });
+
+      // --- URL validation: must be http/https, blocks javascript:/data:/etc. ---
+      const cleanImageUrl = validateHttpUrl(image_url);
+      if (!cleanImageUrl) return secureJson({ error: 'image_url must be a valid http(s) URL' }, { status: 400 });
+      const cleanDestUrl = validateHttpUrl(dest_url);
+      if (!cleanDestUrl) return secureJson({ error: 'dest_url must be a valid http(s) URL' }, { status: 400 });
+
+      // --- Slot ---
       if (![1, 2, 3].includes(Number(slot_number))) {
-        return new Response(JSON.stringify({ error: 'slot_number must be 1, 2, or 3' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
+        return secureJson({ error: 'slot_number must be 1, 2, or 3' }, { status: 400 });
+      }
+
+      // --- Date: strict YYYY-MM-DD, real date, must be in the future ---
+      if (typeof target_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target_date)) {
+        return secureJson({ error: 'target_date must be in YYYY-MM-DD format' }, { status: 400 });
+      }
+      const parsedDate = new Date(`${target_date}T00:00:00Z`);
+      if (isNaN(parsedDate.getTime()) || target_date !== parsedDate.toISOString().slice(0, 10)) {
+        return secureJson({ error: 'target_date is not a real calendar date' }, { status: 400 });
       }
       const todayStr = new Date().toISOString().slice(0, 10);
       if (target_date <= todayStr) {
-        return new Response(JSON.stringify({ error: 'target_date must be a future date' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
+        return secureJson({ error: 'target_date must be a future date' }, { status: 400 });
       }
-      if (Number(bid_amount) <= 0) {
-        return new Response(JSON.stringify({ error: 'bid_amount must be positive' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
-        });
+
+      // --- Amount: finite, positive, within a sane ceiling ---
+      const amt = Number(bid_amount);
+      if (!Number.isFinite(amt) || amt <= 0) {
+        return secureJson({ error: 'bid_amount must be a positive number' }, { status: 400 });
       }
+      if (amt > 1_000_000) {
+        return secureJson({ error: 'bid_amount exceeds the maximum allowed' }, { status: 400 });
+      }
+
       await env.DB.prepare(
         `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(advertiser_name, contact, email || '', discord_username || '', image_url, dest_url, Number(bid_amount), target_date, Number(slot_number)).run();
-      return new Response(JSON.stringify({ ok: true, message: 'Bid received. Winners notified after 8 PM UTC.' }), {
-        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
-      });
+      ).bind(adv, con, eml, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number)).run();
+
+      return secureJson({ ok: true, message: 'Bid received. Winners notified after 8 PM UTC.' });
     }
 
     // GET /api/ads/current
@@ -1864,7 +1925,12 @@ export default {
       await env.DB.prepare(
         `UPDATE ad_slots SET clicks = clicks + 1 WHERE id = ?`
       ).bind(slotId).run();
-      return Response.redirect(row.dest_url, 302);
+      // Re-validate the stored URL before redirecting. New bids are validated
+      // on submission, but this guards legacy rows and defends against an
+      // open-redirect if a bad URL ever reached the table by another path.
+      const safeDest = validateHttpUrl(row.dest_url);
+      if (!safeDest) return new Response('This ad has an invalid destination.', { status: 400 });
+      return Response.redirect(safeDest, 302);
     }
 
     // POST /api/ads/report  — editor/admin only
@@ -2257,6 +2323,6 @@ export default {
           await sendDiscordDm(env, bid.discord_username, reminderDiscordMsg(bid, slotLabel));
         }
       }
-    } 
+    }
   },
 };
