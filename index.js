@@ -380,15 +380,21 @@ const MAX_IMAGE_BYTES = 800_000; // ~800 KB base64 data URL
  * @param {any} val
  * @returns {string|null} cleaned value or null
  */
-function validateImageUrl(val) {
+function validateImageUrl(val, maxLen = MAX_IMAGE_BYTES) {
   if (!val) return null;
   if (typeof val !== "string") return null;
   if (!val.startsWith("data:image/")) return null;
   const allowed = ["data:image/jpeg;base64,", "data:image/jpg;base64,", "data:image/png;base64,", "data:image/gif;base64,", "data:image/webp;base64,"];
   if (!allowed.some(prefix => val.startsWith(prefix))) return null;
-  if (val.length > MAX_IMAGE_BYTES) return null;
+  if (val.length > maxLen) return null;
   return val;
 }
+
+// Advertisers upload an image file (capped at 800 KB raw in the form). Base64
+// encoding inflates that by ~4/3, so the stored data-URL string can reach
+// ~1.1 MB — this cap is sized to accept any file the form allows, so a valid
+// upload never passes the client check only to be rejected by the server.
+const MAX_AD_IMAGE_BYTES = 1_150_000;
 
 /**
  * Validate a public-facing http(s) URL submitted by an untrusted advertiser
@@ -1844,9 +1850,13 @@ export default {
       if (dsc.length > 100) return secureJson({ error: 'discord_username is too long' }, { status: 400 });
       if (eml && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: 'email is not a valid address' }, { status: 400 });
 
-      // --- URL validation: must be http/https, blocks javascript:/data:/etc. ---
-      const cleanImageUrl = validateHttpUrl(image_url);
-      if (!cleanImageUrl) return secureJson({ error: 'image_url must be a valid http(s) URL' }, { status: 400 });
+      // --- Image: must be an uploaded image as a data: URL (allowlisted MIME
+      //     types only — no SVG, so no embedded script). The advertise form
+      //     submits exactly this via FileReader.readAsDataURL. ---
+      const cleanImageUrl = validateImageUrl(image_url, MAX_AD_IMAGE_BYTES);
+      if (!cleanImageUrl) return secureJson({ error: 'image_url must be an uploaded PNG, JPEG, GIF, or WebP image (max 800 KB)' }, { status: 400 });
+      // --- Destination: the click-through link, a real external http(s) URL.
+      //     Blocks javascript:/data:/vbscript:/file: so the redirect target is safe. ---
       const cleanDestUrl = validateHttpUrl(dest_url);
       if (!cleanDestUrl) return secureJson({ error: 'dest_url must be a valid http(s) URL' }, { status: 400 });
 
@@ -2081,8 +2091,11 @@ export default {
 
       // Auth path 1: a permanent bot API key (machine-to-machine, no expiry).
       // Set via: npx wrangler secret put BOT_API_KEY
+      // Header-only on purpose: query strings can be written to request logs in
+      // plaintext (observability.logs is enabled), so the key must never travel
+      // in the URL.
       const botKey = env.BOT_API_KEY;
-      const presentedKey = request.headers.get('X-Bot-Key') || url.searchParams.get('bot_key');
+      const presentedKey = request.headers.get('X-Bot-Key');
       const isBot = botKey && presentedKey &&
         presentedKey.length === botKey.length &&
         timingSafeEqualStr(presentedKey, botKey);
