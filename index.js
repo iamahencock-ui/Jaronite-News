@@ -1583,6 +1583,7 @@ export default {
 
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT status FROM articles WHERE id = ?").bind(id).first();
+      if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       const newStatus = article.status === "censored" ? "published" : "censored";
       await env.DB.prepare("UPDATE articles SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(newStatus, id).run();
       await log(env, admin.username, newStatus === "censored" ? "CENSOR_ARTICLE" : "UNCENSOR_ARTICLE", `Article ID ${id} set to ${newStatus}`);
@@ -2070,7 +2071,7 @@ export default {
           await sendEmail(env, {
             to: bid.email,
             subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
-            html: paymentConfirmedEmailHtml(bid, slotLabel, amount),
+            html: paymentConfirmedEmailHtml(bid, slotLabelPay, amount),
           });
         }
         if (bid.discord_username) {

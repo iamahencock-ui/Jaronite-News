@@ -293,17 +293,36 @@
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
     tmp.querySelectorAll('script,style,iframe,object,embed,form').forEach(n => n.remove());
+    const allowed = ['p','br','strong','b','em','i','u','s','strike','h2','h3','h4','ul','ol','li','blockquote','hr','a','code','span','div'];
+    // querySelectorAll('*') is a static, document-order list, so unwrapping a
+    // disallowed parent still leaves its (already-listed) children to be processed.
     tmp.querySelectorAll('*').forEach(el => {
       const tag = el.tagName.toLowerCase();
-      const allowed = ['p','br','strong','b','em','i','u','s','strike','h2','h3','h4','ul','ol','li','blockquote','hr','a','code','span','div'];
-      if (!allowed.includes(tag)) { el.replaceWith(...el.childNodes); }
-    });
-    tmp.querySelectorAll('a').forEach(a => {
-      const href = a.getAttribute('href') || '';
-      while (a.attributes.length) a.removeAttribute(a.attributes[0].name);
-      if (href) a.setAttribute('href', escapeHtml(href));
-      a.setAttribute('target', '_blank');
-      a.setAttribute('rel', 'noopener noreferrer');
+      if (!allowed.includes(tag)) { el.replaceWith(...el.childNodes); return; }
+
+      // Strip EVERY attribute off every allowed tag. This removes on* event
+      // handlers (onclick/onmouseover/onerror/…), inline style, and anything
+      // else an author could smuggle in — none of the allowed formatting tags
+      // legitimately need attributes. Only <a href> is re-added below.
+      const savedHref = tag === 'a' ? (el.getAttribute('href') || '') : '';
+      while (el.attributes.length) el.removeAttribute(el.attributes[0].name);
+
+      if (tag === 'a') {
+        // Re-add href only if it resolves to a safe protocol. Blocks
+        // javascript:, data:, vbscript:, file:, etc.
+        let safeHref = '';
+        if (savedHref) {
+          try {
+            const u = new URL(savedHref, location.origin);
+            if (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'mailto:') {
+              safeHref = u.href;
+            }
+          } catch { safeHref = ''; }
+        }
+        if (safeHref) el.setAttribute('href', safeHref);
+        el.setAttribute('target', '_blank');
+        el.setAttribute('rel', 'noopener noreferrer');
+      }
     });
     return tmp.innerHTML;
   }
