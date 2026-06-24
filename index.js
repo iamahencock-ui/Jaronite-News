@@ -2091,6 +2091,15 @@ export default {
       }
     }
 
+    // Any /api/* path that didn't match a real route above gets a clean JSON 404
+    // rather than falling through into the static-asset handler.
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      });
+    }
+
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(url.pathname);
     if (!hasExtension && url.pathname !== "/") {
       try {
