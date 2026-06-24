@@ -167,6 +167,12 @@ CREATE TABLE IF NOT EXISTS ad_bids (
   email TEXT,                           -- advertiser email for automated notifications
   discord_username TEXT,                -- advertiser Discord username for bot DMs
   status TEXT DEFAULT 'pending',        -- 'pending' | 'won' | 'lost'
+  -- Payment tracking (DC Economy webhook integration).
+  -- payment_status: 'unpaid' | 'awaiting_payment' | 'paid' | 'overpaid' | 'underpaid'
+  payment_status TEXT DEFAULT 'unpaid',
+  payment_txn_id TEXT,                  -- DC Economy txnId
+  payment_received_at DATETIME,
+  payment_amount_received REAL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -203,22 +209,34 @@ CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
 
 -- ============================================================
 -- Payment tracking (webhook integration with DC Economy API)
--- Run after deploying the webhook receiver in index.js:
---   npx wrangler d1 execute jaronite-news-db --remote --file=./schema.sql
 -- ============================================================
-
--- Add payment columns to ad_bids (safe to re-run — uses ALTER TABLE IF NOT EXISTS pattern)
--- payment_status: 'unpaid' | 'awaiting_payment' | 'paid' | 'overpaid' | 'underpaid'
--- These are added as separate ALTER TABLE statements for existing installs.
--- New installs: these columns are present via the schema additions below.
--- For existing installs run each ALTER TABLE manually if the column doesn't exist.
-
--- (For clean installs the ad_bids CREATE TABLE above already has these via migration;
---  for existing installs apply these ALTER TABLEs):
--- ALTER TABLE ad_bids ADD COLUMN payment_status TEXT DEFAULT 'unpaid';
--- ALTER TABLE ad_bids ADD COLUMN payment_txn_id TEXT;         -- DC Economy txnId
--- ALTER TABLE ad_bids ADD COLUMN payment_received_at DATETIME;
--- ALTER TABLE ad_bids ADD COLUMN payment_amount_received REAL;
+--
+-- The payment columns (payment_status, payment_txn_id,
+-- payment_received_at, payment_amount_received) AND the advertiser
+-- columns (email, discord_username) are now part of the
+-- `CREATE TABLE ad_bids` definition above, so a FRESH install gets
+-- them automatically when you run this file.
+--
+-- EXISTING installs: because `CREATE TABLE IF NOT EXISTS` skips a
+-- table that already exists, re-running this file will NOT add the
+-- new columns to an ad_bids table created before these were added.
+-- SQLite has no `ADD COLUMN IF NOT EXISTS`, and D1 aborts a file on
+-- the first error — so these ALTERs are intentionally kept OUT of
+-- this file (a duplicate-column error would abort the whole run).
+--
+-- Run each line below ONCE, by hand, only for an existing install
+-- that predates these columns. Skip any that already exist (you'll
+-- get a harmless "duplicate column name" error if you re-run one):
+--
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN payment_status TEXT DEFAULT 'unpaid'"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN payment_txn_id TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN payment_received_at DATETIME"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN payment_amount_received REAL"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_username TEXT"
+--
+-- Verify afterward with:
+--   npx wrangler d1 execute jaronite-news-db --remote --command "PRAGMA table_info(ad_bids)"
 
 -- Deduplication table for incoming webhook deliveries.
 -- DC Economy uses at-least-once delivery; we store every deliveryId we've
@@ -231,7 +249,3 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_delivery_id ON webhook_deliveries(delivery_id);
-
--- Add email column to ad_bids for existing installs:
---   ALTER TABLE ad_bids ADD COLUMN email TEXT;
---   ALTER TABLE ad_bids ADD COLUMN discord_username TEXT;
