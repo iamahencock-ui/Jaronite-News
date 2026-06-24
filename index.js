@@ -1958,18 +1958,16 @@ export default {
     }
 
     // POST /api/ads/report  — editor/admin only
-    // Body: { token, from_date?, to_date? }
+    // Auth via the standard Authorization: Bearer <token> header (same as the
+    // rest of the API and what the portal client already sends), never a token
+    // in the request body.
+    // Body: { from_date?, to_date? }
     if (url.pathname === '/api/ads/report' && request.method === 'POST') {
+      const reviewer = await requireEditorOrAdmin(env, request);
+      if (!reviewer) return secureJson({ error: 'Unauthorized' }, { status: 403 });
       let body;
       try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
-      const { token, from_date, to_date } = body;
-      const session = token ? await env.DB.prepare(
-        `SELECT u.role FROM sessions s JOIN users u ON u.username = s.username
-         WHERE s.token = ? AND s.expires_at > datetime('now')`
-      ).bind(token).first() : null;
-      if (!session || !['admin', 'editor'].includes(session.role)) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-      }
+      const { from_date, to_date } = body;
       const from = from_date || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       const to   = to_date   || new Date().toISOString().slice(0, 10);
       const rows = await env.DB.prepare(
@@ -2096,31 +2094,28 @@ export default {
     }
 
     // ================================================================
-    // GET /api/ads/payment-status  — editor/admin only
+    // GET /api/ads/payment-status  — editor/admin (or bot) only
     // Returns payment status for all won bids, optionally filtered by date range.
-    // Query params: token (required), from_date, to_date
+    // Auth: either an X-Bot-Key header (machine-to-machine) or a normal staff
+    // session via the Authorization: Bearer <token> header. Tokens/keys are
+    // header-only on purpose — query strings can be written to request logs in
+    // plaintext (observability.logs is enabled), so secrets must never travel
+    // in the URL.
+    // Query params: from_date, to_date
     // ================================================================
     if (url.pathname === '/api/ads/payment-status' && request.method === 'GET') {
-      const token = url.searchParams.get('token');
-
       // Auth path 1: a permanent bot API key (machine-to-machine, no expiry).
       // Set via: npx wrangler secret put BOT_API_KEY
-      // Header-only on purpose: query strings can be written to request logs in
-      // plaintext (observability.logs is enabled), so the key must never travel
-      // in the URL.
       const botKey = env.BOT_API_KEY;
       const presentedKey = request.headers.get('X-Bot-Key');
       const isBot = botKey && presentedKey &&
         presentedKey.length === botKey.length &&
         timingSafeEqualStr(presentedKey, botKey);
 
-      // Auth path 2: a normal staff session (editor/admin).
-      const session = (!isBot && token) ? await env.DB.prepare(
-        `SELECT u.role FROM sessions s JOIN users u ON u.username = s.username
-         WHERE s.token = ? AND s.expires_at > datetime('now')`
-      ).bind(token).first() : null;
+      // Auth path 2: a normal staff session (editor/admin), via Bearer header.
+      const reviewer = isBot ? null : await requireEditorOrAdmin(env, request);
 
-      if (!isBot && (!session || !['admin', 'editor'].includes(session.role))) {
+      if (!isBot && !reviewer) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 403, headers: { 'Content-Type': 'application/json' }
         });
