@@ -1007,7 +1007,7 @@ export default {
       const { article_id, visitor_id, referrer } = await request.json();
       if (!article_id || !visitor_id) return secureJson({ error: "Missing fields" }, { status: 400 });
 
-      const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ?").bind(article_id).first();
+      const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ? AND status = 'published'").bind(article_id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
       const ua = request.headers.get("User-Agent") || "";
@@ -1035,11 +1035,24 @@ export default {
     // not just "tab was open in the background".
     if (url.pathname === "/api/analytics/ping" && request.method === "POST") {
       const { view_id, read_seconds, max_scroll_pct } = await request.json();
-      if (!view_id) return secureJson({ error: "Missing view_id" }, { status: 400 });
+      const viewId = parseInt(view_id, 10);
+      if (!viewId || isNaN(viewId)) return secureJson({ error: "Missing view_id" }, { status: 400 });
+
+      // This endpoint is unauthenticated, so treat the reported numbers as
+      // untrusted. Clamp them into sane ranges (scroll is a 0–100 percentage;
+      // read time can't realistically exceed a day) and use MAX(col, ?) so a
+      // value can only ever move upward — a stray or malicious ping can never
+      // lower a view's already-recorded read time or scroll depth.
+      let secs = Math.floor(Number(read_seconds));
+      let scroll = Math.floor(Number(max_scroll_pct));
+      if (!Number.isFinite(secs) || secs < 0) secs = 0;
+      if (secs > 86400) secs = 86400;
+      if (!Number.isFinite(scroll) || scroll < 0) scroll = 0;
+      if (scroll > 100) scroll = 100;
 
       await env.DB.prepare(
-        "UPDATE page_views SET read_seconds = ?, max_scroll_pct = ? WHERE id = ?"
-      ).bind(read_seconds || 0, max_scroll_pct || 0, view_id).run();
+        "UPDATE page_views SET read_seconds = MAX(read_seconds, ?), max_scroll_pct = MAX(max_scroll_pct, ?) WHERE id = ?"
+      ).bind(secs, scroll, viewId).run();
       return secureJson({ success: true });
     }
 
