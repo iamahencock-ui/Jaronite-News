@@ -232,6 +232,33 @@ Your ad is confirmed and will run as scheduled. You'll receive a performance rep
 — Jaronite News Inc.`;
 }
 
+function underpaidDiscordMsg(bid, slotLabel, received) {
+  const shortfall = (bid.bid_amount - Number(received)).toFixed(2);
+  return `⚠️ **Incomplete payment received for your Jaronite News ad**
+
+Hi **${bid.advertiser_name}** — we received a payment of **${Number(received).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ${bid.target_date}), but the full amount owed is **${Number(bid.bid_amount).toFixed(2)} ℐ**.
+
+You're short by **${shortfall} ℐ**. Please send the remaining amount in-game with the same memo:
+\`\`\`
+bid:${bid.id}
+\`\`\`
+Your ad slot is reserved but won't be confirmed until the full amount is received. If payment isn't completed before ${bid.target_date}, your slot may be forfeited.
+
+Questions? Contact us on the DemocracyCraft Discord.
+— Jaronite News Inc.`;
+}
+
+function overpaidDiscordMsg(bid, slotLabel, received) {
+  const excess = (Number(received) - bid.bid_amount).toFixed(2);
+  return `✅ **Payment received — your ad is confirmed!**
+
+Hi **${bid.advertiser_name}** — we received your payment of **${Number(received).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ${bid.target_date}). Your ad is confirmed and will run as scheduled.
+
+Note: you overpaid by **${excess} ℐ**. Please contact us on the DemocracyCraft Discord to arrange a refund of the excess amount.
+
+— Jaronite News Inc.`;
+}
+
 function reminderDiscordMsg(bid, slotLabel) {
   return `⏰ **Reminder: payment pending for your Jaronite News ad**
 
@@ -286,6 +313,58 @@ function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
      (${slotLabel}, ${bid.target_date}). Your ad is confirmed and will run as scheduled.</p>
   <p>After your ad runs you'll receive a performance report with impressions, clicks, and your final cost.</p>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+</div>`;
+}
+
+function underpaidEmailHtml(bid, slotLabel, received) {
+  const shortfall = (bid.bid_amount - Number(received)).toFixed(2);
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#c0392b;">⚠️ Incomplete payment received</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>We received a payment of <strong>${Number(received).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
+     (${slotLabel}, ${bid.target_date}), but the full amount owed is <strong>${Number(bid.bid_amount).toFixed(2)} ℐ</strong>.</p>
+  <p>You're short by <strong>${shortfall} ℐ</strong>. Please send the remaining amount in-game using:</p>
+  <div style="background:#fff0f0;border-left:4px solid #c0392b;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
+    /pay JaroniteNews ${shortfall} bid:${bid.id}
+  </div>
+  <p style="color:#666;font-size:0.9em;">
+    Include <strong>bid:${bid.id}</strong> in the memo so we can match your top-up automatically.<br>
+    Your slot is reserved but won't be confirmed until the full amount is received. If payment isn't completed before ${bid.target_date}, your slot may be forfeited.
+  </p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin-top:12px;">
+    <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Expected</td><td><strong>${Number(bid.bid_amount).toFixed(2)} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Received</td><td><strong>${Number(received).toFixed(2)} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#c0392b;">Shortfall</td><td><strong>${shortfall} ℐ</strong></td></tr>
+  </table>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">Questions? Reply to this email or contact us on Discord.<br>— Jaronite News Inc.</p>
+</div>`;
+}
+
+function overpaidEmailHtml(bid, slotLabel, received) {
+  const excess = (Number(received) - bid.bid_amount).toFixed(2);
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#27ae60;">✅ Payment received — your ad is confirmed!</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>We received your payment of <strong>${Number(received).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
+     (${slotLabel}, ${bid.target_date}). Your ad is confirmed and will run as scheduled.</p>
+  <p style="color:#e67e22;">Note: you overpaid by <strong>${excess} ℐ</strong>. Please contact us to arrange a refund of the excess amount.</p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin-top:12px;">
+    <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Expected</td><td><strong>${Number(bid.bid_amount).toFixed(2)} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Received</td><td><strong>${Number(received).toFixed(2)} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#e67e22;">Overpaid</td><td><strong>${excess} ℐ</strong></td></tr>
+  </table>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">
+    After your ad runs you'll receive a performance report with impressions, clicks, and your final cost.<br>
+    Questions? Reply to this email or contact us on Discord.<br>— Jaronite News Inc.
+  </p>
 </div>`;
 }
 
@@ -1548,19 +1627,9 @@ export default {
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
 
       const { id } = await request.json();
-      if (!id) return secureJson({ error: "Missing article id" }, { status: 400 });
-      const articleId = parseInt(id, 10);
-      if (isNaN(articleId)) return secureJson({ error: "Invalid article id" }, { status: 400 });
-      const article = await env.DB.prepare("SELECT title FROM articles WHERE id = ?").bind(articleId).first();
-      if (!article) return secureJson({ error: "Article not found" }, { status: 404 });
-      // Delete child rows first — comments, favorites, and page_views all
-      // have a foreign-key reference to articles(id) with no ON DELETE CASCADE,
-      // so D1's FK enforcement will block the parent delete if any exist.
-      await env.DB.prepare("DELETE FROM comments   WHERE article_id = ?").bind(articleId).run();
-      await env.DB.prepare("DELETE FROM favorites  WHERE article_id = ?").bind(articleId).run();
-      await env.DB.prepare("DELETE FROM page_views WHERE article_id = ?").bind(articleId).run();
-      await env.DB.prepare("DELETE FROM articles   WHERE id = ?").bind(articleId).run();
-      await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${articleId} — "${article?.title}"`);
+      const article = await env.DB.prepare("SELECT title FROM articles WHERE id = ?").bind(id).first();
+      await env.DB.prepare("DELETE FROM articles WHERE id = ?").bind(id).run();
+      await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${id} — "${article?.title}"`);
       return secureJson({ success: true });
     }
 
@@ -1984,12 +2053,30 @@ export default {
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
-            subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
-            html: paymentConfirmedEmailHtml(bid, slotLabel, amount),
+            subject: paymentStatus === 'overpaid'
+              ? `✅ Payment received (overpaid) — Jaronite News ad #${bid.id}`
+              : `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
+            html: paymentStatus === 'overpaid'
+              ? overpaidEmailHtml(bid, slotLabelPay, amount)
+              : paymentConfirmedEmailHtml(bid, slotLabelPay, amount),
           });
         }
         if (bid.discord_username) {
-          await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, amount));
+          await sendDiscordDm(env, bid.discord_username, paymentStatus === 'overpaid'
+            ? overpaidDiscordMsg(bid, slotLabelPay, amount)
+            : confirmedDiscordMsg(bid, slotLabelPay, amount));
+        }
+      } else if (paymentStatus === 'underpaid') {
+        const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+        if (bid.email) {
+          await sendEmail(env, {
+            to: bid.email,
+            subject: `⚠️ Incomplete payment received — Jaronite News ad #${bid.id}`,
+            html: underpaidEmailHtml(bid, slotLabelPay, amount),
+          });
+        }
+        if (bid.discord_username) {
+          await sendDiscordDm(env, bid.discord_username, underpaidDiscordMsg(bid, slotLabelPay, amount));
         }
       }
 
