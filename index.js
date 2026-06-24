@@ -2305,10 +2305,21 @@ export default {
   // Runs at 8 PM UTC (award bids) and midnight UTC (safety check).
   // ================================================================
   async scheduled(event, env, ctx) {
+    // Decide which job to run from the cron pattern Cloudflare passes in
+    // (event.cron) rather than the wall clock. This is Cloudflare's documented
+    // pattern, can't drift if a trigger fires a minute late, and lets you
+    // simulate either job locally at any time:
+    //   curl ".../cdn-cgi/handler/scheduled?cron=0+20+*+*+*"   → award
+    //   curl ".../cdn-cgi/handler/scheduled?cron=0+0+*+*+*"    → cleanup + reminders
+    // Fallback: if event.cron is missing/unrecognised, fall back to the UTC
+    // hour so production behaviour is unchanged even without a cron value.
+    const cron = event && event.cron ? event.cron : "";
     const hour = new Date().getUTCHours();
+    const runAward   = cron === "0 20 * * *" || (!cron && hour === 20);
+    const runCleanup = cron === "0 0 * * *"  || (!cron && hour === 0);
 
-    // ---- 8 PM UTC: award tomorrow's bids ----
-    if (hour === 20) {
+    // ---- Award tomorrow's bids (8 PM UTC trigger: "0 20 * * *") ----
+    if (runAward) {
       const tomorrow = new Date();
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
       const targetDate = tomorrow.toISOString().slice(0, 10);
@@ -2363,8 +2374,8 @@ export default {
       }
     }
 
-    // ---- Midnight UTC: clean up pending bids + send payment reminders ----
-    if (hour === 0) {
+    // ---- Clean up pending bids + send payment reminders (midnight UTC trigger: "0 0 * * *") ----
+    if (runCleanup) {
       const today = new Date().toISOString().slice(0, 10);
       await env.DB.prepare(
         `UPDATE ad_bids SET status = 'lost'
