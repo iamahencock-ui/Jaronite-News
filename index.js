@@ -239,16 +239,22 @@ async function sendDiscordDm(env, discordUsername, message) {
 }
 
 function winDiscordMsg(bid, slotLabel) {
+  const rate = Number(bid.bid_amount).toFixed(2);
   return `🎉 **You won a Jaronite News ad slot!**
 
-Hi **${bid.advertiser_name}** — your bid of **${Number(bid.bid_amount).toFixed(2)} ℐ/view** won the **${slotLabel}** slot for **${bid.target_date}**.
+Hi **${bid.advertiser_name}** — your bid of **${rate} ℐ/view** won the **${slotLabel}** slot for **${bid.target_date}**.
 
-**How to pay:**
-Send payment in-game to the Jaronite News firm account with this exact memo:
+**What happens next — please read:**
+• **You don't pay anything yet.**
+• Your ad runs on **${bid.target_date}**, billed by actual views at your **${rate} ℐ/view** rate.
+• After it finishes, we'll send you an **invoice with the exact amount** to pay.
+
+**How to pay (only once you receive your invoice):**
+Run this in-game, replacing \`<amount>\` with the exact figure shown on your invoice:
 \`\`\`
-bid:${bid.id}
+/pay ${FIRM_PAY_NAME} <amount> bid:${bid.id}
 \`\`\`
-Include \`bid:${bid.id}\` in the memo/message so we match your payment automatically.
+Keep \`bid:${bid.id}\` in the memo exactly as shown so we match your payment automatically. Please don't send payment before you get the invoice.
 
 Questions? Reply here or contact us on the DemocracyCraft Discord.
 — Jaronite News Inc.`;
@@ -278,21 +284,25 @@ Pay in-game with memo \`bid:${bid.id}\` to the Jaronite News firm account. If pa
 }
 
 function winEmailHtml(bid, slotLabel) {
-  const totalEstimate = (bid.bid_amount * 100).toFixed(2); // rough estimate: 100 views/day
+  const rate = Number(bid.bid_amount).toFixed(2);
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
   <h2 style="color:#5b3fa0;">🎉 You won an ad slot on Jaronite News!</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>Your bid of <strong>${Number(bid.bid_amount).toFixed(2)} ℐ/view</strong> won the
+  <p>Your bid of <strong>${rate} ℐ/view</strong> won the
      <strong>${slotLabel}</strong> slot for <strong>${bid.target_date}</strong>.</p>
-  <h3 style="color:#5b3fa0;">How to pay</h3>
-  <p>Transfer payment to the <strong>Jaronite News Inc.</strong> firm account in-game using:</p>
+  <h3 style="color:#5b3fa0;">What happens next</h3>
+  <p><strong>You don't pay anything yet.</strong> Your ad runs on <strong>${bid.target_date}</strong> and is
+     billed by actual views at your rate of <strong>${rate} ℐ/view</strong>. After it finishes, we'll send you an
+     <strong>invoice with the exact amount</strong> to pay.</p>
+  <h3 style="color:#5b3fa0;">How to pay (only once you receive your invoice)</h3>
+  <p>Run this command in-game, replacing <code>&lt;amount&gt;</code> with the exact figure shown on your invoice:</p>
   <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay JaroniteNews &lt;amount&gt; bid:${bid.id}
+    /pay ${FIRM_PAY_NAME} &lt;amount&gt; bid:${bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
-    Include <strong>bid:${bid.id}</strong> exactly as shown in the memo/message field so we can match your payment automatically.<br>
-    You pay based on actual views — we'll send a final invoice after your ad runs.
+    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment
+    automatically. Please don't send payment before you receive the invoice.
   </p>
   <h3 style="color:#5b3fa0;">Your bid details</h3>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;">
@@ -347,6 +357,11 @@ function reminderEmailHtml(bid, slotLabel, daysUntilRun) {
 }
 
 const SLOT_LABELS = { 1: 'Bottom Leaderboard (728×90)', 2: 'Left Skyscraper (160×600)', 3: 'Right Skyscraper (160×600)' };
+
+// In-game account name advertisers send payment to (used in the /pay command
+// shown in every notification). Change this in one place if the firm account
+// name changes.
+const FIRM_PAY_NAME = 'JaroniteNews';
 
 // ---------- in-memory rate limiting ----------
 //
