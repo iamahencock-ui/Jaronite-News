@@ -173,6 +173,10 @@ CREATE TABLE IF NOT EXISTS ad_bids (
   payment_txn_id TEXT,                  -- DC Economy txnId
   payment_received_at DATETIME,
   payment_amount_received REAL,
+  -- Set when a win notification (email and/or Discord DM) was successfully
+  -- delivered for this bid — by the award cron or the manual re-send action.
+  -- NULL means the winner has not been successfully notified yet.
+  notified_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -234,6 +238,7 @@ CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN payment_amount_received REAL"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email TEXT"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_username TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN notified_at DATETIME"
 --
 -- Verify afterward with:
 --   npx wrangler d1 execute jaronite-news-db --remote --command "PRAGMA table_info(ad_bids)"

@@ -648,6 +648,13 @@
         <button onclick="loadAdReport()" style="padding:6px 16px; border-radius:6px; background:var(--mid-purple,#7c5cbf); color:#fff; border:none; cursor:pointer; font-size:0.85rem;">Run Report</button>
       </div>
       <div id="ad-report-list">Select a date range and click Run Report.</div>
+
+      <h3 style="color:#c9a84c; margin:28px 0 6px;">Winner Notifications</h3>
+      <p style="color:#666; font-size:0.85rem; margin-top:0;">Won bids and whether the advertiser was successfully notified. Use Re-send if a notification was missed (e.g. a Discord username that's since been corrected).</p>
+      <div style="margin-bottom:12px;">
+        <button onclick="loadWinnerNotifications()" style="padding:6px 16px; border-radius:6px; background:var(--mid-purple,#7c5cbf); color:#fff; border:none; cursor:pointer; font-size:0.85rem;">Load winners</button>
+      </div>
+      <div id="ad-notify-list" style="font-size:0.85rem; color:#888;">Click “Load winners” to view notification status.</div>
     </div>
 
     <!-- EDITOR (and admin): REVIEW QUEUE + REVIEW BOX -->
@@ -1880,6 +1887,100 @@
           </tbody>
         </table>
       </div>`;
+  }
+
+  // ---------- winner notifications (editor/admin) ----------
+
+  async function loadWinnerNotifications() {
+    const container = document.getElementById('ad-notify-list');
+    const from = document.getElementById('ad-report-from').value;
+    const to   = document.getElementById('ad-report-to').value;
+    container.textContent = 'Loading…';
+
+    let rows;
+    try {
+      const qs = new URLSearchParams();
+      if (from) qs.set('from_date', from);
+      if (to)   qs.set('to_date', to);
+      const res = await fetch('/api/ads/payment-status?' + qs.toString(), { headers: authHeaders() });
+      rows = await res.json();
+    } catch (e) {
+      container.textContent = 'Failed to load winners.';
+      return;
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      container.innerHTML = '<p style="color:#888;">No won bids in this date range.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+          <thead>
+            <tr style="border-bottom:1px solid #2a2a4a; color:#888; text-align:left;">
+              <th style="padding:8px 10px;">Date</th>
+              <th style="padding:8px 10px;">Slot</th>
+              <th style="padding:8px 10px;">Advertiser</th>
+              <th style="padding:8px 10px;">Email</th>
+              <th style="padding:8px 10px;">Discord</th>
+              <th style="padding:8px 10px;">Notified</th>
+              <th style="padding:8px 10px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr style="border-bottom:1px solid #1e1e36; color:#c0bfd8;" id="ad-notify-row-${r.id}">
+                <td style="padding:8px 10px;">${escapeHtml(r.target_date)}</td>
+                <td style="padding:8px 10px;">Slot ${r.slot_number}</td>
+                <td style="padding:8px 10px;">${escapeHtml(r.advertiser_name)}</td>
+                <td style="padding:8px 10px; color:#888;">${escapeHtml(r.email || '—')}</td>
+                <td style="padding:8px 10px; color:#888;">${escapeHtml(r.discord_username || '—')}</td>
+                <td style="padding:8px 10px;" class="ad-notify-status">${r.notified_at
+                  ? `<span style="color:#4caf50;">✓ ${escapeHtml(String(r.notified_at).slice(0,16).replace('T',' '))}</span>`
+                  : `<span style="color:#e0a030;">not sent</span>`}</td>
+                <td style="padding:8px 10px; text-align:right;">
+                  <button onclick="resendNotification(${r.id}, this)"
+                    style="padding:5px 12px; border-radius:6px; background:#2a2a4a; color:#e0dff0; border:1px solid #3a3a5a; cursor:pointer; font-size:0.8rem;">
+                    Re-send</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div id="ad-notify-feedback" style="margin-top:10px; font-size:0.82rem;"></div>`;
+  }
+
+  async function resendNotification(bidId, btn) {
+    const feedback = document.getElementById('ad-notify-feedback');
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Sending…';
+    try {
+      const res = await fetch('/api/ads/resend-notification', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ bid_id: bidId })
+      });
+      const data = await res.json();
+      if (data.error) {
+        if (feedback) feedback.innerHTML = `<span style="color:#e06060;">Bid #${bidId}: ${escapeHtml(data.error)}</span>`;
+      } else {
+        const fmt = (label, r) => `${label}: ${r.ok ? '✓ sent' : '✗ ' + escapeHtml(r.skipped || r.error || 'failed')}`;
+        const cls = data.notified ? '#4caf50' : '#e0a030';
+        if (feedback) feedback.innerHTML =
+          `<span style="color:${cls};">Bid #${bidId} — ${fmt('email', data.email)}; ${fmt('Discord', data.discord)}</span>`;
+        // Refresh the row's Notified cell if at least one channel succeeded.
+        if (data.notified) {
+          const cell = document.querySelector(`#ad-notify-row-${bidId} .ad-notify-status`);
+          if (cell) cell.innerHTML = `<span style="color:#4caf50;">✓ just now</span>`;
+        }
+      }
+    } catch (e) {
+      if (feedback) feedback.innerHTML = `<span style="color:#e06060;">Network error re-sending bid #${bidId}.</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 
   // ---------- logs (global) ----------

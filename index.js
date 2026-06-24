@@ -130,9 +130,15 @@ function secureJson(data, init = {}) {
 // Requires: RESEND_API_KEY secret  (npx wrangler secret put RESEND_API_KEY)
 //           RESEND_FROM_EMAIL env var in wrangler.toml, e.g. "ads@jaronitenews.com"
 // ================================================================
+// Returns a result object so callers (e.g. the manual "re-send notification"
+// admin action) can report what actually happened instead of failing silently:
+//   { ok: true }                      — delivered
+//   { ok: false, skipped: "reason" }  — not attempted (e.g. no API key / no address)
+//   { ok: false, error: "reason" }    — attempted but failed
 async function sendEmail(env, { to, subject, html }) {
   const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('RESEND_API_KEY not set — email skipped'); return; }
+  if (!apiKey) { console.warn('RESEND_API_KEY not set — email skipped'); return { ok: false, skipped: 'RESEND_API_KEY not configured' }; }
+  if (!to) return { ok: false, skipped: 'no recipient email' };
   const from = env.RESEND_FROM_EMAIL || 'Jaronite News <ads@jaronitenews.com>';
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -146,9 +152,12 @@ async function sendEmail(env, { to, subject, html }) {
     if (!res.ok) {
       const err = await res.text();
       console.error('Resend error:', res.status, err);
+      return { ok: false, error: `Resend API ${res.status}: ${err.slice(0, 200)}` };
     }
+    return { ok: true };
   } catch (e) {
     console.error('Resend fetch failed:', e);
+    return { ok: false, error: `network error: ${e.message || e}` };
   }
 }
 
@@ -160,10 +169,12 @@ async function sendEmail(env, { to, subject, html }) {
 // Note: the bot must share a server with the recipient, or have
 //       the MESSAGE_CONTENT intent enabled in the Developer Portal.
 // ================================================================
+// Returns a result object (see sendEmail) so callers can surface the outcome:
+//   { ok: true } | { ok: false, skipped: "..." } | { ok: false, error: "..." }
 async function sendDiscordDm(env, discordUsername, message) {
   const token = env.DISCORD_BOT_TOKEN;
-  if (!token) { console.warn('DISCORD_BOT_TOKEN not set — Discord DM skipped'); return; }
-  if (!discordUsername) return;
+  if (!token) { console.warn('DISCORD_BOT_TOKEN not set — Discord DM skipped'); return { ok: false, skipped: 'DISCORD_BOT_TOKEN not configured' }; }
+  if (!discordUsername) return { ok: false, skipped: 'no Discord username on file' };
 
   try {
     // Strip any #discriminator suffix (legacy tags like user#1234)
@@ -172,15 +183,16 @@ async function sendDiscordDm(env, discordUsername, message) {
     // Search for the user via the bot's guild member search.
     // We search the configured guild (server) for the username.
     const guildId = env.DISCORD_GUILD_ID;
-    if (!guildId) { console.warn('DISCORD_GUILD_ID not set — Discord DM skipped'); return; }
+    if (!guildId) { console.warn('DISCORD_GUILD_ID not set — Discord DM skipped'); return { ok: false, skipped: 'DISCORD_GUILD_ID not configured' }; }
 
     const searchRes = await fetch(
       `https://discord.com/api/v10/guilds/${guildId}/members/search?query=${encodeURIComponent(username)}&limit=5`,
       { headers: { Authorization: `Bot ${token}` } }
     );
     if (!searchRes.ok) {
-      console.error('Discord member search failed:', searchRes.status, await searchRes.text());
-      return;
+      const t = await searchRes.text();
+      console.error('Discord member search failed:', searchRes.status, t);
+      return { ok: false, error: `member search ${searchRes.status}: ${t.slice(0, 200)}` };
     }
     const members = await searchRes.json();
     // Find the closest match — prefer exact username match
@@ -191,7 +203,7 @@ async function sendDiscordDm(env, discordUsername, message) {
 
     if (!member) {
       console.warn(`Discord: could not find user "${username}" in guild`);
-      return;
+      return { ok: false, error: `user "${username}" not found in the server` };
     }
     const userId = member.user.id;
 
@@ -202,8 +214,9 @@ async function sendDiscordDm(env, discordUsername, message) {
       body: JSON.stringify({ recipient_id: userId }),
     });
     if (!dmRes.ok) {
-      console.error('Discord DM channel open failed:', dmRes.status, await dmRes.text());
-      return;
+      const t = await dmRes.text();
+      console.error('Discord DM channel open failed:', dmRes.status, t);
+      return { ok: false, error: `open DM ${dmRes.status}: ${t.slice(0, 200)}` };
     }
     const dmChannel = await dmRes.json();
 
@@ -214,10 +227,14 @@ async function sendDiscordDm(env, discordUsername, message) {
       body: JSON.stringify({ content: message }),
     });
     if (!msgRes.ok) {
-      console.error('Discord message send failed:', msgRes.status, await msgRes.text());
+      const t = await msgRes.text();
+      console.error('Discord message send failed:', msgRes.status, t);
+      return { ok: false, error: `send message ${msgRes.status}: ${t.slice(0, 200)}` };
     }
+    return { ok: true };
   } catch (e) {
     console.error('Discord DM failed:', e);
+    return { ok: false, error: `network error: ${e.message || e}` };
   }
 }
 
@@ -2176,7 +2193,8 @@ export default {
         `SELECT b.id, b.advertiser_name, b.contact, b.bid_amount,
                 b.target_date, b.slot_number, b.status AS bid_status,
                 b.payment_status, b.payment_amount_received,
-                b.payment_txn_id, b.payment_received_at
+                b.payment_txn_id, b.payment_received_at,
+                b.email, b.discord_username, b.notified_at
          FROM ad_bids b
          WHERE b.status = 'won' AND b.target_date BETWEEN ? AND ?
          ORDER BY b.target_date DESC, b.slot_number`
@@ -2184,6 +2202,50 @@ export default {
       return new Response(JSON.stringify(rows.results || []), {
         headers: { 'Content-Type': 'application/json', ...securityHeaders() }
       });
+    }
+
+    // ================================================================
+    // POST /api/ads/resend-notification  — editor/admin only
+    // Manually re-send the "you won" notification (email + Discord DM) for a
+    // won bid. Used when the original auto-notification was missed — e.g. a
+    // mistyped Discord username that's since been corrected, or a mail/bot
+    // secret that wasn't configured at award time. Reports per-channel results
+    // so staff can see exactly what happened, and stamps notified_at on success.
+    // ================================================================
+    if (url.pathname === '/api/ads/resend-notification' && request.method === 'POST') {
+      const reviewer = await requireEditorOrAdmin(env, request);
+      if (!reviewer) return secureJson({ error: 'Unauthorized' }, { status: 403 });
+
+      const { bid_id } = await request.json();
+      const bidId = parseInt(bid_id, 10);
+      if (!bidId || isNaN(bidId)) return secureJson({ error: 'Invalid bid_id' }, { status: 400 });
+
+      const bid = await env.DB.prepare(`SELECT * FROM ad_bids WHERE id = ?`).bind(bidId).first();
+      if (!bid) return secureJson({ error: 'Bid not found' }, { status: 404 });
+      if (bid.status !== 'won') {
+        return secureJson({ error: 'Only won bids can be notified.' }, { status: 400 });
+      }
+
+      const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+      const emailRes = bid.email
+        ? await sendEmail(env, {
+            to: bid.email,
+            subject: `🎉 You won a Jaronite News ad slot for ${bid.target_date}!`,
+            html: winEmailHtml(bid, slotLabel),
+          })
+        : { ok: false, skipped: 'no email on file' };
+      const discordRes = bid.discord_username
+        ? await sendDiscordDm(env, bid.discord_username, winDiscordMsg(bid, slotLabel))
+        : { ok: false, skipped: 'no Discord username on file' };
+
+      const notified = emailRes.ok || discordRes.ok;
+      if (notified) {
+        await env.DB.prepare(`UPDATE ad_bids SET notified_at = datetime('now') WHERE id = ?`).bind(bidId).run();
+      }
+      await log(env, reviewer.username, 'RESEND_AD_NOTIFICATION',
+        `Re-sent win notification for bid #${bidId} (${bid.advertiser_name}) — email: ${emailRes.ok ? 'sent' : (emailRes.skipped || emailRes.error)}; discord: ${discordRes.ok ? 'sent' : (discordRes.skipped || discordRes.error)}`);
+
+      return secureJson({ success: true, notified, email: emailRes, discord: discordRes });
     }
 
     // /advertise → advertise.html (public bid form)
@@ -2353,17 +2415,24 @@ export default {
           `UPDATE ad_bids SET status = 'won', payment_status = 'awaiting_payment' WHERE id = ?`
         ).bind(winner.id).run();
 
-        // Send win notifications (email + Discord DM)
+        // Send win notifications (email + Discord DM). Record notified_at if
+        // at least one channel succeeded, so the portal can show who still
+        // needs a manual re-send.
         const slotLabelWin = SLOT_LABELS[slot] || `Slot ${slot}`;
+        let emailRes = { ok: false };
+        let discordRes = { ok: false };
         if (winner.email) {
-          await sendEmail(env, {
+          emailRes = await sendEmail(env, {
             to: winner.email,
             subject: `🎉 You won a Jaronite News ad slot for ${targetDate}!`,
             html: winEmailHtml(winner, slotLabelWin),
           });
         }
         if (winner.discord_username) {
-          await sendDiscordDm(env, winner.discord_username, winDiscordMsg(winner, slotLabelWin));
+          discordRes = await sendDiscordDm(env, winner.discord_username, winDiscordMsg(winner, slotLabelWin));
+        }
+        if (emailRes.ok || discordRes.ok) {
+          await env.DB.prepare(`UPDATE ad_bids SET notified_at = datetime('now') WHERE id = ?`).bind(winner.id).run();
         }
 
         // Mark all other pending bids for this slot/date as lost
