@@ -193,7 +193,18 @@
       font-family: inherit;
       transition: border-color .15s;
     }
-    .form-group input:focus,
+    .form-group input[type="file"] {
+      padding: 10px 12px;
+      cursor: pointer;
+      background: var(--card-bg, #1a1040);
+      color: var(--ink, #e8e0ff);
+      border: 1.5px dashed var(--mid-purple, #7c5cbf);
+    }
+    .form-group input[type="file"]:hover {
+      border-color: #a07de0;
+    }
+
+        .form-group input:focus,
     .form-group select:focus {
       outline: none;
       border-color: var(--mid-purple, #7c5cbf);
@@ -368,6 +379,13 @@
       <label>Your Name / Business</label>
       <input type="text" id="f-name" placeholder="e.g. JaroMart, BuildCo Inc.">
     </div>
+
+    <div class="form-group">
+      <label>Contact (Discord tag or in-game name)</label>
+      <input type="text" id="f-contact" placeholder="e.g. username#0000 or YourIGN">
+      <div class="hint">We'll use this to notify you if you win, and for billing.</div>
+    </div>
+
     <div class="form-group">
       <label>Email Address</label>
       <input type="email" id="f-email" placeholder="you@example.com">
@@ -381,9 +399,9 @@
     </div>
 
     <div class="form-group">
-      <label>Ad Image URL <span style="font-weight:400;text-transform:none;" id="img-size-label">(728×90 px)</span></label>
-      <input type="url" id="f-image" placeholder="https://i.imgur.com/yourimage.png" oninput="previewImage()">
-      <div class="hint" id="img-size-hint">Host your image on Imgur, Discord CDN, or any public URL. Must be exactly 728×90 px for the leaderboard slot.</div>
+      <label>Ad Image <span style="font-weight:400;text-transform:none;" id="img-size-label">(728×90 px)</span></label>
+      <input type="file" id="f-image" accept="image/png,image/jpeg,image/gif,image/webp" onchange="handleImageUpload(this)">
+      <div class="hint" id="img-size-hint">Upload a PNG or JPEG. Must be exactly 728×90 px for the leaderboard slot. Max 800 KB.</div>
       <div class="ad-preview-box" id="ad-preview-box">
         <div class="ad-preview-placeholder" id="ad-preview-placeholder">Preview will appear here</div>
       </div>
@@ -499,23 +517,40 @@
       box.style.maxWidth = '100%';
       box.style.height = '90px';
     }
-    previewImage();
   }
 
-  function previewImage() {
-    const url = document.getElementById('f-image').value.trim();
+  // Holds the base64 data URL of the uploaded image
+  let uploadedImageDataUrl = null;
+
+  function handleImageUpload(input) {
     const box = document.getElementById('ad-preview-box');
-    if (!url) {
+    const file = input.files[0];
+    if (!file) {
+      uploadedImageDataUrl = null;
       box.innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
       return;
     }
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'Ad preview';
-    img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
-    img.onerror = () => { box.innerHTML = '<div class="ad-preview-placeholder" style="color:#c62828">Could not load image — check the URL</div>'; };
-    box.innerHTML = '';
-    box.appendChild(img);
+    if (file.size > 800 * 1024) {
+      uploadedImageDataUrl = null;
+      box.innerHTML = '<div class="ad-preview-placeholder" style="color:#c62828">Image too large — max 800 KB</div>';
+      input.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      uploadedImageDataUrl = e.target.result;
+      const img = document.createElement('img');
+      img.src = uploadedImageDataUrl;
+      img.alt = 'Ad preview';
+      img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+      box.innerHTML = '';
+      box.appendChild(img);
+    };
+    reader.onerror = () => {
+      uploadedImageDataUrl = null;
+      box.innerHTML = '<div class="ad-preview-placeholder" style="color:#c62828">Could not read file</div>';
+    };
+    reader.readAsDataURL(file);
   }
 
   async function submitBid() {
@@ -528,7 +563,7 @@
     const contact = document.getElementById('f-contact').value.trim();
     const email   = document.getElementById('f-email').value.trim();
     const discord_username = document.getElementById('f-discord').value.trim();
-    const image   = document.getElementById('f-image').value.trim();
+    const image   = uploadedImageDataUrl;
     const dest    = document.getElementById('f-dest').value.trim();
     const date    = document.getElementById('f-date').value;
     const slotType = document.getElementById('f-slot').value;
@@ -536,6 +571,7 @@
     const bid     = parseFloat(document.getElementById('f-bid').value);
 
     if (!name || !contact || !email || !image || !dest || !date || !bid || bid < 0.01) {
+      // image here means uploadedImageDataUrl
       notice.className = 'form-notice error';
       notice.textContent = 'Please fill in all fields with valid values.';
       return;
@@ -566,6 +602,7 @@
         notice.innerHTML = `✓ Bid received! Winners are notified after 8 PM UTC. Good luck!`;
         // Reset form
         ['f-name','f-contact','f-email','f-discord','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
+        uploadedImageDataUrl = null;
         document.getElementById('ad-preview-box').innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
         loadBidBoard(); // refresh board after bid submitted
       } else {
