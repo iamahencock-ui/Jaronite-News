@@ -83,6 +83,20 @@ async function hashArticleText(title, content) {
 // ---------- security headers ----------
 
 /**
+/**
+ * Constant-time string comparison. Avoids leaking how many leading
+ * characters of a secret matched via response-timing differences.
+ * Callers must check length equality first (this assumes equal length).
+ */
+function timingSafeEqualStr(a, b) {
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+/**
  * Standard security headers added to every HTML/API response.
  * CSP stops injected scripts; the rest are defence-in-depth headers that
  * cost nothing but significantly raise the bar for common attack classes.
@@ -1998,11 +2012,22 @@ export default {
     // ================================================================
     if (url.pathname === '/api/ads/payment-status' && request.method === 'GET') {
       const token = url.searchParams.get('token');
-      const session = token ? await env.DB.prepare(
+
+      // Auth path 1: a permanent bot API key (machine-to-machine, no expiry).
+      // Set via: npx wrangler secret put BOT_API_KEY
+      const botKey = env.BOT_API_KEY;
+      const presentedKey = request.headers.get('X-Bot-Key') || url.searchParams.get('bot_key');
+      const isBot = botKey && presentedKey &&
+        presentedKey.length === botKey.length &&
+        timingSafeEqualStr(presentedKey, botKey);
+
+      // Auth path 2: a normal staff session (editor/admin).
+      const session = (!isBot && token) ? await env.DB.prepare(
         `SELECT u.role FROM sessions s JOIN users u ON u.username = s.username
          WHERE s.token = ? AND s.expires_at > datetime('now')`
       ).bind(token).first() : null;
-      if (!session || !['admin', 'editor'].includes(session.role)) {
+
+      if (!isBot && (!session || !['admin', 'editor'].includes(session.role))) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 403, headers: { 'Content-Type': 'application/json' }
         });
@@ -2232,6 +2257,6 @@ export default {
           await sendDiscordDm(env, bid.discord_username, reminderDiscordMsg(bid, slotLabel));
         }
       }
-    }
+    } 
   },
 };
