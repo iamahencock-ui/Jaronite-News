@@ -28,6 +28,6 @@ crons = ["0 20 * * *", "0 0 * * *"]
 # Midnight UTC → (same scheduled handler checks the hour to distinguish)
 
 [vars]
-RESEND_FROM_EMAIL = "Jaronite News <onboarding@resend.dev>"
+RESEND_FROM_EMAIL = "Jaronite News <ads@jaronitenews.com>"
 DISCORD_GUILD_ID = "1513015724455628940"
 DC_ECONOMY_ACCOUNT_ID = "118045"
