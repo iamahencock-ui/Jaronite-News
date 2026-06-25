@@ -252,7 +252,7 @@ Hi **${bid.advertiser_name}** — your bid of **${rate} ℐ/view** won the **${s
 **How to pay (only once you receive your invoice):**
 Run this in-game, replacing \`<amount>\` with the exact figure shown on your invoice:
 \`\`\`
-/pay ${FIRM_PAY_NAME} <amount> bid:${bid.pay_ref || bid.id}
+/pay-account business ${FIRM_PAY_NAME} <amount> bid:${bid.pay_ref || bid.id}
 \`\`\`
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo exactly as shown so we match your payment automatically. Please don't send payment before you get the invoice.
 
@@ -280,7 +280,7 @@ Hi **${bid.advertiser_name}** — we haven't received payment for your ad in the
 
 **How to pay:**
 \`\`\`
-/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
+/pay-account business ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 — Jaronite News Inc.`;
@@ -301,7 +301,7 @@ function winEmailHtml(bid, slotLabel) {
   <h3 style="color:#5b3fa0;">How to pay (only once you receive your invoice)</h3>
   <p>Run this command in-game, replacing <code>&lt;amount&gt;</code> with the exact figure shown on your invoice:</p>
   <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} &lt;amount&gt; bid:${bid.pay_ref || bid.id}
+    /pay-account business ${FIRM_PAY_NAME} &lt;amount&gt; bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
     Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment
@@ -388,7 +388,7 @@ Hi **${bid.advertiser_name}** — your ad ran in the **${slotLabel}** slot on **
 **How to pay:**
 Run this in-game exactly as shown:
 \`\`\`
-/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
+/pay-account business ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 
@@ -413,7 +413,7 @@ function invoiceEmailHtml(bid, slotLabel, views, total) {
   <h3 style="color:#5b3fa0;">How to pay</h3>
   <p>Run this command in-game exactly as shown:</p>
   <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
+    /pay-account business ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
     Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
@@ -441,7 +441,7 @@ Hi **${bid.advertiser_name}** — thanks, we've received **${paidStr} ℐ** towa
 
 Please send the rest to settle your invoice:
 \`\`\`
-/pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
+/pay-account business ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 — Jaronite News Inc.`;
@@ -464,7 +464,7 @@ function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
   </table>
   <h3 style="color:#e67e22;">Pay the remaining balance</h3>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
+    /pay-account business ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
     Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
@@ -494,7 +494,7 @@ function reminderEmailHtml(bid, slotLabel, total) {
   <p>We haven't yet received payment for your ad in the <strong>${slotLabel}</strong> slot on
      <strong>${bid.target_date}</strong>. Your outstanding balance is <strong>${totalStr} ℐ</strong>.</p>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
+    /pay-account business ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
     Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
@@ -511,9 +511,10 @@ function reminderEmailHtml(bid, slotLabel, total) {
 
 const SLOT_LABELS = { 1: 'Bottom Leaderboard (728×90)', 2: 'Left Skyscraper (160×600)', 3: 'Right Skyscraper (160×600)' };
 
-// In-game account name advertisers send payment to (used in the /pay command
-// shown in every notification). Change this in one place if the firm account
-// name changes.
+// In-game BUSINESS (firm) account advertisers send payment to, via
+// /pay-account business <name> <amount> bid:<ref>. Payments land in the firm
+// account, so the DC Economy webhook stays scoped to that firm. Change in one
+// place if the firm name changes.
 const FIRM_PAY_NAME = 'JaroniteNews';
 
 // Minimum accepted bid, in ℐ per view. Enforced server-side on every bid.
