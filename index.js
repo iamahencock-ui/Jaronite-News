@@ -516,6 +516,9 @@ const SLOT_LABELS = { 1: 'Bottom Leaderboard (728×90)', 2: 'Left Skyscraper (16
 // name changes.
 const FIRM_PAY_NAME = 'JaroniteNews';
 
+// Minimum accepted bid, in ℐ per view. Enforced server-side on every bid.
+const MIN_BID_PER_VIEW = 0.5;
+
 /**
  * Compute what a winning advertiser owes: the per-view rate (bid_amount)
  * multiplied by the views the ad actually received (ad_slots.impressions for
@@ -2259,10 +2262,13 @@ export default {
         return secureJson({ error: 'target_date must be a future date' }, { status: 400 });
       }
 
-      // --- Amount: finite, positive, within a sane ceiling ---
+      // --- Amount: finite, at least the minimum, within a sane ceiling ---
       const amt = Number(bid_amount);
       if (!Number.isFinite(amt) || amt <= 0) {
         return secureJson({ error: 'bid_amount must be a positive number' }, { status: 400 });
+      }
+      if (amt < MIN_BID_PER_VIEW) {
+        return secureJson({ error: `bid_amount must be at least ${MIN_BID_PER_VIEW.toFixed(2)} ℐ per view` }, { status: 400 });
       }
       if (amt > 1_000_000) {
         return secureJson({ error: 'bid_amount exceeds the maximum allowed' }, { status: 400 });
