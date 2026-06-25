@@ -164,6 +164,10 @@ CREATE TABLE IF NOT EXISTS ad_bids (
   bid_amount REAL NOT NULL,             -- amount in server currency
   target_date TEXT NOT NULL,            -- YYYY-MM-DD
   slot_number INTEGER NOT NULL CHECK(slot_number IN (1,2,3)),
+  -- Long random payment reference used in the in-game memo (bid:<pay_ref>).
+  -- Unguessable so nobody can pay against someone else's bid; the webhook
+  -- matches incoming payments on this. The numeric id stays for staff display.
+  pay_ref TEXT,
   email TEXT,                           -- advertiser email for automated notifications
   discord_username TEXT,                -- advertiser Discord username for bot DMs
   -- Public (self-serve) bidding double-confirmation. On submission we email a
@@ -223,6 +227,7 @@ CREATE TABLE IF NOT EXISTS ad_events (
 
 CREATE INDEX IF NOT EXISTS idx_ad_bids_target_date ON ad_bids(target_date);
 CREATE INDEX IF NOT EXISTS idx_ad_bids_status ON ad_bids(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_bids_pay_ref ON ad_bids(pay_ref);
 CREATE INDEX IF NOT EXISTS idx_ad_slots_run_date ON ad_slots(run_date);
 CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
 
@@ -259,6 +264,8 @@ CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email_token TEXT"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email_verified_at DATETIME"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_token TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN pay_ref TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_bids_pay_ref ON ad_bids(pay_ref)"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_verified_at DATETIME"
 --
 -- Verify afterward with:

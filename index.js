@@ -252,9 +252,9 @@ Hi **${bid.advertiser_name}** — your bid of **${rate} ℐ/view** won the **${s
 **How to pay (only once you receive your invoice):**
 Run this in-game, replacing \`<amount>\` with the exact figure shown on your invoice:
 \`\`\`
-/pay ${FIRM_PAY_NAME} <amount> bid:${bid.id}
+/pay ${FIRM_PAY_NAME} <amount> bid:${bid.pay_ref || bid.id}
 \`\`\`
-Keep \`bid:${bid.id}\` in the memo exactly as shown so we match your payment automatically. Please don't send payment before you get the invoice.
+Keep \`bid:${bid.pay_ref || bid.id}\` in the memo exactly as shown so we match your payment automatically. Please don't send payment before you get the invoice.
 
 Questions? Reply here or contact us on the DemocracyCraft Discord.
 — Jaronite News Inc.`;
@@ -280,9 +280,9 @@ Hi **${bid.advertiser_name}** — we haven't received payment for your ad in the
 
 **How to pay:**
 \`\`\`
-/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
-Keep \`bid:${bid.id}\` in the memo so we match your payment automatically.
+Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 — Jaronite News Inc.`;
 }
 
@@ -301,10 +301,10 @@ function winEmailHtml(bid, slotLabel) {
   <h3 style="color:#5b3fa0;">How to pay (only once you receive your invoice)</h3>
   <p>Run this command in-game, replacing <code>&lt;amount&gt;</code> with the exact figure shown on your invoice:</p>
   <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} &lt;amount&gt; bid:${bid.id}
+    /pay ${FIRM_PAY_NAME} &lt;amount&gt; bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
-    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment
+    Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment
     automatically. Please don't send payment before you receive the invoice.
   </p>
   <h3 style="color:#5b3fa0;">Your bid details</h3>
@@ -388,9 +388,9 @@ Hi **${bid.advertiser_name}** — your ad ran in the **${slotLabel}** slot on **
 **How to pay:**
 Run this in-game exactly as shown:
 \`\`\`
-/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+/pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
-Keep \`bid:${bid.id}\` in the memo so we match your payment automatically.
+Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 
 Thanks for advertising with us!
 — Jaronite News Inc.`;
@@ -413,10 +413,10 @@ function invoiceEmailHtml(bid, slotLabel, views, total) {
   <h3 style="color:#5b3fa0;">How to pay</h3>
   <p>Run this command in-game exactly as shown:</p>
   <div style="background:#f3f0ff;border-left:4px solid #5b3fa0;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
-    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
+    Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
   </p>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">
     Questions? Reply to this email or contact us on Discord.<br>
@@ -441,9 +441,9 @@ Hi **${bid.advertiser_name}** — thanks, we've received **${paidStr} ℐ** towa
 
 Please send the rest to settle your invoice:
 \`\`\`
-/pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.id}
+/pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
-Keep \`bid:${bid.id}\` in the memo so we match your payment automatically.
+Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 — Jaronite News Inc.`;
 }
 
@@ -464,10 +464,10 @@ function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
   </table>
   <h3 style="color:#e67e22;">Pay the remaining balance</h3>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.id}
+    /pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
-    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
+    Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
   </p>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
 </div>`;
@@ -494,10 +494,10 @@ function reminderEmailHtml(bid, slotLabel, total) {
   <p>We haven't yet received payment for your ad in the <strong>${slotLabel}</strong> slot on
      <strong>${bid.target_date}</strong>. Your outstanding balance is <strong>${totalStr} ℐ</strong>.</p>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
-    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.id}
+    /pay ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
   </div>
   <p style="color:#666;font-size:0.9em;">
-    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
+    Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
   </p>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin-top:12px;">
     <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
@@ -518,6 +518,16 @@ const FIRM_PAY_NAME = 'JaroniteNews';
 
 // Minimum accepted bid, in ℐ per view. Enforced server-side on every bid.
 const MIN_BID_PER_VIEW = 5.0;
+
+/**
+ * Generate a long, unguessable payment reference for a bid's memo
+ * (16 random bytes → 32 hex chars). Used as `bid:<pay_ref>` so a payer can't
+ * target another advertiser's bid by guessing a sequential id.
+ * @returns {string}
+ */
+function newPayRef() {
+  return bufToHex(crypto.getRandomValues(new Uint8Array(16)).buffer);
+}
 
 /**
  * Compute what a winning advertiser owes: the per-view rate (bid_amount)
@@ -2057,12 +2067,14 @@ export default {
     }
 
     // Parse the memo field from a DC Economy transaction.
-    // Advertisers must pay with memo = "bid:<id>" (e.g. "bid:42").
-    // Returns the bid id as a number, or null if memo doesn't match.
+    // Advertisers pay with memo = "bid:<pay_ref>" (a long random token), e.g.
+    // "bid:9f2c...". Returns the token string, or null if the memo doesn't
+    // match. (Legacy memos were "bid:<numeric id>", which still match here and
+    // are handled by the numeric fallback at lookup time.)
     function parseBidIdFromMemo(memo) {
       if (!memo || typeof memo !== 'string') return null;
-      const m = memo.trim().match(/^bid:(\d+)$/i);
-      return m ? parseInt(m[1], 10) : null;
+      const m = memo.trim().match(/^bid:([A-Za-z0-9]+)$/i);
+      return m ? m[1] : null;
     }
     // ----------------------------------------------------------------
 
@@ -2276,11 +2288,13 @@ export default {
 
       // Insert the bid already verified (Discord OAuth + membership happened
       // before submission), so it competes immediately. Contact is the verified
-      // Discord handle; email may be null.
+      // Discord handle; email may be null. Each bid gets a long random pay_ref
+      // used in its payment memo.
+      const payRef = newPayRef();
       const inserted = await env.DB.prepare(
-        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number, discord_verified_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-      ).bind(adv, con, eml || null, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number)).run();
+        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number, pay_ref, discord_verified_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      ).bind(adv, con, eml || null, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number), payRef).run();
 
       return secureJson({
         ok: true,
@@ -2455,21 +2469,27 @@ export default {
         `INSERT OR IGNORE INTO webhook_deliveries (delivery_id, txn_id) VALUES (?, ?)`
       ).bind(deliveryId, String(txn.txnId || '')).run();
 
-      // Parse bid ID from memo
-      const bidId = parseBidIdFromMemo(txn.memo || txn.message || '');
-      if (!bidId) {
-        // Payment with no recognisable bid ID — log but don't error (might be unrelated)
+      // Parse the payment token from the memo (bid:<pay_ref>)
+      const payToken = parseBidIdFromMemo(txn.memo || txn.message || '');
+      if (!payToken) {
+        // Payment with no recognisable memo — log but don't error (might be unrelated)
         console.log(`DC webhook: unrecognised memo "${txn.memo}" — ignoring`);
         return new Response('ok', { status: 200 });
       }
 
-      // Look up the bid
-      const bid = await env.DB.prepare(
-        `SELECT * FROM ad_bids WHERE id = ?`
-      ).bind(bidId).first();
+      // Look up the bid by its pay_ref. Fall back to the numeric id for any
+      // legacy memos issued before pay_ref existed.
+      let bid = await env.DB.prepare(
+        `SELECT * FROM ad_bids WHERE pay_ref = ?`
+      ).bind(payToken).first();
+      if (!bid && /^\d+$/.test(payToken)) {
+        bid = await env.DB.prepare(
+          `SELECT * FROM ad_bids WHERE id = ?`
+        ).bind(parseInt(payToken, 10)).first();
+      }
 
       if (!bid) {
-        console.warn(`DC webhook: bid ${bidId} not found`);
+        console.warn(`DC webhook: no bid matches memo token "${payToken}"`);
         return new Response('ok', { status: 200 });
       }
 
@@ -2509,9 +2529,9 @@ export default {
              payment_amount_received = ?,
              payment_received_at = datetime('now')
          WHERE id = ?`
-      ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), totalPaid, bidId).run();
+      ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), totalPaid, bid.id).run();
 
-      console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (owed ${amountOwed}, paid ${totalPaid} this txn ${amount})`);
+      console.log(`DC webhook: bid ${bid.id} marked ${paymentStatus} (owed ${amountOwed}, paid ${totalPaid} this txn ${amount})`);
 
       const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
       if (paymentStatus === 'paid' || paymentStatus === 'overpaid') {
