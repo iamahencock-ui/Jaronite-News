@@ -2497,6 +2497,77 @@ export default {
       return secureJson({ success: true, kind, sent: sentOk, notified, email: emailRes, discord: discordRes });
     }
 
+    // ================================================================
+    // POST /api/ads/adjust-payment  — ADMIN only
+    // Manually record an off-platform payment or correct a bid's payment state.
+    // actions:
+    //   'mark_paid'       → settle the invoice in full (paid)
+    //   'record_payment'  → add `amount` to what's been received, recompute status
+    //   'reset'           → clear payments back to awaiting_payment
+    // Does NOT email/DM the advertiser — use the stage-aware Re-send button if
+    // you want to send a receipt/balance notice after adjusting.
+    // ================================================================
+    if (url.pathname === '/api/ads/adjust-payment' && request.method === 'POST') {
+      const admin = await requireAdmin(env, request);
+      if (!admin) return secureJson({ error: 'Unauthorized' }, { status: 403 });
+
+      const body = await request.json().catch(() => ({}));
+      const bidId = parseInt(body.bid_id, 10);
+      const action = body.action;
+      if (!bidId || isNaN(bidId)) return secureJson({ error: 'Invalid bid_id' }, { status: 400 });
+
+      const bid = await env.DB.prepare(`SELECT * FROM ad_bids WHERE id = ?`).bind(bidId).first();
+      if (!bid) return secureJson({ error: 'Bid not found' }, { status: 404 });
+      if (bid.status !== 'won') return secureJson({ error: 'Only won bids have payments.' }, { status: 400 });
+
+      const tolerance = 0.01;
+      const amountOwed = (bid.amount_owed != null) ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
+      const prevPaid = Number(bid.payment_amount_received) || 0;
+
+      if (action === 'reset') {
+        await env.DB.prepare(
+          `UPDATE ad_bids SET payment_status = 'awaiting_payment', payment_amount_received = NULL,
+                              payment_received_at = NULL, payment_txn_id = NULL WHERE id = ?`
+        ).bind(bidId).run();
+        await log(env, admin.username, 'ADJUST_AD_PAYMENT', `Reset payment for bid #${bidId} (${bid.advertiser_name})`);
+        return secureJson({ success: true, payment_status: 'awaiting_payment', amount_owed: amountOwed, paid: 0, remaining: amountOwed });
+      }
+
+      let newPaid;
+      if (action === 'mark_paid') {
+        newPaid = amountOwed;
+      } else if (action === 'record_payment') {
+        const amt = Number(body.amount);
+        if (!Number.isFinite(amt) || amt <= 0) return secureJson({ error: 'amount must be a positive number' }, { status: 400 });
+        newPaid = Math.round((prevPaid + amt) * 100) / 100;
+      } else {
+        return secureJson({ error: 'Unknown action' }, { status: 400 });
+      }
+
+      let paymentStatus;
+      if (newPaid + tolerance >= amountOwed) {
+        paymentStatus = (newPaid - amountOwed > tolerance) ? 'overpaid' : 'paid';
+      } else {
+        paymentStatus = 'underpaid';
+      }
+
+      await env.DB.prepare(
+        `UPDATE ad_bids SET payment_status = ?, payment_amount_received = ?,
+                            payment_received_at = datetime('now'), payment_txn_id = ? WHERE id = ?`
+      ).bind(paymentStatus, newPaid, `manual:${admin.username}`, bidId).run();
+
+      await log(env, admin.username, 'ADJUST_AD_PAYMENT',
+        `${action} on bid #${bidId} (${bid.advertiser_name}) — owed ${amountOwed.toFixed(2)}, now paid ${newPaid.toFixed(2)}, status ${paymentStatus}`);
+
+      return secureJson({
+        success: true,
+        payment_status: paymentStatus,
+        amount_owed: amountOwed,
+        paid: newPaid,
+        remaining: Math.round((amountOwed - newPaid) * 100) / 100,
+      });
+    }
+
     // /advertise → advertise.html (public bid form)
     if (url.pathname === '/advertise') {
       const advUrl = new URL('/advertise.html', url.origin);

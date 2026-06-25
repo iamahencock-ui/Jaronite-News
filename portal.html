@@ -1940,6 +1940,8 @@
       return;
     }
 
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
     container.innerHTML = `
       <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
@@ -1950,9 +1952,11 @@
               <th style="padding:8px 10px;">Advertiser</th>
               <th style="padding:8px 10px;">Status</th>
               <th style="padding:8px 10px; text-align:right;">Owed</th>
+              <th style="padding:8px 10px; text-align:right;">Paid</th>
               <th style="padding:8px 10px;">Email</th>
               <th style="padding:8px 10px;">Discord</th>
               <th style="padding:8px 10px;">Notified</th>
+              ${isAdmin ? '<th style="padding:8px 10px;">Payment</th>' : ''}
               <th style="padding:8px 10px;"></th>
             </tr>
           </thead>
@@ -1964,11 +1968,23 @@
                 <td style="padding:8px 10px;">${escapeHtml(r.advertiser_name)}</td>
                 <td style="padding:8px 10px;">${adStagePill(r.stage)}</td>
                 <td style="padding:8px 10px; text-align:right;">${r.amount_owed != null ? Number(r.amount_owed).toFixed(2) + ' J' : '—'}</td>
+                <td style="padding:8px 10px; text-align:right;">${r.payment_amount_received != null ? Number(r.payment_amount_received).toFixed(2) + ' J' : '—'}</td>
                 <td style="padding:8px 10px; color:#888;">${escapeHtml(r.email || '—')}</td>
                 <td style="padding:8px 10px; color:#888;">${escapeHtml(r.discord_username || '—')}</td>
                 <td style="padding:8px 10px;" class="ad-notify-status">${r.notified_at
                   ? `<span style="color:#4caf50;">✓ ${escapeHtml(String(r.notified_at).slice(0,16).replace('T',' '))}</span>`
                   : `<span style="color:#e0a030;">not sent</span>`}</td>
+                ${isAdmin ? `
+                <td style="padding:8px 10px; white-space:nowrap;">
+                  <input type="number" step="0.01" min="0" id="ad-pay-amt-${r.id}" placeholder="0.00"
+                    style="width:70px; padding:4px 6px; border-radius:6px; border:1px solid #3a3a5a; background:#1a1a2e; color:#e0dff0; font-size:0.78rem;">
+                  <button onclick="adjustPayment(${r.id}, 'record_payment', this)"
+                    style="padding:4px 9px; border-radius:6px; background:#2a2a4a; color:#e0dff0; border:1px solid #3a3a5a; cursor:pointer; font-size:0.78rem;">Record</button>
+                  <button onclick="adjustPayment(${r.id}, 'mark_paid', this)"
+                    style="padding:4px 9px; border-radius:6px; background:#1f4a2a; color:#7fdca0; border:1px solid #2f5a3a; cursor:pointer; font-size:0.78rem;">Mark paid</button>
+                  <button onclick="adjustPayment(${r.id}, 'reset', this)" title="Clear payments back to awaiting"
+                    style="padding:4px 9px; border-radius:6px; background:#3a2a2a; color:#e0a0a0; border:1px solid #5a3a3a; cursor:pointer; font-size:0.78rem;">Reset</button>
+                </td>` : ''}
                 <td style="padding:8px 10px; text-align:right;">
                   <button onclick="resendNotification(${r.id}, this)"
                     style="padding:5px 12px; border-radius:6px; background:#2a2a4a; color:#e0dff0; border:1px solid #3a3a5a; cursor:pointer; font-size:0.8rem; white-space:nowrap;">
@@ -1979,6 +1995,45 @@
         </table>
       </div>
       <div id="ad-notify-feedback" style="margin-top:10px; font-size:0.82rem;"></div>`;
+  }
+
+  async function adjustPayment(bidId, action, btn) {
+    const feedback = document.getElementById('ad-notify-feedback');
+    const payload = { bid_id: bidId, action };
+    if (action === 'record_payment') {
+      const input = document.getElementById('ad-pay-amt-' + bidId);
+      const amt = input ? Number(input.value) : NaN;
+      if (!Number.isFinite(amt) || amt <= 0) {
+        if (feedback) feedback.innerHTML = `<span style="color:#e06060;">Enter a positive amount to record.</span>`;
+        return;
+      }
+      payload.amount = amt;
+    }
+    if (action === 'reset' && !confirm('Clear all recorded payments for this bid?')) return;
+
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = '…';
+    try {
+      const res = await fetch('/api/ads/adjust-payment', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) {
+        if (feedback) feedback.innerHTML = `<span style="color:#e06060;">Bid #${bidId}: ${escapeHtml(data.error)}</span>`;
+      } else {
+        if (feedback) feedback.innerHTML =
+          `<span style="color:#4caf50;">Bid #${bidId} — ${escapeHtml(data.payment_status)} · paid ${Number(data.paid).toFixed(2)} of ${Number(data.amount_owed).toFixed(2)} J (remaining ${Number(data.remaining).toFixed(2)} J)</span>`;
+        loadWinnerNotifications(); // refresh pills, owed/paid, labels
+      }
+    } catch (e) {
+      if (feedback) feedback.innerHTML = `<span style="color:#e06060;">Network error adjusting bid #${bidId}.</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
   }
 
   async function resendNotification(bidId, btn) {
