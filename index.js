@@ -2074,10 +2074,11 @@ export default {
     // are handled by the numeric fallback at lookup time.)
     function parseBidIdFromMemo(memo) {
       if (!memo || typeof memo !== 'string') return null;
-      // Find bid:<token> ANYWHERE in the text. The memo may be exactly
-      // "bid:<ref>", or the economy may wrap it in other text, or it may land
-      // in the `message` field instead of `memo` — so we don't anchor.
-      const m = memo.match(/bid:([A-Za-z0-9]+)/i);
+      // Find the bid token ANYWHERE in the text. We don't anchor because the
+      // economy wraps the memo in its own text ("Payment from X to business
+      // Y: <memo>"). The colon is OPTIONAL because DC strips ':' from memos —
+      // a payer types "bid:abc" but it arrives as "bidabc".
+      const m = memo.match(/bid:?\s*([A-Za-z0-9]+)/i);
       return m ? m[1] : null;
     }
     // ----------------------------------------------------------------
