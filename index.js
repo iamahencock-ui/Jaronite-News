@@ -260,10 +260,17 @@ Questions? Reply here or contact us on the DemocracyCraft Discord.
 — Jaronite News Inc.`;
 }
 
-function confirmedDiscordMsg(bid, slotLabel, amount) {
+function confirmedDiscordMsg(bid, slotLabel, amount, stats = { views: 0, clicks: 0, ctr: 0, cost: 0 }) {
+  const rate = Number(bid.bid_amount).toFixed(2);
   return `✅ **Payment received — thank you!**
 
 Hi **${bid.advertiser_name}** — we've received your payment of **${Number(amount).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.
+
+**📊 Performance report**
+• Views: **${stats.views}**
+• Clicks: **${stats.clicks}**
+• Click-through rate: **${Number(stats.ctr).toFixed(2)}%**
+• Final cost: **${Number(stats.cost).toFixed(2)} ℐ** (at ${rate} ℐ/view)
 
 Thanks for advertising with Jaronite News — we'd love to have you back!
 — Jaronite News Inc.`;
@@ -473,13 +480,20 @@ function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
 </div>`;
 }
 
-function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
+function paymentConfirmedEmailHtml(bid, slotLabel, amount, stats = { views: 0, clicks: 0, ctr: 0, cost: 0 }) {
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
   <h2 style="color:#27ae60;">✅ Payment received — thank you!</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
   <p>We've received your payment of <strong>${Number(amount).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
      (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.</p>
+  <h3 style="color:#27ae60;">📊 Performance report</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin:8px 0 16px;">
+    <tr><td style="padding:6px 0;color:#666;">Views</td><td style="text-align:right;"><strong>${stats.views}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Clicks</td><td style="text-align:right;"><strong>${stats.clicks}</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Click-through rate</td><td style="text-align:right;"><strong>${Number(stats.ctr).toFixed(2)}%</strong></td></tr>
+    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Final cost</strong></td><td style="text-align:right;"><strong style="color:#27ae60;">${Number(stats.cost).toFixed(2)} ℐ</strong> <span style="color:#888;font-weight:normal;">(at ${Number(bid.bid_amount).toFixed(2)} ℐ/view)</span></td></tr>
+  </table>
   <p>Thanks for advertising with Jaronite News — we'd love to have you back!</p>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
 </div>`;
@@ -545,6 +559,24 @@ async function computeAmountOwed(env, bid) {
   const views = slot ? (slot.impressions || 0) : 0;
   const total = Math.round(Number(bid.bid_amount) * views * 100) / 100;
   return { views, total };
+}
+
+/**
+ * Performance stats for a finished ad, for the post-run report on the receipt:
+ * views (impressions), clicks, click-through rate (%), and final cost.
+ * @param {object} env
+ * @param {object} bid - ad_bids row (needs id, bid_amount)
+ * @returns {Promise<{views:number, clicks:number, ctr:number, cost:number}>}
+ */
+async function getAdStats(env, bid) {
+  const slot = await env.DB.prepare(
+    `SELECT impressions, clicks FROM ad_slots WHERE bid_id = ? ORDER BY run_date DESC LIMIT 1`
+  ).bind(bid.id).first();
+  const views = slot ? (slot.impressions || 0) : 0;
+  const clicks = slot ? (slot.clicks || 0) : 0;
+  const ctr = views > 0 ? Math.round((clicks / views) * 10000) / 100 : 0;
+  const cost = Math.round(Number(bid.bid_amount) * views * 100) / 100;
+  return { views, clicks, ctr, cost };
 }
 
 // An unpaid invoice becomes "late" this many days after it was sent.
@@ -2543,16 +2575,17 @@ export default {
 
       const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
       if (paymentStatus === 'paid' || paymentStatus === 'overpaid') {
-        // Fully settled (we keep any overpayment) — send the confirmation.
+        // Fully settled (we keep any overpayment) — send the receipt + report.
+        const stats = await getAdStats(env, bid);
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
             subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
-            html: paymentConfirmedEmailHtml(bid, slotLabelPay, totalPaid),
+            html: paymentConfirmedEmailHtml(bid, slotLabelPay, totalPaid, stats),
           });
         }
         if (bid.discord_username) {
-          await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, totalPaid));
+          await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, totalPaid, stats));
         }
       } else {
         // Underpaid — acknowledge what we got and tell them the remaining balance.
@@ -2661,9 +2694,10 @@ export default {
       if (stage === 'paid' || stage === 'overpaid') {
         kind = 'receipt';
         const paidAmt = Number(bid.payment_amount_received) || 0;
+        const stats = await getAdStats(env, bid);
         subject = `✅ Payment confirmed — Jaronite News ad #${bid.id}`;
-        emailHtml = paymentConfirmedEmailHtml(bid, slotLabel, paidAmt);
-        discordMsg = confirmedDiscordMsg(bid, slotLabel, paidAmt);
+        emailHtml = paymentConfirmedEmailHtml(bid, slotLabel, paidAmt, stats);
+        discordMsg = confirmedDiscordMsg(bid, slotLabel, paidAmt, stats);
       } else if (stage === 'underpaid') {
         kind = 'balance due';
         const owed = (bid.amount_owed != null) ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
