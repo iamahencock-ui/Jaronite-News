@@ -2036,7 +2036,7 @@ export default {
     //        npx wrangler secret put DC_WEBHOOK_SECRET
     //      (paste the HMAC signing secret from economy.democracycraft.net/me/webhooks)
     //   c. On economy.democracycraft.net/me/webhooks, add endpoint:
-    //        https://<your-worker>.workers.dev/api/ads/webhook/payment
+    //        https://jaronitenews.com/api/ads/webhook/payment
     //      Scope it to your firm account so you only receive inbound transfers.
 
     // Verify the HMAC-SHA256 signature DC Economy attaches to every webhook.

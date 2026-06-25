@@ -2,6 +2,14 @@ name = "jaronitenewsinc"
 main = "index.js"
 compatibility_date = "2026-06-19"
 
+# Custom domain(s) served by this Worker. Requires jaronitenews.com to be a
+# zone on this Cloudflare account; wrangler creates the custom-domain binding
+# on deploy. Remove the www line if you don't want the www subdomain.
+routes = [
+  { pattern = "jaronitenews.com", custom_domain = true },
+  { pattern = "www.jaronitenews.com", custom_domain = true },
+]
+
 [site]
 bucket = "./"
 
