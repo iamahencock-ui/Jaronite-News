@@ -2067,6 +2067,10 @@ export default {
     // Start the advertiser Discord verification: redirect to Discord's OAuth
     // consent screen (identify scope only). On return we check server
     // membership with the bot. `state` is echoed back for CSRF protection.
+    //
+    // Uses the single Jaronite News Discord app (DISCORD_CLIENT_ID) — the same
+    // app as the DM bot, which is a member of the guild. Reader login and
+    // advertiser verification both run on this one app.
     if (url.pathname === '/api/ads/discord/login' && request.method === 'GET') {
       const state = url.searchParams.get('state') || '';
       const redirectUri = `${url.origin}/api/ads/discord/callback`;
