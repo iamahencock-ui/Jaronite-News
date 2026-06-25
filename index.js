@@ -2074,7 +2074,10 @@ export default {
     // are handled by the numeric fallback at lookup time.)
     function parseBidIdFromMemo(memo) {
       if (!memo || typeof memo !== 'string') return null;
-      const m = memo.trim().match(/^bid:([A-Za-z0-9]+)$/i);
+      // Find bid:<token> ANYWHERE in the text. The memo may be exactly
+      // "bid:<ref>", or the economy may wrap it in other text, or it may land
+      // in the `message` field instead of `memo` — so we don't anchor.
+      const m = memo.match(/bid:([A-Za-z0-9]+)/i);
       return m ? m[1] : null;
     }
     // ----------------------------------------------------------------
@@ -2470,11 +2473,14 @@ export default {
         `INSERT OR IGNORE INTO webhook_deliveries (delivery_id, txn_id) VALUES (?, ?)`
       ).bind(deliveryId, String(txn.txnId || '')).run();
 
-      // Parse the payment token from the memo (bid:<pay_ref>)
-      const payToken = parseBidIdFromMemo(txn.memo || txn.message || '');
+      // Parse the payment token (bid:<pay_ref>) from anywhere in the payload.
+      // Different economy commands put the memo in different fields, so rather
+      // than guess we scan the whole serialized payload for the token.
+      const payToken = parseBidIdFromMemo(JSON.stringify(payload));
       if (!payToken) {
-        // Payment with no recognisable memo — log but don't error (might be unrelated)
-        console.log(`DC webhook: unrecognised memo "${txn.memo}" — ignoring`);
+        // No bid token found anywhere — log the FULL payload so we can see what
+        // the economy actually sent (view with `wrangler tail`).
+        console.log(`DC webhook: no bid token in payload — ${JSON.stringify(payload)}`);
         return new Response('ok', { status: 200 });
       }
 
