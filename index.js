@@ -261,11 +261,11 @@ Questions? Reply here or contact us on the DemocracyCraft Discord.
 }
 
 function confirmedDiscordMsg(bid, slotLabel, amount) {
-  return `✅ **Payment received — your ad is confirmed!**
+  return `✅ **Payment received — thank you!**
 
-Hi **${bid.advertiser_name}** — we received your payment of **${Number(amount).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ${bid.target_date}).
+Hi **${bid.advertiser_name}** — we've received your payment of **${Number(amount).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.
 
-Your ad is confirmed and will run as scheduled. You'll receive a performance report after it runs.
+Thanks for advertising with Jaronite News — we'd love to have you back!
 — Jaronite News Inc.`;
 }
 
@@ -476,11 +476,11 @@ function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
 function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#27ae60;">✅ Payment received — your ad is confirmed!</h2>
+  <h2 style="color:#27ae60;">✅ Payment received — thank you!</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>We received your payment of <strong>${Number(amount).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
-     (${slotLabel}, ${bid.target_date}). Your ad is confirmed and will run as scheduled.</p>
-  <p>After your ad runs you'll receive a performance report with impressions, clicks, and your final cost.</p>
+  <p>We've received your payment of <strong>${Number(amount).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
+     (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.</p>
+  <p>Thanks for advertising with Jaronite News — we'd love to have you back!</p>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
 </div>`;
 }
