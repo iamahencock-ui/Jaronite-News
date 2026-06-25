@@ -517,7 +517,7 @@ const SLOT_LABELS = { 1: 'Bottom Leaderboard (728×90)', 2: 'Left Skyscraper (16
 const FIRM_PAY_NAME = 'JaroniteNews';
 
 // Minimum accepted bid, in ℐ per view. Enforced server-side on every bid.
-const MIN_BID_PER_VIEW = 0.5;
+const MIN_BID_PER_VIEW = 5.0;
 
 /**
  * Compute what a winning advertiser owes: the per-view rate (bid_amount)
