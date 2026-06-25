@@ -769,6 +769,24 @@ async function computeAmountOwed(env, bid) {
   return { views, total };
 }
 __name(computeAmountOwed, "computeAmountOwed");
+var LATE_AFTER_DAYS = 3;
+function winnerStage(bid) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (bid.payment_status === "paid") return "paid";
+  if (bid.payment_status === "overpaid") return "overpaid";
+  if (bid.payment_status === "underpaid") return "underpaid";
+  if (bid.status === "pending") return "pending";
+  if (bid.status === "lost") return "lost";
+  if (!bid.invoiced_at) {
+    return bid.target_date >= today ? "won" : "awaiting_invoice";
+  }
+  const invoicedDay = String(bid.invoiced_at).slice(0, 10);
+  const daysSince = Math.floor(
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${invoicedDay}T00:00:00Z`)) / 864e5
+  );
+  return daysSince >= LATE_AFTER_DAYS ? "late" : "unpaid";
+}
+__name(winnerStage, "winnerStage");
 var rateLimitStore = /* @__PURE__ */ new Map();
 function isRateLimited(key, maxCalls, windowMs) {
   const now = Date.now();
@@ -2021,12 +2039,22 @@ var index_default = {
                 b.target_date, b.slot_number, b.status AS bid_status,
                 b.payment_status, b.payment_amount_received,
                 b.payment_txn_id, b.payment_received_at,
-                b.email, b.discord_username, b.notified_at
+                b.email, b.discord_username, b.notified_at,
+                b.amount_owed, b.invoiced_at
          FROM ad_bids b
          WHERE b.status = 'won' AND b.target_date BETWEEN ? AND ?
          ORDER BY b.target_date DESC, b.slot_number`
       ).bind(from, to).all();
-      return new Response(JSON.stringify(rows.results || []), {
+      const withStage = (rows.results || []).map((r) => ({
+        ...r,
+        stage: winnerStage({
+          status: r.bid_status,
+          payment_status: r.payment_status,
+          invoiced_at: r.invoiced_at,
+          target_date: r.target_date
+        })
+      }));
+      return new Response(JSON.stringify(withStage), {
         headers: { "Content-Type": "application/json", ...securityHeaders() }
       });
     }

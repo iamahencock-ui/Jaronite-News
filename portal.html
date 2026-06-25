@@ -1891,6 +1891,24 @@
 
   // ---------- winner notifications (editor/admin) ----------
 
+  // Display style for each derived lifecycle stage returned by the API.
+  const AD_STAGE_STYLE = {
+    pending:          { label: 'Pending',          bg: '#3a3a4a', fg: '#cfcfe0' },
+    won:              { label: 'Won — scheduled',  bg: '#1e3a5f', fg: '#7db4ff' },
+    awaiting_invoice: { label: 'Awaiting invoice', bg: '#4a4020', fg: '#e6c860' },
+    unpaid:           { label: 'Unpaid',           bg: '#4a3a18', fg: '#f0b84a' },
+    late:             { label: 'Late',             bg: '#5a1f18', fg: '#ff7a60' },
+    underpaid:        { label: 'Underpaid',        bg: '#4a3a18', fg: '#f0b84a' },
+    overpaid:         { label: 'Overpaid',         bg: '#1f4a2a', fg: '#7fdca0' },
+    paid:             { label: 'Paid',             bg: '#1f4a2a', fg: '#7fdca0' },
+    lost:             { label: 'Lost',             bg: '#2a2a2a', fg: '#888' },
+  };
+
+  function adStagePill(stage) {
+    const s = AD_STAGE_STYLE[stage] || { label: stage || 'Unknown', bg: '#3a3a4a', fg: '#cfcfe0' };
+    return `<span style="display:inline-block; padding:2px 9px; border-radius:999px; font-size:0.72rem; font-weight:600; background:${s.bg}; color:${s.fg};">${escapeHtml(s.label)}</span>`;
+  }
+
   async function loadWinnerNotifications() {
     const container = document.getElementById('ad-notify-list');
     const from = document.getElementById('ad-report-from').value;
@@ -1921,6 +1939,8 @@
               <th style="padding:8px 10px;">Date</th>
               <th style="padding:8px 10px;">Slot</th>
               <th style="padding:8px 10px;">Advertiser</th>
+              <th style="padding:8px 10px;">Status</th>
+              <th style="padding:8px 10px; text-align:right;">Owed</th>
               <th style="padding:8px 10px;">Email</th>
               <th style="padding:8px 10px;">Discord</th>
               <th style="padding:8px 10px;">Notified</th>
@@ -1933,6 +1953,8 @@
                 <td style="padding:8px 10px;">${escapeHtml(r.target_date)}</td>
                 <td style="padding:8px 10px;">Slot ${r.slot_number}</td>
                 <td style="padding:8px 10px;">${escapeHtml(r.advertiser_name)}</td>
+                <td style="padding:8px 10px;">${adStagePill(r.stage)}</td>
+                <td style="padding:8px 10px; text-align:right;">${r.amount_owed != null ? Number(r.amount_owed).toFixed(2) + ' J' : '—'}</td>
                 <td style="padding:8px 10px; color:#888;">${escapeHtml(r.email || '—')}</td>
                 <td style="padding:8px 10px; color:#888;">${escapeHtml(r.discord_username || '—')}</td>
                 <td style="padding:8px 10px;" class="ad-notify-status">${r.notified_at

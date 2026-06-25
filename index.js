@@ -434,6 +434,45 @@ async function computeAmountOwed(env, bid) {
   return { views, total };
 }
 
+// An unpaid invoice becomes "late" this many days after it was sent.
+const LATE_AFTER_DAYS = 3;
+
+/**
+ * Derive a single human-facing lifecycle stage for a bid/winner from the raw
+ * status, payment_status, and dates. Kept derived (not stored) so it can never
+ * drift out of sync with the underlying columns. Returns one of:
+ *   pending | lost | won | awaiting_invoice | unpaid | late |
+ *   underpaid | overpaid | paid
+ * @param {object} bid - needs { status, payment_status, invoiced_at, target_date }
+ * @returns {string}
+ */
+function winnerStage(bid) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Once money has arrived, the payment outcome is the stage.
+  if (bid.payment_status === 'paid') return 'paid';
+  if (bid.payment_status === 'overpaid') return 'overpaid';
+  if (bid.payment_status === 'underpaid') return 'underpaid';
+
+  // Otherwise fall back to the bid lifecycle.
+  if (bid.status === 'pending') return 'pending';
+  if (bid.status === 'lost') return 'lost';
+
+  // status === 'won' and not yet paid.
+  if (!bid.invoiced_at) {
+    // Won but no invoice yet: still scheduled to run, or just finished and
+    // waiting for the nightly invoice job.
+    return (bid.target_date >= today) ? 'won' : 'awaiting_invoice';
+  }
+
+  // Invoiced and still outstanding — "late" once past the grace window.
+  const invoicedDay = String(bid.invoiced_at).slice(0, 10);
+  const daysSince = Math.floor(
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${invoicedDay}T00:00:00Z`)) / 86400000
+  );
+  return daysSince >= LATE_AFTER_DAYS ? 'late' : 'unpaid';
+}
+
 // ---------- in-memory rate limiting ----------
 //
 // Simple token-bucket per key (IP-based for login; user-id-based for comments).
@@ -2290,12 +2329,23 @@ export default {
                 b.target_date, b.slot_number, b.status AS bid_status,
                 b.payment_status, b.payment_amount_received,
                 b.payment_txn_id, b.payment_received_at,
-                b.email, b.discord_username, b.notified_at
+                b.email, b.discord_username, b.notified_at,
+                b.amount_owed, b.invoiced_at
          FROM ad_bids b
          WHERE b.status = 'won' AND b.target_date BETWEEN ? AND ?
          ORDER BY b.target_date DESC, b.slot_number`
       ).bind(from, to).all();
-      return new Response(JSON.stringify(rows.results || []), {
+      // Attach a single derived lifecycle stage per winner for display.
+      const withStage = (rows.results || []).map(r => ({
+        ...r,
+        stage: winnerStage({
+          status: r.bid_status,
+          payment_status: r.payment_status,
+          invoiced_at: r.invoiced_at,
+          target_date: r.target_date,
+        }),
+      }));
+      return new Response(JSON.stringify(withStage), {
         headers: { 'Content-Type': 'application/json', ...securityHeaders() }
       });
     }
