@@ -2063,6 +2063,101 @@ export default {
     }
     // ----------------------------------------------------------------
 
+    // GET /api/ads/discord/login  — public
+    // Start the advertiser Discord verification: redirect to Discord's OAuth
+    // consent screen (identify scope only). On return we check server
+    // membership with the bot. `state` is echoed back for CSRF protection.
+    if (url.pathname === '/api/ads/discord/login' && request.method === 'GET') {
+      const state = url.searchParams.get('state') || '';
+      const redirectUri = `${url.origin}/api/ads/discord/callback`;
+      const discordUrl = new URL('https://discord.com/oauth2/authorize');
+      discordUrl.searchParams.set('client_id', env.DISCORD_CLIENT_ID);
+      discordUrl.searchParams.set('redirect_uri', redirectUri);
+      discordUrl.searchParams.set('response_type', 'code');
+      discordUrl.searchParams.set('scope', 'identify');
+      discordUrl.searchParams.set('state', state);
+      discordUrl.searchParams.set('prompt', 'consent');
+      return Response.redirect(discordUrl.toString(), 302);
+    }
+
+    // GET /api/ads/discord/callback  — public
+    // Discord redirects here with ?code=. Exchange it, fetch the user's
+    // identity, then check (via the bot) whether they're a member of our
+    // guild. If they are, mint a short-lived verification token and bounce
+    // back to /advertise with it. If not, bounce back asking them to join.
+    if (url.pathname === '/api/ads/discord/callback' && request.method === 'GET') {
+      pruneRateLimitStore();
+      if (isRateLimited(`ads_oauth:${clientIp}`, 20, 60_000)) {
+        return Response.redirect(`${url.origin}/advertise#ad_error=rate_limited`, 302);
+      }
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state') || '';
+      const st = `&state=${encodeURIComponent(state)}`;
+      if (!code) return Response.redirect(`${url.origin}/advertise#ad_error=missing_code${st}`, 302);
+      const redirectUri = `${url.origin}/api/ads/discord/callback`;
+
+      let tokenData;
+      try {
+        const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: env.DISCORD_CLIENT_ID,
+            client_secret: env.DISCORD_CLIENT_SECRET,
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirectUri,
+          }).toString(),
+        });
+        tokenData = await tokenRes.json();
+        if (!tokenData.access_token) throw new Error('no access token');
+      } catch (e) {
+        return Response.redirect(`${url.origin}/advertise#ad_error=token_exchange${st}`, 302);
+      }
+
+      let profile;
+      try {
+        const pRes = await fetch('https://discord.com/api/users/@me', {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        profile = await pRes.json();
+        if (!profile.id) throw new Error('no id');
+      } catch (e) {
+        return Response.redirect(`${url.origin}/advertise#ad_error=profile${st}`, 302);
+      }
+      const displayName = profile.global_name || profile.username;
+
+      // Membership check via the bot: GET the member by id in our guild.
+      // 200 = member, 404 = not a member.
+      const guildId = env.DISCORD_GUILD_ID;
+      const botToken = env.DISCORD_BOT_TOKEN;
+      if (!guildId || !botToken) {
+        return Response.redirect(`${url.origin}/advertise#ad_error=server_not_configured${st}`, 302);
+      }
+      let isMember = false;
+      try {
+        const mRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${profile.id}`, {
+          headers: { Authorization: `Bot ${botToken}` },
+        });
+        isMember = mRes.ok;
+      } catch (e) {
+        isMember = false;
+      }
+      if (!isMember) {
+        return Response.redirect(`${url.origin}/advertise#ad_join=1${st}`, 302);
+      }
+
+      // Member confirmed — mint a short-lived verification token.
+      const vToken = newSessionToken();
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      await env.DB.prepare(
+        `INSERT INTO ad_verifications (token, discord_id, discord_username, expires_at) VALUES (?, ?, ?, ?)`
+      ).bind(vToken, profile.id, displayName, expiresAt).run();
+
+      const frag = `ad_verify=${vToken}&u=${encodeURIComponent(displayName)}${st}`;
+      return Response.redirect(`${url.origin}/advertise#${frag}`, 302);
+    }
+
     // GET /api/ads/bids?date=YYYY-MM-DD&slot=1  — public
     // Returns top 3 current bids for a given date+slot so advertisers can
     // see what they need to beat. Advertiser names are shown, contacts hidden.
@@ -2078,7 +2173,7 @@ export default {
         `SELECT advertiser_name, bid_amount, created_at
          FROM ad_bids
          WHERE target_date = ? AND slot_number = ? AND status = 'pending'
-           AND email_verified_at IS NOT NULL AND discord_verified_at IS NOT NULL
+           AND discord_verified_at IS NOT NULL
          ORDER BY bid_amount DESC, id ASC
          LIMIT 3`
       ).bind(date, slot).all();
@@ -2088,9 +2183,11 @@ export default {
     }
 
     // POST /api/ads/bid  — public, no auth required
-    // Body: { advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number }
-    // Public self-serve bidding: email AND discord_username are required, and
-    // the bid only competes once both are confirmed via the links we send.
+    // Body: { advertiser_name, email?, image_url, dest_url, bid_amount, target_date, slot_number, verify_token }
+    // Public self-serve bidding: the bidder must first verify their Discord
+    // account AND server membership via /api/ads/discord/login, which yields a
+    // verify_token. Email is optional (for notifications). The Discord handle
+    // (and contact) come from the verified identity, never client input.
     if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
       // Rate limit: this endpoint is unauthenticated and feeds the auto-award
       // cron, so cap submissions per IP to stop flooding / bid-stuffing.
@@ -2101,26 +2198,34 @@ export default {
 
       let body;
       try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
-      const { advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number } = body;
+      const { advertiser_name, email, image_url, dest_url, bid_amount, target_date, slot_number, verify_token } = body;
 
-      if (!advertiser_name || !contact || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
+      if (!advertiser_name || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
         return secureJson({ error: 'Missing required fields' }, { status: 400 });
       }
-      // Email + Discord are now mandatory — they're how we confirm the bidder.
-      if (!email || !discord_username) {
-        return secureJson({ error: 'A valid email and Discord username are required so we can confirm your bid.' }, { status: 400 });
-      }
 
-      // --- Length caps on free-text fields (defence against oversized payloads) ---
+      // --- Discord verification (required): resolve the verified identity from
+      //     the token minted by the OAuth + server-membership check. ---
+      if (!verify_token) {
+        return secureJson({ error: 'Please verify your Discord account before bidding.' }, { status: 400 });
+      }
+      const verification = await env.DB.prepare(
+        `SELECT discord_id, discord_username, expires_at FROM ad_verifications WHERE token = ?`
+      ).bind(String(verify_token)).first();
+      if (!verification || new Date(verification.expires_at) < new Date()) {
+        return secureJson({ error: 'Your Discord verification has expired — please reconnect Discord and try again.' }, { status: 400 });
+      }
+      const dsc = String(verification.discord_username).slice(0, 100);
+      const con = dsc; // contact = the verified Discord handle (no separate field)
+
+      // --- Email is optional now; validate only if provided. ---
+      const eml = email ? String(email).trim() : '';
       const adv = String(advertiser_name).trim();
-      const con = String(contact).trim();
-      const eml = String(email).trim();
-      const dsc = String(discord_username).trim();
       if (adv.length < 1 || adv.length > 100) return secureJson({ error: 'advertiser_name must be 1–100 characters' }, { status: 400 });
-      if (con.length < 1 || con.length > 100) return secureJson({ error: 'contact must be 1–100 characters' }, { status: 400 });
-      if (eml.length < 1 || eml.length > 254) return secureJson({ error: 'email is required and must be under 254 characters' }, { status: 400 });
-      if (dsc.length < 1 || dsc.length > 100) return secureJson({ error: 'Discord username is required and must be under 100 characters' }, { status: 400 });
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: 'email is not a valid address' }, { status: 400 });
+      if (eml) {
+        if (eml.length > 254) return secureJson({ error: 'email is too long' }, { status: 400 });
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: 'email is not a valid address' }, { status: 400 });
+      }
 
       // --- Image: must be an uploaded image as a data: URL (allowlisted MIME
       //     types only — no SVG, so no embedded script). The advertise form
@@ -2159,78 +2264,20 @@ export default {
         return secureJson({ error: 'bid_amount exceeds the maximum allowed' }, { status: 400 });
       }
 
-      // Generate the two confirmation tokens up front so we can store them and
-      // build the links. The bid is inserted as 'pending' but unverified; the
-      // award cron skips it until both *_verified_at are set.
-      const emailToken = newSessionToken();
-      const discordToken = newSessionToken();
-
+      // Insert the bid already verified (Discord OAuth + membership happened
+      // before submission), so it competes immediately. Contact is the verified
+      // Discord handle; email may be null.
       const inserted = await env.DB.prepare(
-        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number, email_token, discord_token)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(adv, con, eml, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number), emailToken, discordToken).run();
-
-      const bidObj = { id: inserted.meta.last_row_id, advertiser_name: adv, target_date, slot_number: Number(slot_number) };
-      const slotLabel = SLOT_LABELS[Number(slot_number)] || `Slot ${slot_number}`;
-      const emailLink = `${url.origin}/api/ads/confirm-email?token=${emailToken}`;
-      const discordLink = `${url.origin}/api/ads/confirm-discord?token=${discordToken}`;
-
-      // Dispatch both confirmation links. Capture results so we can tell the
-      // bidder if a channel couldn't be reached (e.g. unknown Discord handle).
-      const emailRes = await sendEmail(env, {
-        to: eml,
-        subject: `Confirm your Jaronite News ad bid (#${bidObj.id})`,
-        html: confirmEmailHtml(bidObj, slotLabel, emailLink),
-      });
-      const discordRes = await sendDiscordDm(env, dsc, confirmDiscordMsg(bidObj, slotLabel, discordLink));
+        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number, discord_verified_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      ).bind(adv, con, eml || null, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number)).run();
 
       return secureJson({
         ok: true,
-        bid_id: bidObj.id,
-        email_sent: !!emailRes.ok,
-        discord_sent: !!discordRes.ok,
-        message: 'Bid received! Check your email and your Discord DMs for two confirmation links. Your bid only competes once BOTH are confirmed.',
-        email_note: emailRes.ok ? null : (emailRes.skipped || emailRes.error),
-        discord_note: discordRes.ok ? null : (discordRes.skipped || discordRes.error),
+        bid_id: inserted.meta.last_row_id,
+        verified_as: dsc,
+        message: `Bid received and verified as ${dsc}! It now competes for its slot — highest ℐ/view bid wins.`,
       });
-    }
-
-    // GET /api/ads/confirm-email?token=...  — public
-    // Advertiser clicks the link we emailed; stamps email_verified_at.
-    if (url.pathname === '/api/ads/confirm-email' && request.method === 'GET') {
-      const token = url.searchParams.get('token');
-      if (!token) return adConfirmPage('Invalid link', 'This confirmation link is missing its token.', false);
-      const bid = await env.DB.prepare(
-        `SELECT id, email_verified_at, discord_verified_at FROM ad_bids WHERE email_token = ?`
-      ).bind(token).first();
-      if (!bid) return adConfirmPage('Link not found', 'This confirmation link is invalid or has already been used.', false);
-
-      if (!bid.email_verified_at) {
-        await env.DB.prepare(`UPDATE ad_bids SET email_verified_at = datetime('now') WHERE id = ?`).bind(bid.id).run();
-      }
-      const bothDone = bid.discord_verified_at; // discord side already done?
-      return adConfirmPage('Email confirmed ✅', bothDone
-        ? 'Your email is confirmed and both checks are complete — your bid is now active and will compete for its slot.'
-        : 'Your email is confirmed. Now confirm your <strong>Discord</strong> account (check your DMs from our bot) to activate your bid.');
-    }
-
-    // GET /api/ads/confirm-discord?token=...  — public
-    // Advertiser clicks the link we DM'd; stamps discord_verified_at.
-    if (url.pathname === '/api/ads/confirm-discord' && request.method === 'GET') {
-      const token = url.searchParams.get('token');
-      if (!token) return adConfirmPage('Invalid link', 'This confirmation link is missing its token.', false);
-      const bid = await env.DB.prepare(
-        `SELECT id, email_verified_at, discord_verified_at FROM ad_bids WHERE discord_token = ?`
-      ).bind(token).first();
-      if (!bid) return adConfirmPage('Link not found', 'This confirmation link is invalid or has already been used.', false);
-
-      if (!bid.discord_verified_at) {
-        await env.DB.prepare(`UPDATE ad_bids SET discord_verified_at = datetime('now') WHERE id = ?`).bind(bid.id).run();
-      }
-      const bothDone = bid.email_verified_at; // email side already done?
-      return adConfirmPage('Discord confirmed ✅', bothDone
-        ? 'Your Discord account is confirmed and both checks are complete — your bid is now active and will compete for its slot.'
-        : 'Your Discord account is confirmed. Now confirm your <strong>email</strong> (check your inbox) to activate your bid.');
     }
 
     // GET /api/ads/current
@@ -2836,7 +2883,7 @@ export default {
         const winner = await env.DB.prepare(
           `SELECT * FROM ad_bids
            WHERE target_date = ? AND slot_number = ? AND status = 'pending'
-             AND email_verified_at IS NOT NULL AND discord_verified_at IS NOT NULL
+             AND discord_verified_at IS NOT NULL
            ORDER BY bid_amount DESC, id ASC LIMIT 1`
         ).bind(targetDate, slot).first();
 
@@ -2898,6 +2945,9 @@ export default {
         `UPDATE ad_bids SET status = 'lost'
          WHERE target_date <= ? AND status = 'pending'`
       ).bind(today).run();
+
+      // 1b) Prune expired advertiser Discord-verification tokens.
+      await env.DB.prepare(`DELETE FROM ad_verifications WHERE expires_at < datetime('now')`).run();
 
       // 2) Invoice ads that have finished running. Billing is per-view, so we
       //    wait until after the run date (target_date < today), compute

@@ -399,21 +399,21 @@
     </div>
 
     <div class="form-group">
-      <label>Contact (Discord tag or in-game name)</label>
-      <input type="text" id="f-contact" placeholder="e.g. username#0000 or YourIGN">
-      <div class="hint">We'll use this to notify you if you win, and for billing.</div>
+      <label>Discord Verification <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(required)</span></label>
+      <div id="verify-box">
+        <button type="button" id="verify-btn" onclick="startDiscordVerify()"
+          style="display:inline-flex;align-items:center;gap:8px;background:#5865F2;color:#fff;border:none;padding:11px 20px;border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;">
+          <svg width="18" height="14" viewBox="0 0 127.14 96.36" fill="#fff"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+          Connect Discord to bid
+        </button>
+      </div>
+      <div class="hint">We verify your Discord account and that you're a member of our server. Bidding stays locked until you're verified.</div>
     </div>
 
     <div class="form-group">
-      <label>Email Address <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(required)</span></label>
-      <input type="email" id="f-email" placeholder="you@example.com" required>
-      <div class="hint">We'll send a confirmation link here. You must confirm it before your bid can compete. Also used for win notifications, invoices, and reports. Never shared or used for marketing.</div>
-    </div>
-
-    <div class="form-group">
-      <label>Discord Username <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(required)</span></label>
-      <input type="text" id="f-discord" placeholder="e.g. yourname or yourname#1234" required>
-      <div class="hint">Our bot will DM you a confirmation link — you must confirm it before your bid can compete. You must be a member of the DemocracyCraft Discord so the bot can reach you.</div>
+      <label>Email Address <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(optional)</span></label>
+      <input type="email" id="f-email" placeholder="you@example.com">
+      <div class="hint">Optional — if provided, we'll also send win notifications, invoices, and reports here. We always reach you on Discord regardless. Never shared or used for marketing.</div>
     </div>
 
     <div class="form-group">
@@ -540,6 +540,61 @@
   // Holds the base64 data URL of the uploaded image
   let uploadedImageDataUrl = null;
 
+  // ── Discord verification (OAuth + server membership) ────────────────────────
+  let adVerifyToken = null;   // set once Discord is verified; required to bid
+
+  function startDiscordVerify() {
+    const state = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+    sessionStorage.setItem('ad_verify_state', state);
+    window.location.href = '/api/ads/discord/login?state=' + encodeURIComponent(state);
+  }
+
+  function setVerified(username) {
+    const box = document.getElementById('verify-box');
+    if (!box) return;
+    box.innerHTML = `<div style="display:inline-flex;align-items:center;gap:8px;background:#1f4a2a;color:#7fdca0;padding:10px 16px;border-radius:8px;font-weight:600;">
+        ✓ Verified as ${escStr(username)}
+      </div>
+      <button type="button" onclick="startDiscordVerify()" style="margin-left:10px;background:none;border:none;color:#9b7fd0;cursor:pointer;font-size:0.85rem;text-decoration:underline;">switch account</button>`;
+  }
+
+  function showJoinPrompt() {
+    const box = document.getElementById('verify-box');
+    if (!box) return;
+    box.innerHTML = `<div style="background:#3a2a18;border:1px solid #6a4a1a;border-radius:8px;padding:14px 16px;color:#f0c060;">
+        <strong>You're not in our Discord server yet.</strong><br>
+        <span style="color:#d8c090;font-size:0.9rem;">Advertisers must be a member so we can reach you. Join, then verify again.</span>
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+          <a href="https://discord.gg/4Gu4ybqDdg" target="_blank" rel="noopener noreferrer"
+             style="background:#5865F2;color:#fff;text-decoration:none;padding:9px 18px;border-radius:8px;font-weight:600;font-size:0.9rem;">Join the server</a>
+          <button type="button" onclick="startDiscordVerify()"
+             style="background:#2a2a4a;color:#e0dff0;border:1px solid #3a3a5a;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:0.9rem;">I've joined — verify again</button>
+        </div>
+      </div>`;
+  }
+
+  // On load, consume any verification result handed back in the URL fragment.
+  function consumeAdVerifyFragment() {
+    if (!location.hash || location.hash.length < 2) return;
+    const params = new URLSearchParams(location.hash.slice(1));
+    const returnedState = params.get('state');
+    const expectedState = sessionStorage.getItem('ad_verify_state');
+    const stateOk = returnedState && expectedState && returnedState === expectedState;
+
+    if (params.has('ad_verify') && stateOk) {
+      adVerifyToken = params.get('ad_verify');
+      setVerified(params.get('u') || 'your Discord');
+    } else if (params.has('ad_join') && stateOk) {
+      showJoinPrompt();
+    } else if (params.has('ad_error')) {
+      const notice = document.getElementById('form-notice');
+      if (notice) { notice.className = 'form-notice error'; notice.textContent = 'Discord verification failed (' + params.get('ad_error') + '). Please try again.'; }
+    }
+    if (stateOk || params.has('ad_error')) sessionStorage.removeItem('ad_verify_state');
+    // Strip the fragment so it isn't reprocessed on refresh.
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+
   function handleImageUpload(input) {
     const box = document.getElementById('ad-preview-box');
     const file = input.files[0];
@@ -578,9 +633,7 @@
     notice.textContent = '';
 
     const name    = document.getElementById('f-name').value.trim();
-    const contact = document.getElementById('f-contact').value.trim();
     const email   = document.getElementById('f-email').value.trim();
-    const discord_username = document.getElementById('f-discord').value.trim();
     const image   = uploadedImageDataUrl;
     const dest    = document.getElementById('f-dest').value.trim();
     const date    = document.getElementById('f-date').value;
@@ -588,10 +641,14 @@
     const slot    = SLOT_INFO[slotType].slot_number;
     const bid     = parseFloat(document.getElementById('f-bid').value);
 
-    if (!name || !contact || !email || !discord_username || !image || !dest || !date || !bid || bid < 0.01) {
-      // image here means uploadedImageDataUrl
+    if (!adVerifyToken) {
       notice.className = 'form-notice error';
-      notice.textContent = 'Please fill in all fields (email and Discord username are required) with valid values.';
+      notice.innerHTML = 'Please connect and verify your Discord account first (the button above).';
+      return;
+    }
+    if (!name || !image || !dest || !date || !bid || bid < 0.01) {
+      notice.className = 'form-notice error';
+      notice.textContent = 'Please fill in your name, ad image, destination URL, date, slot, and a valid bid.';
       return;
     }
 
@@ -604,9 +661,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           advertiser_name: name,
-          contact,
-          email,
-          discord_username,
+          email,                 // optional
+          verify_token: adVerifyToken,
           image_url: image,
           dest_url: dest,
           bid_amount: bid,
@@ -617,14 +673,9 @@
       const data = await res.json();
       if (res.ok && data.ok) {
         notice.className = 'form-notice success';
-        let confirmMsg = `✓ Bid received! Check your <strong>email</strong> and your <strong>Discord DMs</strong> for two confirmation links — your bid only competes once you confirm BOTH.`;
-        const warns = [];
-        if (data.email_sent === false) warns.push(`we couldn't send the confirmation email (${data.email_note || 'unknown reason'})`);
-        if (data.discord_sent === false) warns.push(`we couldn't DM you on Discord (${data.discord_note || 'unknown reason'}) — make sure you've joined our server and allow DMs`);
-        if (warns.length) confirmMsg += `<br><span style="color:#c97a2a;">Heads up: ${warns.join('; ')}. Contact us on Discord if you don't get both links.</span>`;
-        notice.innerHTML = confirmMsg;
-        // Reset form
-        ['f-name','f-contact','f-email','f-discord','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
+        notice.innerHTML = `✓ ${data.message || 'Bid received and verified!'} Good luck!`;
+        // Reset the bid fields (keep the Discord verification so they can bid again)
+        ['f-name','f-email','f-dest','f-bid'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         uploadedImageDataUrl = null;
         document.getElementById('ad-preview-box').innerHTML = '<div class="ad-preview-placeholder">Preview will appear here</div>';
         loadBidBoard(); // refresh board after bid submitted
@@ -712,6 +763,7 @@
 
   onSlotTypeChange(); // init preview box size and labels on load
   loadBidBoard();        // load initial bid board
+  consumeAdVerifyFragment(); // pick up Discord verification result from the URL
   renderReaderAuthWidget(document.getElementById('reader-auth'));
   try { const s = JSON.parse(localStorage.getItem('jni_reader_settings')||'{}'); if(s.dark) document.body.classList.add('reader-dark-mode'); } catch{}
 </script>

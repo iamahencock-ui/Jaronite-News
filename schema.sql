@@ -275,3 +275,20 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_delivery_id ON webhook_deliveries(delivery_id);
+
+-- ============================================================
+-- Advertiser Discord verification (public self-serve bidding).
+-- When someone connects their Discord via OAuth on the /advertise page and
+-- is confirmed to be a member of our server, we store a short-lived token
+-- here. The bid form sends that token; the bid endpoint trusts the
+-- server-side discord identity recorded here (never client-supplied input).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ad_verifications (
+  token TEXT PRIMARY KEY,
+  discord_id TEXT NOT NULL,          -- verified Discord user id (snowflake)
+  discord_username TEXT NOT NULL,    -- verified Discord display/global name
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL       -- token good for ~30 min after OAuth
+);
+
+CREATE INDEX IF NOT EXISTS idx_ad_verifications_expires ON ad_verifications(expires_at);
