@@ -87,3 +87,23 @@
 
 <footer class="site-footer">
   © 2026 Jaronite News Inc. — Covering DemocracyCraft with Integrity ·
+  <a href="/advertise" class="nav-advertise-btn">📢 Advertise</a>
+      <a href="/favorites" class="nav-favorites-btn">♡ Favorites</a>
+      <a href="/portal">Staff Portal</a>
+</footer>
+
+<script src="/reader.js"></script>
+<script>
+  // Render the reader auth widget. renderReaderAuthWidget() also consumes the
+  // Discord login token from the URL fragment after the OAuth round-trip — the
+  // callback redirects back here to "/", so this is what actually persists the
+  // login. Without it, logging in never sticks (the token is dropped).
+  renderReaderAuthWidget(document.getElementById('reader-auth'));
+  try {
+    const s = JSON.parse(localStorage.getItem('jni_reader_settings') || '{}');
+    if (s.dark) document.body.classList.add('reader-dark-mode');
+  } catch {}
+</script>
+
+</body>
+</html>
