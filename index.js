@@ -374,6 +374,54 @@ function invoiceEmailHtml(bid, slotLabel, views, total) {
 </div>`;
 }
 
+// Sent when a payment arrives but doesn't cover the full invoice — acknowledges
+// what was received and asks for the remaining balance.
+function underpaidDiscordMsg(bid, slotLabel, owed, paid, remaining) {
+  const owedStr = Number(owed).toFixed(2);
+  const paidStr = Number(paid).toFixed(2);
+  const remainingStr = Number(remaining).toFixed(2);
+  return `⚠️ **Partial payment received — balance still due**
+
+Hi **${bid.advertiser_name}** — thanks, we've received **${paidStr} ℐ** toward your ad in the **${slotLabel}** slot on **${bid.target_date}**.
+
+• Invoice total: **${owedStr} ℐ**
+• Paid so far: **${paidStr} ℐ**
+• **Remaining: ${remainingStr} ℐ**
+
+Please send the rest to settle your invoice:
+\`\`\`
+/pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.id}
+\`\`\`
+Keep \`bid:${bid.id}\` in the memo so we match your payment automatically.
+— Jaronite News Inc.`;
+}
+
+function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
+  const owedStr = Number(owed).toFixed(2);
+  const paidStr = Number(paid).toFixed(2);
+  const remainingStr = Number(remaining).toFixed(2);
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#e67e22;">⚠️ Partial payment received — balance due</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>Thanks — we've received <strong>${paidStr} ℐ</strong> toward your ad in the <strong>${slotLabel}</strong>
+     slot on <strong>${bid.target_date}</strong>, but that doesn't yet cover the full invoice.</p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin:8px 0 16px;">
+    <tr><td style="padding:6px 0;color:#666;">Invoice total</td><td style="text-align:right;"><strong>${owedStr} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Paid so far</td><td style="text-align:right;"><strong>${paidStr} ℐ</strong></td></tr>
+    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Remaining</strong></td><td style="text-align:right;"><strong style="color:#e67e22;font-size:1.1em;">${remainingStr} ℐ</strong></td></tr>
+  </table>
+  <h3 style="color:#e67e22;">Pay the remaining balance</h3>
+  <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
+    /pay ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.id}
+  </div>
+  <p style="color:#666;font-size:0.9em;">
+    Keep <strong>bid:${bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
+  </p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+</div>`;
+}
+
 function paymentConfirmedEmailHtml(bid, slotLabel, amount) {
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
@@ -2254,18 +2302,25 @@ export default {
         amountOwed = owed.total;
       }
 
-      // Determine payment status against the amount owed.
-      let paymentStatus;
+      // Accumulate payments. Partial payers can top up over several transfers,
+      // so we add this payment to whatever they've already sent rather than
+      // overwriting — that's what lets an 'underpaid' bid become 'paid' once
+      // the balance is covered.
       const tolerance = 0.01; // float rounding tolerance
-      if (Math.abs(amount - amountOwed) <= tolerance) {
-        paymentStatus = 'paid';
-      } else if (amount > amountOwed) {
-        paymentStatus = 'overpaid';
+      const prevPaid = Number(bid.payment_amount_received) || 0;
+      const totalPaid = Math.round((prevPaid + amount) * 100) / 100;
+      const remaining = Math.round((amountOwed - totalPaid) * 100) / 100;
+
+      // Determine payment status against the CUMULATIVE amount paid.
+      // Overpayment is intentionally treated as fully settled — we keep the
+      // surplus (no refund logic).
+      let paymentStatus;
+      if (totalPaid + tolerance >= amountOwed) {
+        paymentStatus = (totalPaid - amountOwed > tolerance) ? 'overpaid' : 'paid';
       } else {
         paymentStatus = 'underpaid';
       }
 
-      // Update bid with payment details
       await env.DB.prepare(
         `UPDATE ad_bids
          SET payment_status = ?,
@@ -2273,22 +2328,34 @@ export default {
              payment_amount_received = ?,
              payment_received_at = datetime('now')
          WHERE id = ?`
-      ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), amount, bidId).run();
+      ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), totalPaid, bidId).run();
 
-      console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (owed ${amountOwed}, received ${amount})`);
+      console.log(`DC webhook: bid ${bidId} marked ${paymentStatus} (owed ${amountOwed}, paid ${totalPaid} this txn ${amount})`);
 
-      // Send payment confirmation (email + Discord DM)
+      const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
       if (paymentStatus === 'paid' || paymentStatus === 'overpaid') {
-        const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+        // Fully settled (we keep any overpayment) — send the confirmation.
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
             subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
-            html: paymentConfirmedEmailHtml(bid, slotLabelPay, amount),
+            html: paymentConfirmedEmailHtml(bid, slotLabelPay, totalPaid),
           });
         }
         if (bid.discord_username) {
-          await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, amount));
+          await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, totalPaid));
+        }
+      } else {
+        // Underpaid — acknowledge what we got and tell them the remaining balance.
+        if (bid.email) {
+          await sendEmail(env, {
+            to: bid.email,
+            subject: `⚠️ Partial payment received — balance due on ad #${bid.id}`,
+            html: underpaidEmailHtml(bid, slotLabelPay, amountOwed, totalPaid, remaining),
+          });
+        }
+        if (bid.discord_username) {
+          await sendDiscordDm(env, bid.discord_username, underpaidDiscordMsg(bid, slotLabelPay, amountOwed, totalPaid, remaining));
         }
       }
 
@@ -2352,11 +2419,11 @@ export default {
 
     // ================================================================
     // POST /api/ads/resend-notification  — editor/admin only
-    // Manually re-send the "you won" notification (email + Discord DM) for a
-    // won bid. Used when the original auto-notification was missed — e.g. a
-    // mistyped Discord username that's since been corrected, or a mail/bot
-    // secret that wasn't configured at award time. Reports per-channel results
-    // so staff can see exactly what happened, and stamps notified_at on success.
+    // Manually re-send the right message for where the bid is in its
+    // lifecycle: the "you won" notice (won/awaiting invoice), the invoice
+    // (unpaid/late), a balance-due notice (underpaid), or the payment receipt
+    // (paid/overpaid). Reports per-channel results so staff can see exactly
+    // what happened.
     // ================================================================
     if (url.pathname === '/api/ads/resend-notification' && request.method === 'POST') {
       const reviewer = await requireEditorOrAdmin(env, request);
@@ -2373,25 +2440,61 @@ export default {
       }
 
       const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
+      const stage = winnerStage({
+        status: bid.status,
+        payment_status: bid.payment_status,
+        invoiced_at: bid.invoiced_at,
+        target_date: bid.target_date,
+      });
+
+      // Choose the message that matches the bid's current stage.
+      let kind, subject, emailHtml, discordMsg;
+      if (stage === 'paid' || stage === 'overpaid') {
+        kind = 'receipt';
+        const paidAmt = Number(bid.payment_amount_received) || 0;
+        subject = `✅ Payment confirmed — Jaronite News ad #${bid.id}`;
+        emailHtml = paymentConfirmedEmailHtml(bid, slotLabel, paidAmt);
+        discordMsg = confirmedDiscordMsg(bid, slotLabel, paidAmt);
+      } else if (stage === 'underpaid') {
+        kind = 'balance due';
+        const owed = (bid.amount_owed != null) ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
+        const paid = Number(bid.payment_amount_received) || 0;
+        const remaining = Math.round((owed - paid) * 100) / 100;
+        subject = `⚠️ Partial payment received — balance due on ad #${bid.id}`;
+        emailHtml = underpaidEmailHtml(bid, slotLabel, owed, paid, remaining);
+        discordMsg = underpaidDiscordMsg(bid, slotLabel, owed, paid, remaining);
+      } else if (stage === 'unpaid' || stage === 'late') {
+        kind = 'invoice';
+        const { views, total } = await computeAmountOwed(env, bid);
+        subject = `🧾 Your Jaronite News ad invoice — ${total.toFixed(2)} ℐ (#${bid.id})`;
+        emailHtml = invoiceEmailHtml(bid, slotLabel, views, total);
+        discordMsg = invoiceDiscordMsg(bid, slotLabel, views, total);
+      } else {
+        // won / awaiting_invoice → the original "you won" notice.
+        kind = 'win notice';
+        subject = `🎉 You won a Jaronite News ad slot for ${bid.target_date}!`;
+        emailHtml = winEmailHtml(bid, slotLabel);
+        discordMsg = winDiscordMsg(bid, slotLabel);
+      }
+
       const emailRes = bid.email
-        ? await sendEmail(env, {
-            to: bid.email,
-            subject: `🎉 You won a Jaronite News ad slot for ${bid.target_date}!`,
-            html: winEmailHtml(bid, slotLabel),
-          })
+        ? await sendEmail(env, { to: bid.email, subject, html: emailHtml })
         : { ok: false, skipped: 'no email on file' };
       const discordRes = bid.discord_username
-        ? await sendDiscordDm(env, bid.discord_username, winDiscordMsg(bid, slotLabel))
+        ? await sendDiscordDm(env, bid.discord_username, discordMsg)
         : { ok: false, skipped: 'no Discord username on file' };
 
-      const notified = emailRes.ok || discordRes.ok;
+      const sentOk = emailRes.ok || discordRes.ok;
+      // Only the "you won" notice updates notified_at — that column specifically
+      // tracks whether the winner was told they won.
+      const notified = sentOk && kind === 'win notice';
       if (notified) {
         await env.DB.prepare(`UPDATE ad_bids SET notified_at = datetime('now') WHERE id = ?`).bind(bidId).run();
       }
       await log(env, reviewer.username, 'RESEND_AD_NOTIFICATION',
-        `Re-sent win notification for bid #${bidId} (${bid.advertiser_name}) — email: ${emailRes.ok ? 'sent' : (emailRes.skipped || emailRes.error)}; discord: ${discordRes.ok ? 'sent' : (discordRes.skipped || discordRes.error)}`);
+        `Re-sent ${kind} for bid #${bidId} (${bid.advertiser_name}) — email: ${emailRes.ok ? 'sent' : (emailRes.skipped || emailRes.error)}; discord: ${discordRes.ok ? 'sent' : (discordRes.skipped || discordRes.error)}`);
 
-      return secureJson({ success: true, notified, email: emailRes, discord: discordRes });
+      return secureJson({ success: true, kind, sent: sentOk, notified, email: emailRes, discord: discordRes });
     }
 
     // /advertise → advertise.html (public bid form)

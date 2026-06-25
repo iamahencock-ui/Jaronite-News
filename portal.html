@@ -1909,6 +1909,15 @@
     return `<span style="display:inline-block; padding:2px 9px; border-radius:999px; font-size:0.72rem; font-weight:600; background:${s.bg}; color:${s.fg};">${escapeHtml(s.label)}</span>`;
   }
 
+  // What the Re-send button will actually send, given the bid's stage —
+  // mirrors the message the server picks in /api/ads/resend-notification.
+  function resendLabel(stage) {
+    if (stage === 'paid' || stage === 'overpaid') return 'Re-send receipt';
+    if (stage === 'underpaid') return 'Re-send balance due';
+    if (stage === 'unpaid' || stage === 'late') return 'Re-send invoice';
+    return 'Re-send win notice';
+  }
+
   async function loadWinnerNotifications() {
     const container = document.getElementById('ad-notify-list');
     const from = document.getElementById('ad-report-from').value;
@@ -1962,8 +1971,8 @@
                   : `<span style="color:#e0a030;">not sent</span>`}</td>
                 <td style="padding:8px 10px; text-align:right;">
                   <button onclick="resendNotification(${r.id}, this)"
-                    style="padding:5px 12px; border-radius:6px; background:#2a2a4a; color:#e0dff0; border:1px solid #3a3a5a; cursor:pointer; font-size:0.8rem;">
-                    Re-send</button>
+                    style="padding:5px 12px; border-radius:6px; background:#2a2a4a; color:#e0dff0; border:1px solid #3a3a5a; cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                    ${resendLabel(r.stage)}</button>
                 </td>
               </tr>`).join('')}
           </tbody>
@@ -1988,10 +1997,10 @@
         if (feedback) feedback.innerHTML = `<span style="color:#e06060;">Bid #${bidId}: ${escapeHtml(data.error)}</span>`;
       } else {
         const fmt = (label, r) => `${label}: ${r.ok ? '✓ sent' : '✗ ' + escapeHtml(r.skipped || r.error || 'failed')}`;
-        const cls = data.notified ? '#4caf50' : '#e0a030';
+        const cls = data.sent ? '#4caf50' : '#e0a030';
         if (feedback) feedback.innerHTML =
-          `<span style="color:${cls};">Bid #${bidId} — ${fmt('email', data.email)}; ${fmt('Discord', data.discord)}</span>`;
-        // Refresh the row's Notified cell if at least one channel succeeded.
+          `<span style="color:${cls};">Bid #${bidId} (${escapeHtml(data.kind || 'notice')}) — ${fmt('email', data.email)}; ${fmt('Discord', data.discord)}</span>`;
+        // Only a win-notice resend updates the Notified column.
         if (data.notified) {
           const cell = document.querySelector(`#ad-notify-row-${bidId} .ad-notify-status`);
           if (cell) cell.innerHTML = `<span style="color:#4caf50;">✓ just now</span>`;
