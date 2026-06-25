@@ -405,15 +405,15 @@
     </div>
 
     <div class="form-group">
-      <label>Email Address</label>
-      <input type="email" id="f-email" placeholder="you@example.com">
-      <div class="hint">We'll send your win notification, payment instructions, and ad performance report here. Never shared or used for marketing.</div>
+      <label>Email Address <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(required)</span></label>
+      <input type="email" id="f-email" placeholder="you@example.com" required>
+      <div class="hint">We'll send a confirmation link here. You must confirm it before your bid can compete. Also used for win notifications, invoices, and reports. Never shared or used for marketing.</div>
     </div>
 
     <div class="form-group">
-      <label>Discord Username <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(optional)</span></label>
-      <input type="text" id="f-discord" placeholder="e.g. yourname or yourname#1234">
-      <div class="hint">If provided, our bot will DM you directly on Discord with win notifications and payment reminders.</div>
+      <label>Discord Username <span style="font-weight:400;font-size:0.85em;color:var(--ink-muted,#888);">(required)</span></label>
+      <input type="text" id="f-discord" placeholder="e.g. yourname or yourname#1234" required>
+      <div class="hint">Our bot will DM you a confirmation link — you must confirm it before your bid can compete. You must be a member of the DemocracyCraft Discord so the bot can reach you.</div>
     </div>
 
     <div class="form-group">
@@ -588,10 +588,10 @@
     const slot    = SLOT_INFO[slotType].slot_number;
     const bid     = parseFloat(document.getElementById('f-bid').value);
 
-    if (!name || !contact || !email || !image || !dest || !date || !bid || bid < 0.01) {
+    if (!name || !contact || !email || !discord_username || !image || !dest || !date || !bid || bid < 0.01) {
       // image here means uploadedImageDataUrl
       notice.className = 'form-notice error';
-      notice.textContent = 'Please fill in all fields with valid values.';
+      notice.textContent = 'Please fill in all fields (email and Discord username are required) with valid values.';
       return;
     }
 
@@ -617,7 +617,12 @@
       const data = await res.json();
       if (res.ok && data.ok) {
         notice.className = 'form-notice success';
-        notice.innerHTML = `✓ Bid received! Winners are notified after 8 PM UTC. Good luck!`;
+        let confirmMsg = `✓ Bid received! Check your <strong>email</strong> and your <strong>Discord DMs</strong> for two confirmation links — your bid only competes once you confirm BOTH.`;
+        const warns = [];
+        if (data.email_sent === false) warns.push(`we couldn't send the confirmation email (${data.email_note || 'unknown reason'})`);
+        if (data.discord_sent === false) warns.push(`we couldn't DM you on Discord (${data.discord_note || 'unknown reason'}) — make sure you've joined our server and allow DMs`);
+        if (warns.length) confirmMsg += `<br><span style="color:#c97a2a;">Heads up: ${warns.join('; ')}. Contact us on Discord if you don't get both links.</span>`;
+        notice.innerHTML = confirmMsg;
         // Reset form
         ['f-name','f-contact','f-email','f-discord','f-image','f-dest','f-bid'].forEach(id => document.getElementById(id).value = '');
         uploadedImageDataUrl = null;

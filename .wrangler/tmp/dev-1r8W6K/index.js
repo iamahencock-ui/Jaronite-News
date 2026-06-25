@@ -671,6 +671,53 @@ function winEmailHtml(bid, slotLabel) {
 </div>`;
 }
 __name(winEmailHtml, "winEmailHtml");
+function confirmEmailHtml(bid, slotLabel, link) {
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
+  <h2 style="color:#5b3fa0;">Confirm your Jaronite News ad bid</h2>
+  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
+  <p>We received your bid for the <strong>${slotLabel}</strong> slot on <strong>${bid.target_date}</strong>.
+     To activate it, please confirm this email address:</p>
+  <p style="text-align:center;margin:24px 0;">
+    <a href="${link}" style="background:#5b3fa0;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;display:inline-block;">Confirm my email</a>
+  </p>
+  <p style="color:#666;font-size:0.9em;">Or paste this link into your browser:<br><span style="word-break:break-all;">${link}</span></p>
+  <p style="color:#666;font-size:0.9em;">Your bid won't compete until <strong>both</strong> your email and your Discord account are confirmed.
+     If you didn't submit this bid, you can ignore this email.</p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">\u2014 Jaronite News Inc.</p>
+</div>`;
+}
+__name(confirmEmailHtml, "confirmEmailHtml");
+function confirmDiscordMsg(bid, slotLabel, link) {
+  return `\u{1F517} **Confirm your Jaronite News ad bid**
+
+Hi **${bid.advertiser_name}** \u2014 we received your bid for the **${slotLabel}** slot on **${bid.target_date}**.
+
+Click to confirm this Discord account is yours:
+${link}
+
+Your bid won't compete until **both** your email and your Discord account are confirmed. If you didn't submit this bid, you can ignore this message.
+\u2014 Jaronite News Inc.`;
+}
+__name(confirmDiscordMsg, "confirmDiscordMsg");
+function adConfirmPage(title, message, ok = true) {
+  const accent = ok ? "#5b3fa0" : "#b03a3a";
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title} \u2014 Jaronite News</title></head>
+<body style="font-family:sans-serif;background:#12101c;color:#e0dff0;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;">
+  <div style="max-width:480px;padding:40px 32px;text-align:center;">
+    <h1 style="color:${accent};margin-bottom:12px;">${title}</h1>
+    <p style="color:#c0bfd8;line-height:1.5;">${message}</p>
+    <p style="margin-top:28px;"><a href="/advertise" style="color:#9b7fd0;">\u2190 Back to advertising</a></p>
+  </div>
+</body></html>`;
+  return new Response(html, {
+    status: ok ? 200 : 400,
+    headers: { "Content-Type": "text/html; charset=utf-8", ...securityHeaders() }
+  });
+}
+__name(adConfirmPage, "adConfirmPage");
 function invoiceDiscordMsg(bid, slotLabel, views, total) {
   const rate = Number(bid.bid_amount).toFixed(2);
   const totalStr = Number(total).toFixed(2);
@@ -1830,6 +1877,7 @@ var index_default = {
         `SELECT advertiser_name, bid_amount, created_at
          FROM ad_bids
          WHERE target_date = ? AND slot_number = ? AND status = 'pending'
+           AND email_verified_at IS NOT NULL AND discord_verified_at IS NOT NULL
          ORDER BY bid_amount DESC, id ASC
          LIMIT 3`
       ).bind(date, slot).all();
@@ -1852,15 +1900,18 @@ var index_default = {
       if (!advertiser_name || !contact || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
         return secureJson({ error: "Missing required fields" }, { status: 400 });
       }
+      if (!email || !discord_username) {
+        return secureJson({ error: "A valid email and Discord username are required so we can confirm your bid." }, { status: 400 });
+      }
       const adv = String(advertiser_name).trim();
       const con = String(contact).trim();
-      const eml = email ? String(email).trim() : "";
-      const dsc = discord_username ? String(discord_username).trim() : "";
+      const eml = String(email).trim();
+      const dsc = String(discord_username).trim();
       if (adv.length < 1 || adv.length > 100) return secureJson({ error: "advertiser_name must be 1\u2013100 characters" }, { status: 400 });
       if (con.length < 1 || con.length > 100) return secureJson({ error: "contact must be 1\u2013100 characters" }, { status: 400 });
-      if (eml.length > 254) return secureJson({ error: "email is too long" }, { status: 400 });
-      if (dsc.length > 100) return secureJson({ error: "discord_username is too long" }, { status: 400 });
-      if (eml && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: "email is not a valid address" }, { status: 400 });
+      if (eml.length < 1 || eml.length > 254) return secureJson({ error: "email is required and must be under 254 characters" }, { status: 400 });
+      if (dsc.length < 1 || dsc.length > 100) return secureJson({ error: "Discord username is required and must be under 100 characters" }, { status: 400 });
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: "email is not a valid address" }, { status: 400 });
       const cleanImageUrl = validateImageUrl(image_url, MAX_AD_IMAGE_BYTES);
       if (!cleanImageUrl) return secureJson({ error: "image_url must be an uploaded PNG, JPEG, GIF, or WebP image (max 800 KB)" }, { status: 400 });
       const cleanDestUrl = validateHttpUrl(dest_url);
@@ -1886,11 +1937,57 @@ var index_default = {
       if (amt > 1e6) {
         return secureJson({ error: "bid_amount exceeds the maximum allowed" }, { status: 400 });
       }
-      await env.DB.prepare(
-        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(adv, con, eml, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number)).run();
-      return secureJson({ ok: true, message: "Bid received. Winners notified after 8 PM UTC." });
+      const emailToken = newSessionToken();
+      const discordToken = newSessionToken();
+      const inserted = await env.DB.prepare(
+        `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number, email_token, discord_token)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(adv, con, eml, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number), emailToken, discordToken).run();
+      const bidObj = { id: inserted.meta.last_row_id, advertiser_name: adv, target_date, slot_number: Number(slot_number) };
+      const slotLabel = SLOT_LABELS[Number(slot_number)] || `Slot ${slot_number}`;
+      const emailLink = `${url.origin}/api/ads/confirm-email?token=${emailToken}`;
+      const discordLink = `${url.origin}/api/ads/confirm-discord?token=${discordToken}`;
+      const emailRes = await sendEmail(env, {
+        to: eml,
+        subject: `Confirm your Jaronite News ad bid (#${bidObj.id})`,
+        html: confirmEmailHtml(bidObj, slotLabel, emailLink)
+      });
+      const discordRes = await sendDiscordDm(env, dsc, confirmDiscordMsg(bidObj, slotLabel, discordLink));
+      return secureJson({
+        ok: true,
+        bid_id: bidObj.id,
+        email_sent: !!emailRes.ok,
+        discord_sent: !!discordRes.ok,
+        message: "Bid received! Check your email and your Discord DMs for two confirmation links. Your bid only competes once BOTH are confirmed.",
+        email_note: emailRes.ok ? null : emailRes.skipped || emailRes.error,
+        discord_note: discordRes.ok ? null : discordRes.skipped || discordRes.error
+      });
+    }
+    if (url.pathname === "/api/ads/confirm-email" && request.method === "GET") {
+      const token = url.searchParams.get("token");
+      if (!token) return adConfirmPage("Invalid link", "This confirmation link is missing its token.", false);
+      const bid = await env.DB.prepare(
+        `SELECT id, email_verified_at, discord_verified_at FROM ad_bids WHERE email_token = ?`
+      ).bind(token).first();
+      if (!bid) return adConfirmPage("Link not found", "This confirmation link is invalid or has already been used.", false);
+      if (!bid.email_verified_at) {
+        await env.DB.prepare(`UPDATE ad_bids SET email_verified_at = datetime('now') WHERE id = ?`).bind(bid.id).run();
+      }
+      const bothDone = bid.discord_verified_at;
+      return adConfirmPage("Email confirmed \u2705", bothDone ? "Your email is confirmed and both checks are complete \u2014 your bid is now active and will compete for its slot." : "Your email is confirmed. Now confirm your <strong>Discord</strong> account (check your DMs from our bot) to activate your bid.");
+    }
+    if (url.pathname === "/api/ads/confirm-discord" && request.method === "GET") {
+      const token = url.searchParams.get("token");
+      if (!token) return adConfirmPage("Invalid link", "This confirmation link is missing its token.", false);
+      const bid = await env.DB.prepare(
+        `SELECT id, email_verified_at, discord_verified_at FROM ad_bids WHERE discord_token = ?`
+      ).bind(token).first();
+      if (!bid) return adConfirmPage("Link not found", "This confirmation link is invalid or has already been used.", false);
+      if (!bid.discord_verified_at) {
+        await env.DB.prepare(`UPDATE ad_bids SET discord_verified_at = datetime('now') WHERE id = ?`).bind(bid.id).run();
+      }
+      const bothDone = bid.email_verified_at;
+      return adConfirmPage("Discord confirmed \u2705", bothDone ? "Your Discord account is confirmed and both checks are complete \u2014 your bid is now active and will compete for its slot." : "Your Discord account is confirmed. Now confirm your <strong>email</strong> (check your inbox) to activate your bid.");
     }
     if (url.pathname === "/api/ads/current" && request.method === "GET") {
       pruneRateLimitStore();
@@ -2350,6 +2447,7 @@ var index_default = {
         const winner = await env.DB.prepare(
           `SELECT * FROM ad_bids
            WHERE target_date = ? AND slot_number = ? AND status = 'pending'
+             AND email_verified_at IS NOT NULL AND discord_verified_at IS NOT NULL
            ORDER BY bid_amount DESC, id ASC LIMIT 1`
         ).bind(targetDate, slot).first();
         if (!winner) continue;

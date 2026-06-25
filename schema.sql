@@ -166,6 +166,14 @@ CREATE TABLE IF NOT EXISTS ad_bids (
   slot_number INTEGER NOT NULL CHECK(slot_number IN (1,2,3)),
   email TEXT,                           -- advertiser email for automated notifications
   discord_username TEXT,                -- advertiser Discord username for bot DMs
+  -- Public (self-serve) bidding double-confirmation. On submission we email a
+  -- confirmation link and DM a confirmation link; clicking each stamps the
+  -- matching *_verified_at. A bid only competes once BOTH are verified, which
+  -- proves the bidder controls the email address and the Discord account.
+  email_token TEXT,
+  email_verified_at DATETIME,
+  discord_token TEXT,
+  discord_verified_at DATETIME,
   status TEXT DEFAULT 'pending',        -- 'pending' | 'won' | 'lost'
   -- Payment tracking (DC Economy webhook integration).
   -- payment_status: 'unpaid' | 'awaiting_payment' | 'paid' | 'overpaid' | 'underpaid'
@@ -248,6 +256,10 @@ CREATE INDEX IF NOT EXISTS idx_ad_events_slot ON ad_events(ad_slot_id);
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN notified_at DATETIME"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN amount_owed REAL"
 --   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN invoiced_at DATETIME"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email_token TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN email_verified_at DATETIME"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_token TEXT"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE ad_bids ADD COLUMN discord_verified_at DATETIME"
 --
 -- Verify afterward with:
 --   npx wrangler d1 execute jaronite-news-db --remote --command "PRAGMA table_info(ad_bids)"
