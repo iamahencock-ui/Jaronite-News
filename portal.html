@@ -811,7 +811,7 @@
           </button>
         </div>
       </div>
-      <button onclick="saveArticleDetailEdit()" style="width:auto; padding:10px 20px; margin-top:12px;">Save Changes</button>
+      <button id="article-detail-save-btn" onclick="saveArticleDetailEdit()" style="width:auto; padding:10px 20px; margin-top:12px;">Save Changes</button>
     </div>
     <div class="article-detail-actions" id="article-detail-actions"></div>
   </div>
@@ -1619,7 +1619,7 @@
       document.getElementById('article-detail-edit-form').style.display = 'block';
       // Repurpose the same edit form's save button for resubmission via a one-off override.
       const form = document.getElementById('article-detail-edit-form');
-      const saveBtn = form.querySelector('button');
+      const saveBtn = document.getElementById('article-detail-save-btn');
       saveBtn.textContent = `Send Back to ${a.claimed_by}`;
       saveBtn.onclick = async () => {
         const title = document.getElementById('article-detail-edit-title').value;
@@ -2804,6 +2804,10 @@
       if (rteDetail) rteDetail.setHTML(a.content);
       document.getElementById('article-detail-edit-content').value = a.content;
       document.getElementById('article-detail-edit-form').style.display = 'block';
+      // Ensure the shared Save button is in "edit" mode (a prior resubmit may
+      // have repurposed it).
+      const saveBtn = document.getElementById('article-detail-save-btn');
+      if (saveBtn) { saveBtn.textContent = 'Save Changes'; saveBtn.onclick = saveArticleDetailEdit; }
     });
   };
 
@@ -2839,7 +2843,9 @@
 
       document.getElementById('article-detail-edit-form').style.display = 'block';
       const form    = document.getElementById('article-detail-edit-form');
-      const saveBtn = form.querySelector('button[onclick], button:last-of-type') || form.querySelector('button');
+      // Target the actual Save button by id — NOT a generic button selector,
+      // which would grab the hidden photo "Remove" buttons that come first.
+      const saveBtn = document.getElementById('article-detail-save-btn');
       saveBtn.textContent = `Send Back to ${a.claimed_by}`;
       saveBtn.onclick = async () => {
         const title   = document.getElementById('article-detail-edit-title').value;
