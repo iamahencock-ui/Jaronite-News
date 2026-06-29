@@ -269,14 +269,41 @@
     return _liveAds;
   }
 
-  // Bottom leaderboard 728×90
+  // House-ad fallback zone (AdvertiseCraft) used when a bidding slot is unsold.
+  const ADCRAFT_FALLBACK_ZONE = 'ADCRAFT-728B19B2';
+
+  // Bottom leaderboard 728×90. When no bid won the slot, fall back to the
+  // AdvertiseCraft house video zone. The container is rendered here; its loader
+  // is started by loadAdcraftFallback() after the page's innerHTML is set,
+  // because <script> tags inserted via innerHTML don't execute.
   function bottomAdHtml(ad) {
     const inner = ad
       ? `<a href="/api/ads/click/${ad.id}" target="_blank" rel="noopener noreferrer" style="display:block;">
            <img class="article-ad-leaderboard" src="${escapeHtml(ad.image_url)}" alt="Advertisement">
          </a>`
-      : `<div class="article-ad-leaderboard-placeholder">Advertisement · 728 × 90</div>`;
+      : `<div id="adcraft-${ADCRAFT_FALLBACK_ZONE}" style="width:100%;max-width:720px;aspect-ratio:16/9;margin:8px auto 0;border-radius:12px;overflow:hidden;background:#000;position:relative;display:flex;align-items:center;justify-content:center;color:#666;font-size:0.85rem;font-family:sans-serif">
+           <span id="adcraft-${ADCRAFT_FALLBACK_ZONE}-label">Loading ad&hellip;</span>
+         </div>`;
     return `<div class="article-ad-bottom"><span class="article-ad-label">Advertisement</span>${inner}</div>`;
+  }
+
+  // Kick off the AdvertiseCraft embed for a fallback container already in the DOM.
+  // (Mirrors the publisher snippet, but as a function so it runs after render.)
+  function loadAdcraftFallback(zone) {
+    const c = document.getElementById('adcraft-' + zone);
+    if (!c) return;
+    const l = document.getElementById('adcraft-' + zone + '-label');
+    const r = function () {
+      const s = document.createElement('script');
+      s.src = 'https://advertisecraft.chickenkiller.com/api/publishers/embed-js?zone=' + zone;
+      s.onerror = function () { if (l) l.textContent = 'Ad unavailable'; };
+      s.async = 1;
+      c.appendChild(s);
+    };
+    if ('IntersectionObserver' in window) {
+      const o = new IntersectionObserver(function (e) { if (e[0].isIntersecting) { o.disconnect(); r(); } }, { threshold: 0 });
+      o.observe(c);
+    } else { r(); }
   }
 
   // Side skyscraper 160×600
@@ -512,6 +539,10 @@
       ${bottomAdHtml(slot1)}
       <div id="article-comments">${commentsSectionHtml(article.id)}</div>
     `;
+
+    // If the leaderboard slot was unsold, the fallback container was rendered —
+    // now start its AdvertiseCraft loader (innerHTML didn't run its script).
+    if (!slot1) loadAdcraftFallback(ADCRAFT_FALLBACK_ZONE);
 
     // Paint favorite state for this article
     paintFavoriteStates([article.id]);

@@ -1239,7 +1239,9 @@ export default {
       if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
 
       const results = await env.DB.prepare(
-        `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at, favorites.created_at as favorited_at
+        `SELECT articles.id, articles.title, articles.category, articles.author,
+                COALESCE(articles.published_at, articles.created_at) AS created_at,
+                favorites.created_at as favorited_at
          FROM favorites JOIN articles ON favorites.article_id = articles.id
          WHERE favorites.discord_user_id = ? AND articles.status = 'published'
          ORDER BY favorites.created_at DESC`
@@ -1505,7 +1507,7 @@ export default {
       if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image (max ~600 KB, JPEG/PNG/WebP/GIF only)." }, { status: 400 });
 
       await env.DB.prepare(
-        "INSERT INTO articles (title, category, content, author, status, image_url) VALUES (?, ?, ?, ?, 'published', ?)"
+        "INSERT INTO articles (title, category, content, author, status, image_url, published_at) VALUES (?, ?, ?, ?, 'published', ?, CURRENT_TIMESTAMP)"
       ).bind(title.trim(), category, content.trim(), user.username, imageUrl).run();
       await log(env, user.username, "INSTAPUBLISH_ARTICLE", `Published article "${title.trim()}" in category "${category}" directly, bypassing review`);
       return secureJson({ success: true });
@@ -1517,13 +1519,15 @@ export default {
       if (!VALID_CATEGORIES.has(category)) return secureJson([], { status: 200 });
 
       const results = await env.DB.prepare(
-        "SELECT * FROM articles WHERE category = ? AND status = 'published' ORDER BY created_at DESC"
+        "SELECT * FROM articles WHERE category = ? AND status = 'published' ORDER BY COALESCE(published_at, created_at) DESC"
       ).bind(category).all();
 
-      // Attach a computed slug to each article so the front end can build
-      // /article/[id]-[slug] links without a separate lookup.
+      // Attach a computed slug, and expose the PUBLISH date as created_at so the
+      // public pages display and sort by when it went live (not when it was
+      // first drafted). Older rows with no published_at fall back to created_at.
       const articles = results.results.map(a => ({
         ...a,
+        created_at: a.published_at || a.created_at,
         slug: `${a.id}-${slugify(a.title)}`,
       }));
       return secureJson(articles);
@@ -1536,10 +1540,11 @@ export default {
         return secureJson({ error: "Too many requests" }, { status: 429 });
       }
       const results = await env.DB.prepare(
-        "SELECT * FROM articles WHERE status = 'published' ORDER BY created_at DESC"
+        "SELECT * FROM articles WHERE status = 'published' ORDER BY COALESCE(published_at, created_at) DESC"
       ).all();
       const articles = results.results.map(a => ({
         ...a,
+        created_at: a.published_at || a.created_at, // expose publish date as the display date
         slug: `${a.id}-${slugify(a.title)}`,
       }));
       return secureJson(articles);
@@ -1561,7 +1566,7 @@ export default {
       ).bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
 
-      return secureJson({ ...article, slug: `${article.id}-${slugify(article.title)}` });
+      return secureJson({ ...article, created_at: article.published_at || article.created_at, slug: `${article.id}-${slugify(article.title)}` });
     }
 
     // API: Lightweight integrity check for an open article (public, no auth).
@@ -1780,7 +1785,7 @@ export default {
       }
 
       await env.DB.prepare(
-        "UPDATE articles SET status = 'published', reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        "UPDATE articles SET status = 'published', reviewed_by = ?, published_at = COALESCE(published_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(reviewer.username, id).run();
       await log(env, reviewer.username, "APPROVE_ARTICLE", `Approved and published article "${article.title}" (ID ${id}) by ${article.author}`);
       return secureJson({ success: true });

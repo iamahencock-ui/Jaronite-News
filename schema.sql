@@ -32,7 +32,12 @@ CREATE TABLE IF NOT EXISTS articles (
   -- NULL when no photo was uploaded. Max ~800 KB enforced in the API.
   image_url TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  -- Set the first time the article is published (approve or instapublish).
+  -- Public lists sort and display by this, falling back to created_at for
+  -- rows that predate the column. Existing-install migration:
+  --   ALTER TABLE articles ADD COLUMN published_at DATETIME;
+  published_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS logs (
