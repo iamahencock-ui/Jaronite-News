@@ -103,8 +103,11 @@ function timingSafeEqualStr(a, b) {
  */
 function securityHeaders(extraHeaders = {}) {
   return {
+    // advertisecraft.chickenkiller.com is allowed so the third-party video ad
+    // embed on article pages can load its script, fetch ad data, and render the
+    // video (script/connect/img/media/frame).
     "Content-Security-Policy":
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none';",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://advertisecraft.chickenkiller.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com https://advertisecraft.chickenkiller.com data:; connect-src 'self' https://advertisecraft.chickenkiller.com; media-src 'self' https://advertisecraft.chickenkiller.com blob: data:; frame-src https://advertisecraft.chickenkiller.com; font-src 'self'; frame-ancestors 'none';",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
