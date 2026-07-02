@@ -370,25 +370,21 @@
 
   <h1>Advertise with Us</h1>
   <p class="subtitle">
-    Reach the DemocracyCraft community directly. We run <strong>3 ad placements per day</strong>,
+    Reach the DemocracyCraft community directly. We run <strong>2 ad placements per day</strong>,
     awarded each evening to the highest bidder per slot. You bid a rate in <strong>ℐ per view</strong> — you only pay for actual article views while your ad runs.
-    Choose a bottom leaderboard (728×90) or a side skyscraper (160×600).
+    Both are side skyscrapers (160×600) on the article side rails.
   </p>
 
   <div class="ad-info-box">
     <h3>Slot Details</h3>
     <div class="ad-info-row">
       <div class="ad-info-item">
-        <div class="label">Bottom Leaderboard</div>
-        <div class="value">728 × 90 px</div>
-      </div>
-      <div class="ad-info-item">
         <div class="label">Side Skyscrapers (×2)</div>
         <div class="value">160 × 600 px</div>
       </div>
       <div class="ad-info-item">
         <div class="label">Slots Per Day</div>
-        <div class="value">3</div>
+        <div class="value">2</div>
       </div>
       <div class="ad-info-item">
         <div class="label">Bidding Closes</div>
@@ -447,7 +443,6 @@
       <div class="form-group">
         <label>Ad Placement</label>
         <select id="f-slot" onchange="onSlotTypeChange()">
-          <option value="bottom">Bottom Leaderboard (728×90) — Slot 1</option>
           <option value="left">Left Skyscraper (160×600) — Slot 2</option>
           <option value="right">Right Skyscraper (160×600) — Slot 3</option>
         </select>
@@ -534,7 +529,6 @@
   document.getElementById('f-date').value = tomorrow.toISOString().slice(0, 10);
 
   const SLOT_INFO = {
-    bottom: { slot_number: 1, w: 728, h: 90,  label: '728×90 px',  hint: 'Appears below the article body on every article page.' },
     left:   { slot_number: 2, w: 160, h: 600, label: '160×600 px', hint: 'Sticky skyscraper on the left side rail (visible on wide screens).' },
     right:  { slot_number: 3, w: 160, h: 600, label: '160×600 px', hint: 'Sticky skyscraper on the right side rail (visible on wide screens).' }
   };

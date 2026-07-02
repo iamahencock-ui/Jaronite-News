@@ -2302,8 +2302,9 @@ export default {
       if (!cleanDestUrl) return secureJson({ error: 'dest_url must be a valid http(s) URL' }, { status: 400 });
 
       // --- Slot ---
-      if (![1, 2, 3].includes(Number(slot_number))) {
-        return secureJson({ error: 'slot_number must be 1, 2, or 3' }, { status: 400 });
+      // Slot 1 (bottom leaderboard) is retired — only the two skyscrapers are sold.
+      if (![2, 3].includes(Number(slot_number))) {
+        return secureJson({ error: 'slot_number must be 2 or 3' }, { status: 400 });
       }
 
       // --- Date: strict YYYY-MM-DD, real date, must be in the future ---
