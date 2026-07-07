@@ -39,6 +39,11 @@
   </div>
 </header>
 
+<!-- Message of the day (hidden until /api/featured returns one) -->
+<div id="motd-bar" style="display:none;background:linear-gradient(90deg,var(--ink-purple),var(--mid-purple));color:#fff;text-align:center;padding:10px 16px;font-size:0.95rem;">
+  <span id="motd-text" style="vertical-align:middle;"></span>
+</div>
+
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-copy">
@@ -54,6 +59,32 @@
     </div>
   </div>
 </section>
+
+<!-- Featured: 1 main story + 3 secondary (picked in the Staff Portal; falls back to latest) -->
+<section id="featured-section" style="display:none;max-width:1100px;margin:36px auto 8px;padding:0 16px;">
+  <div class="section-label">Featured</div>
+  <h2 style="font-family:var(--font-serif);margin:6px 0 20px;">Today's top stories</h2>
+  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:22px;" id="featured-grid">
+    <a id="feat-main" href="#" style="display:block;background:var(--card-bg);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--card-shadow);overflow:hidden;text-decoration:none;color:var(--ink);">
+      <div id="feat-main-img" style="display:none;aspect-ratio:16/7;background-size:cover;background-position:center;"></div>
+      <div style="padding:22px 24px;">
+        <div id="feat-main-cat" style="color:var(--mid-purple);font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;"></div>
+        <h3 id="feat-main-title" style="font-family:var(--font-serif);font-size:1.6rem;line-height:1.25;margin:8px 0;"></h3>
+        <p id="feat-main-excerpt" style="color:var(--ink-soft);font-size:0.95rem;line-height:1.55;margin:0 0 10px;"></p>
+        <div id="feat-main-meta" style="color:var(--ink-muted);font-size:0.8rem;"></div>
+      </div>
+    </a>
+    <div id="feat-side" style="display:flex;flex-direction:column;gap:14px;"></div>
+  </div>
+</section>
+<style>
+  @media (max-width: 760px) { #featured-grid { grid-template-columns: 1fr !important; } }
+  .feat-mini { display:block;background:var(--card-bg);border:1px solid var(--rule);border-radius:12px;box-shadow:var(--card-shadow);padding:14px 18px;text-decoration:none;color:var(--ink);flex:1; }
+  .feat-mini:hover, #feat-main:hover { box-shadow:var(--card-shadow-h); }
+  .feat-mini .cat { color:var(--mid-purple);font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em; }
+  .feat-mini h4 { font-family:var(--font-serif);font-size:1.05rem;line-height:1.3;margin:6px 0; }
+  .feat-mini .meta { color:var(--ink-muted);font-size:0.75rem; }
+</style>
 
 <main class="categories-section">
   <div class="section-label">Browse by Section</div>
@@ -128,6 +159,42 @@
     const s = JSON.parse(localStorage.getItem('jni_reader_settings') || '{}');
     if (s.dark) document.body.classList.add('reader-dark-mode');
   } catch {}
+
+  // MOTD + featured stories
+  (async () => {
+    try {
+      const r = await fetch('/api/featured');
+      if (!r.ok) return;
+      const d = await r.json();
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const dateOf = (v) => { const t = new Date(v); return isNaN(t) ? '' : t.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+
+      if (d.motd) {
+        document.getElementById('motd-text').textContent = d.motd;
+        document.getElementById('motd-bar').style.display = 'block';
+      }
+      if (d.main) {
+        const a = d.main;
+        document.getElementById('feat-main').href = '/article/' + a.slug;
+        document.getElementById('feat-main-cat').textContent = a.category;
+        document.getElementById('feat-main-title').textContent = a.title;
+        document.getElementById('feat-main-excerpt').textContent = a.excerpt + (a.excerpt.length >= 220 ? '…' : '');
+        document.getElementById('feat-main-meta').textContent = `By ${a.author} · ${dateOf(a.created_at)}`;
+        if (a.image_url) {
+          const img = document.getElementById('feat-main-img');
+          img.style.backgroundImage = `url("${a.image_url.replace(/"/g, '')}")`;
+          img.style.display = 'block';
+        }
+        document.getElementById('feat-side').innerHTML = (d.others || []).map(o => `
+          <a class="feat-mini" href="/article/${esc(o.slug)}">
+            <div class="cat">${esc(o.category)}</div>
+            <h4>${esc(o.title)}</h4>
+            <div class="meta">By ${esc(o.author)} · ${esc(dateOf(o.created_at))}</div>
+          </a>`).join('');
+        document.getElementById('featured-section').style.display = 'block';
+      }
+    } catch {}
+  })();
 </script>
 
 </body>

@@ -40,6 +40,20 @@ CREATE TABLE IF NOT EXISTS articles (
   published_at DATETIME
 );
 
+-- ============================================================
+-- Homepage: message of the day + featured stories.
+-- MOTD lives in site_settings (key='motd'); featured picks are a
+-- featured_rank on articles (1 = main story, 2-4 = secondary).
+-- EXISTING installs, run once:
+--   npx wrangler d1 execute jaronite-news-db --remote --command "CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value TEXT, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+--   npx wrangler d1 execute jaronite-news-db --remote --command "ALTER TABLE articles ADD COLUMN featured_rank INTEGER"
+-- ============================================================
+CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL,

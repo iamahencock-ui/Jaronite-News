@@ -1,93 +1,443 @@
-import { getAssetFromKV } from "@cloudflare/kv-asset-handler";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __commonJS = (cb, mod) => function __require() {
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// node_modules/mime/Mime.js
+var require_Mime = __commonJS({
+  "node_modules/mime/Mime.js"(exports, module) {
+    "use strict";
+    function Mime() {
+      this._types = /* @__PURE__ */ Object.create(null);
+      this._extensions = /* @__PURE__ */ Object.create(null);
+      for (let i = 0; i < arguments.length; i++) {
+        this.define(arguments[i]);
+      }
+      this.define = this.define.bind(this);
+      this.getType = this.getType.bind(this);
+      this.getExtension = this.getExtension.bind(this);
+    }
+    __name(Mime, "Mime");
+    Mime.prototype.define = function(typeMap, force) {
+      for (let type in typeMap) {
+        let extensions = typeMap[type].map(function(t) {
+          return t.toLowerCase();
+        });
+        type = type.toLowerCase();
+        for (let i = 0; i < extensions.length; i++) {
+          const ext = extensions[i];
+          if (ext[0] === "*") {
+            continue;
+          }
+          if (!force && ext in this._types) {
+            throw new Error(
+              'Attempt to change mapping for "' + ext + '" extension from "' + this._types[ext] + '" to "' + type + '". Pass `force=true` to allow this, otherwise remove "' + ext + '" from the list of extensions for "' + type + '".'
+            );
+          }
+          this._types[ext] = type;
+        }
+        if (force || !this._extensions[type]) {
+          const ext = extensions[0];
+          this._extensions[type] = ext[0] !== "*" ? ext : ext.substr(1);
+        }
+      }
+    };
+    Mime.prototype.getType = function(path) {
+      path = String(path);
+      let last = path.replace(/^.*[/\\]/, "").toLowerCase();
+      let ext = last.replace(/^.*\./, "").toLowerCase();
+      let hasPath = last.length < path.length;
+      let hasDot = ext.length < last.length - 1;
+      return (hasDot || !hasPath) && this._types[ext] || null;
+    };
+    Mime.prototype.getExtension = function(type) {
+      type = /^\s*([^;\s]*)/.test(type) && RegExp.$1;
+      return type && this._extensions[type.toLowerCase()] || null;
+    };
+    module.exports = Mime;
+  }
+});
+
+// node_modules/mime/types/standard.js
+var require_standard = __commonJS({
+  "node_modules/mime/types/standard.js"(exports, module) {
+    module.exports = { "application/andrew-inset": ["ez"], "application/applixware": ["aw"], "application/atom+xml": ["atom"], "application/atomcat+xml": ["atomcat"], "application/atomdeleted+xml": ["atomdeleted"], "application/atomsvc+xml": ["atomsvc"], "application/atsc-dwd+xml": ["dwd"], "application/atsc-held+xml": ["held"], "application/atsc-rsat+xml": ["rsat"], "application/bdoc": ["bdoc"], "application/calendar+xml": ["xcs"], "application/ccxml+xml": ["ccxml"], "application/cdfx+xml": ["cdfx"], "application/cdmi-capability": ["cdmia"], "application/cdmi-container": ["cdmic"], "application/cdmi-domain": ["cdmid"], "application/cdmi-object": ["cdmio"], "application/cdmi-queue": ["cdmiq"], "application/cu-seeme": ["cu"], "application/dash+xml": ["mpd"], "application/davmount+xml": ["davmount"], "application/docbook+xml": ["dbk"], "application/dssc+der": ["dssc"], "application/dssc+xml": ["xdssc"], "application/ecmascript": ["es", "ecma"], "application/emma+xml": ["emma"], "application/emotionml+xml": ["emotionml"], "application/epub+zip": ["epub"], "application/exi": ["exi"], "application/express": ["exp"], "application/fdt+xml": ["fdt"], "application/font-tdpfr": ["pfr"], "application/geo+json": ["geojson"], "application/gml+xml": ["gml"], "application/gpx+xml": ["gpx"], "application/gxf": ["gxf"], "application/gzip": ["gz"], "application/hjson": ["hjson"], "application/hyperstudio": ["stk"], "application/inkml+xml": ["ink", "inkml"], "application/ipfix": ["ipfix"], "application/its+xml": ["its"], "application/java-archive": ["jar", "war", "ear"], "application/java-serialized-object": ["ser"], "application/java-vm": ["class"], "application/javascript": ["js", "mjs"], "application/json": ["json", "map"], "application/json5": ["json5"], "application/jsonml+json": ["jsonml"], "application/ld+json": ["jsonld"], "application/lgr+xml": ["lgr"], "application/lost+xml": ["lostxml"], "application/mac-binhex40": ["hqx"], "application/mac-compactpro": ["cpt"], "application/mads+xml": ["mads"], "application/manifest+json": ["webmanifest"], "application/marc": ["mrc"], "application/marcxml+xml": ["mrcx"], "application/mathematica": ["ma", "nb", "mb"], "application/mathml+xml": ["mathml"], "application/mbox": ["mbox"], "application/mediaservercontrol+xml": ["mscml"], "application/metalink+xml": ["metalink"], "application/metalink4+xml": ["meta4"], "application/mets+xml": ["mets"], "application/mmt-aei+xml": ["maei"], "application/mmt-usd+xml": ["musd"], "application/mods+xml": ["mods"], "application/mp21": ["m21", "mp21"], "application/mp4": ["mp4s", "m4p"], "application/msword": ["doc", "dot"], "application/mxf": ["mxf"], "application/n-quads": ["nq"], "application/n-triples": ["nt"], "application/node": ["cjs"], "application/octet-stream": ["bin", "dms", "lrf", "mar", "so", "dist", "distz", "pkg", "bpk", "dump", "elc", "deploy", "exe", "dll", "deb", "dmg", "iso", "img", "msi", "msp", "msm", "buffer"], "application/oda": ["oda"], "application/oebps-package+xml": ["opf"], "application/ogg": ["ogx"], "application/omdoc+xml": ["omdoc"], "application/onenote": ["onetoc", "onetoc2", "onetmp", "onepkg"], "application/oxps": ["oxps"], "application/p2p-overlay+xml": ["relo"], "application/patch-ops-error+xml": ["xer"], "application/pdf": ["pdf"], "application/pgp-encrypted": ["pgp"], "application/pgp-signature": ["asc", "sig"], "application/pics-rules": ["prf"], "application/pkcs10": ["p10"], "application/pkcs7-mime": ["p7m", "p7c"], "application/pkcs7-signature": ["p7s"], "application/pkcs8": ["p8"], "application/pkix-attr-cert": ["ac"], "application/pkix-cert": ["cer"], "application/pkix-crl": ["crl"], "application/pkix-pkipath": ["pkipath"], "application/pkixcmp": ["pki"], "application/pls+xml": ["pls"], "application/postscript": ["ai", "eps", "ps"], "application/provenance+xml": ["provx"], "application/pskc+xml": ["pskcxml"], "application/raml+yaml": ["raml"], "application/rdf+xml": ["rdf", "owl"], "application/reginfo+xml": ["rif"], "application/relax-ng-compact-syntax": ["rnc"], "application/resource-lists+xml": ["rl"], "application/resource-lists-diff+xml": ["rld"], "application/rls-services+xml": ["rs"], "application/route-apd+xml": ["rapd"], "application/route-s-tsid+xml": ["sls"], "application/route-usd+xml": ["rusd"], "application/rpki-ghostbusters": ["gbr"], "application/rpki-manifest": ["mft"], "application/rpki-roa": ["roa"], "application/rsd+xml": ["rsd"], "application/rss+xml": ["rss"], "application/rtf": ["rtf"], "application/sbml+xml": ["sbml"], "application/scvp-cv-request": ["scq"], "application/scvp-cv-response": ["scs"], "application/scvp-vp-request": ["spq"], "application/scvp-vp-response": ["spp"], "application/sdp": ["sdp"], "application/senml+xml": ["senmlx"], "application/sensml+xml": ["sensmlx"], "application/set-payment-initiation": ["setpay"], "application/set-registration-initiation": ["setreg"], "application/shf+xml": ["shf"], "application/sieve": ["siv", "sieve"], "application/smil+xml": ["smi", "smil"], "application/sparql-query": ["rq"], "application/sparql-results+xml": ["srx"], "application/srgs": ["gram"], "application/srgs+xml": ["grxml"], "application/sru+xml": ["sru"], "application/ssdl+xml": ["ssdl"], "application/ssml+xml": ["ssml"], "application/swid+xml": ["swidtag"], "application/tei+xml": ["tei", "teicorpus"], "application/thraud+xml": ["tfi"], "application/timestamped-data": ["tsd"], "application/toml": ["toml"], "application/trig": ["trig"], "application/ttml+xml": ["ttml"], "application/ubjson": ["ubj"], "application/urc-ressheet+xml": ["rsheet"], "application/urc-targetdesc+xml": ["td"], "application/voicexml+xml": ["vxml"], "application/wasm": ["wasm"], "application/widget": ["wgt"], "application/winhlp": ["hlp"], "application/wsdl+xml": ["wsdl"], "application/wspolicy+xml": ["wspolicy"], "application/xaml+xml": ["xaml"], "application/xcap-att+xml": ["xav"], "application/xcap-caps+xml": ["xca"], "application/xcap-diff+xml": ["xdf"], "application/xcap-el+xml": ["xel"], "application/xcap-ns+xml": ["xns"], "application/xenc+xml": ["xenc"], "application/xhtml+xml": ["xhtml", "xht"], "application/xliff+xml": ["xlf"], "application/xml": ["xml", "xsl", "xsd", "rng"], "application/xml-dtd": ["dtd"], "application/xop+xml": ["xop"], "application/xproc+xml": ["xpl"], "application/xslt+xml": ["*xsl", "xslt"], "application/xspf+xml": ["xspf"], "application/xv+xml": ["mxml", "xhvml", "xvml", "xvm"], "application/yang": ["yang"], "application/yin+xml": ["yin"], "application/zip": ["zip"], "audio/3gpp": ["*3gpp"], "audio/adpcm": ["adp"], "audio/amr": ["amr"], "audio/basic": ["au", "snd"], "audio/midi": ["mid", "midi", "kar", "rmi"], "audio/mobile-xmf": ["mxmf"], "audio/mp3": ["*mp3"], "audio/mp4": ["m4a", "mp4a"], "audio/mpeg": ["mpga", "mp2", "mp2a", "mp3", "m2a", "m3a"], "audio/ogg": ["oga", "ogg", "spx", "opus"], "audio/s3m": ["s3m"], "audio/silk": ["sil"], "audio/wav": ["wav"], "audio/wave": ["*wav"], "audio/webm": ["weba"], "audio/xm": ["xm"], "font/collection": ["ttc"], "font/otf": ["otf"], "font/ttf": ["ttf"], "font/woff": ["woff"], "font/woff2": ["woff2"], "image/aces": ["exr"], "image/apng": ["apng"], "image/avif": ["avif"], "image/bmp": ["bmp"], "image/cgm": ["cgm"], "image/dicom-rle": ["drle"], "image/emf": ["emf"], "image/fits": ["fits"], "image/g3fax": ["g3"], "image/gif": ["gif"], "image/heic": ["heic"], "image/heic-sequence": ["heics"], "image/heif": ["heif"], "image/heif-sequence": ["heifs"], "image/hej2k": ["hej2"], "image/hsj2": ["hsj2"], "image/ief": ["ief"], "image/jls": ["jls"], "image/jp2": ["jp2", "jpg2"], "image/jpeg": ["jpeg", "jpg", "jpe"], "image/jph": ["jph"], "image/jphc": ["jhc"], "image/jpm": ["jpm"], "image/jpx": ["jpx", "jpf"], "image/jxr": ["jxr"], "image/jxra": ["jxra"], "image/jxrs": ["jxrs"], "image/jxs": ["jxs"], "image/jxsc": ["jxsc"], "image/jxsi": ["jxsi"], "image/jxss": ["jxss"], "image/ktx": ["ktx"], "image/ktx2": ["ktx2"], "image/png": ["png"], "image/sgi": ["sgi"], "image/svg+xml": ["svg", "svgz"], "image/t38": ["t38"], "image/tiff": ["tif", "tiff"], "image/tiff-fx": ["tfx"], "image/webp": ["webp"], "image/wmf": ["wmf"], "message/disposition-notification": ["disposition-notification"], "message/global": ["u8msg"], "message/global-delivery-status": ["u8dsn"], "message/global-disposition-notification": ["u8mdn"], "message/global-headers": ["u8hdr"], "message/rfc822": ["eml", "mime"], "model/3mf": ["3mf"], "model/gltf+json": ["gltf"], "model/gltf-binary": ["glb"], "model/iges": ["igs", "iges"], "model/mesh": ["msh", "mesh", "silo"], "model/mtl": ["mtl"], "model/obj": ["obj"], "model/step+xml": ["stpx"], "model/step+zip": ["stpz"], "model/step-xml+zip": ["stpxz"], "model/stl": ["stl"], "model/vrml": ["wrl", "vrml"], "model/x3d+binary": ["*x3db", "x3dbz"], "model/x3d+fastinfoset": ["x3db"], "model/x3d+vrml": ["*x3dv", "x3dvz"], "model/x3d+xml": ["x3d", "x3dz"], "model/x3d-vrml": ["x3dv"], "text/cache-manifest": ["appcache", "manifest"], "text/calendar": ["ics", "ifb"], "text/coffeescript": ["coffee", "litcoffee"], "text/css": ["css"], "text/csv": ["csv"], "text/html": ["html", "htm", "shtml"], "text/jade": ["jade"], "text/jsx": ["jsx"], "text/less": ["less"], "text/markdown": ["markdown", "md"], "text/mathml": ["mml"], "text/mdx": ["mdx"], "text/n3": ["n3"], "text/plain": ["txt", "text", "conf", "def", "list", "log", "in", "ini"], "text/richtext": ["rtx"], "text/rtf": ["*rtf"], "text/sgml": ["sgml", "sgm"], "text/shex": ["shex"], "text/slim": ["slim", "slm"], "text/spdx": ["spdx"], "text/stylus": ["stylus", "styl"], "text/tab-separated-values": ["tsv"], "text/troff": ["t", "tr", "roff", "man", "me", "ms"], "text/turtle": ["ttl"], "text/uri-list": ["uri", "uris", "urls"], "text/vcard": ["vcard"], "text/vtt": ["vtt"], "text/xml": ["*xml"], "text/yaml": ["yaml", "yml"], "video/3gpp": ["3gp", "3gpp"], "video/3gpp2": ["3g2"], "video/h261": ["h261"], "video/h263": ["h263"], "video/h264": ["h264"], "video/iso.segment": ["m4s"], "video/jpeg": ["jpgv"], "video/jpm": ["*jpm", "jpgm"], "video/mj2": ["mj2", "mjp2"], "video/mp2t": ["ts"], "video/mp4": ["mp4", "mp4v", "mpg4"], "video/mpeg": ["mpeg", "mpg", "mpe", "m1v", "m2v"], "video/ogg": ["ogv"], "video/quicktime": ["qt", "mov"], "video/webm": ["webm"] };
+  }
+});
+
+// node_modules/mime/types/other.js
+var require_other = __commonJS({
+  "node_modules/mime/types/other.js"(exports, module) {
+    module.exports = { "application/prs.cww": ["cww"], "application/vnd.1000minds.decision-model+xml": ["1km"], "application/vnd.3gpp.pic-bw-large": ["plb"], "application/vnd.3gpp.pic-bw-small": ["psb"], "application/vnd.3gpp.pic-bw-var": ["pvb"], "application/vnd.3gpp2.tcap": ["tcap"], "application/vnd.3m.post-it-notes": ["pwn"], "application/vnd.accpac.simply.aso": ["aso"], "application/vnd.accpac.simply.imp": ["imp"], "application/vnd.acucobol": ["acu"], "application/vnd.acucorp": ["atc", "acutc"], "application/vnd.adobe.air-application-installer-package+zip": ["air"], "application/vnd.adobe.formscentral.fcdt": ["fcdt"], "application/vnd.adobe.fxp": ["fxp", "fxpl"], "application/vnd.adobe.xdp+xml": ["xdp"], "application/vnd.adobe.xfdf": ["xfdf"], "application/vnd.ahead.space": ["ahead"], "application/vnd.airzip.filesecure.azf": ["azf"], "application/vnd.airzip.filesecure.azs": ["azs"], "application/vnd.amazon.ebook": ["azw"], "application/vnd.americandynamics.acc": ["acc"], "application/vnd.amiga.ami": ["ami"], "application/vnd.android.package-archive": ["apk"], "application/vnd.anser-web-certificate-issue-initiation": ["cii"], "application/vnd.anser-web-funds-transfer-initiation": ["fti"], "application/vnd.antix.game-component": ["atx"], "application/vnd.apple.installer+xml": ["mpkg"], "application/vnd.apple.keynote": ["key"], "application/vnd.apple.mpegurl": ["m3u8"], "application/vnd.apple.numbers": ["numbers"], "application/vnd.apple.pages": ["pages"], "application/vnd.apple.pkpass": ["pkpass"], "application/vnd.aristanetworks.swi": ["swi"], "application/vnd.astraea-software.iota": ["iota"], "application/vnd.audiograph": ["aep"], "application/vnd.balsamiq.bmml+xml": ["bmml"], "application/vnd.blueice.multipass": ["mpm"], "application/vnd.bmi": ["bmi"], "application/vnd.businessobjects": ["rep"], "application/vnd.chemdraw+xml": ["cdxml"], "application/vnd.chipnuts.karaoke-mmd": ["mmd"], "application/vnd.cinderella": ["cdy"], "application/vnd.citationstyles.style+xml": ["csl"], "application/vnd.claymore": ["cla"], "application/vnd.cloanto.rp9": ["rp9"], "application/vnd.clonk.c4group": ["c4g", "c4d", "c4f", "c4p", "c4u"], "application/vnd.cluetrust.cartomobile-config": ["c11amc"], "application/vnd.cluetrust.cartomobile-config-pkg": ["c11amz"], "application/vnd.commonspace": ["csp"], "application/vnd.contact.cmsg": ["cdbcmsg"], "application/vnd.cosmocaller": ["cmc"], "application/vnd.crick.clicker": ["clkx"], "application/vnd.crick.clicker.keyboard": ["clkk"], "application/vnd.crick.clicker.palette": ["clkp"], "application/vnd.crick.clicker.template": ["clkt"], "application/vnd.crick.clicker.wordbank": ["clkw"], "application/vnd.criticaltools.wbs+xml": ["wbs"], "application/vnd.ctc-posml": ["pml"], "application/vnd.cups-ppd": ["ppd"], "application/vnd.curl.car": ["car"], "application/vnd.curl.pcurl": ["pcurl"], "application/vnd.dart": ["dart"], "application/vnd.data-vision.rdz": ["rdz"], "application/vnd.dbf": ["dbf"], "application/vnd.dece.data": ["uvf", "uvvf", "uvd", "uvvd"], "application/vnd.dece.ttml+xml": ["uvt", "uvvt"], "application/vnd.dece.unspecified": ["uvx", "uvvx"], "application/vnd.dece.zip": ["uvz", "uvvz"], "application/vnd.denovo.fcselayout-link": ["fe_launch"], "application/vnd.dna": ["dna"], "application/vnd.dolby.mlp": ["mlp"], "application/vnd.dpgraph": ["dpg"], "application/vnd.dreamfactory": ["dfac"], "application/vnd.ds-keypoint": ["kpxx"], "application/vnd.dvb.ait": ["ait"], "application/vnd.dvb.service": ["svc"], "application/vnd.dynageo": ["geo"], "application/vnd.ecowin.chart": ["mag"], "application/vnd.enliven": ["nml"], "application/vnd.epson.esf": ["esf"], "application/vnd.epson.msf": ["msf"], "application/vnd.epson.quickanime": ["qam"], "application/vnd.epson.salt": ["slt"], "application/vnd.epson.ssf": ["ssf"], "application/vnd.eszigno3+xml": ["es3", "et3"], "application/vnd.ezpix-album": ["ez2"], "application/vnd.ezpix-package": ["ez3"], "application/vnd.fdf": ["fdf"], "application/vnd.fdsn.mseed": ["mseed"], "application/vnd.fdsn.seed": ["seed", "dataless"], "application/vnd.flographit": ["gph"], "application/vnd.fluxtime.clip": ["ftc"], "application/vnd.framemaker": ["fm", "frame", "maker", "book"], "application/vnd.frogans.fnc": ["fnc"], "application/vnd.frogans.ltf": ["ltf"], "application/vnd.fsc.weblaunch": ["fsc"], "application/vnd.fujitsu.oasys": ["oas"], "application/vnd.fujitsu.oasys2": ["oa2"], "application/vnd.fujitsu.oasys3": ["oa3"], "application/vnd.fujitsu.oasysgp": ["fg5"], "application/vnd.fujitsu.oasysprs": ["bh2"], "application/vnd.fujixerox.ddd": ["ddd"], "application/vnd.fujixerox.docuworks": ["xdw"], "application/vnd.fujixerox.docuworks.binder": ["xbd"], "application/vnd.fuzzysheet": ["fzs"], "application/vnd.genomatix.tuxedo": ["txd"], "application/vnd.geogebra.file": ["ggb"], "application/vnd.geogebra.tool": ["ggt"], "application/vnd.geometry-explorer": ["gex", "gre"], "application/vnd.geonext": ["gxt"], "application/vnd.geoplan": ["g2w"], "application/vnd.geospace": ["g3w"], "application/vnd.gmx": ["gmx"], "application/vnd.google-apps.document": ["gdoc"], "application/vnd.google-apps.presentation": ["gslides"], "application/vnd.google-apps.spreadsheet": ["gsheet"], "application/vnd.google-earth.kml+xml": ["kml"], "application/vnd.google-earth.kmz": ["kmz"], "application/vnd.grafeq": ["gqf", "gqs"], "application/vnd.groove-account": ["gac"], "application/vnd.groove-help": ["ghf"], "application/vnd.groove-identity-message": ["gim"], "application/vnd.groove-injector": ["grv"], "application/vnd.groove-tool-message": ["gtm"], "application/vnd.groove-tool-template": ["tpl"], "application/vnd.groove-vcard": ["vcg"], "application/vnd.hal+xml": ["hal"], "application/vnd.handheld-entertainment+xml": ["zmm"], "application/vnd.hbci": ["hbci"], "application/vnd.hhe.lesson-player": ["les"], "application/vnd.hp-hpgl": ["hpgl"], "application/vnd.hp-hpid": ["hpid"], "application/vnd.hp-hps": ["hps"], "application/vnd.hp-jlyt": ["jlt"], "application/vnd.hp-pcl": ["pcl"], "application/vnd.hp-pclxl": ["pclxl"], "application/vnd.hydrostatix.sof-data": ["sfd-hdstx"], "application/vnd.ibm.minipay": ["mpy"], "application/vnd.ibm.modcap": ["afp", "listafp", "list3820"], "application/vnd.ibm.rights-management": ["irm"], "application/vnd.ibm.secure-container": ["sc"], "application/vnd.iccprofile": ["icc", "icm"], "application/vnd.igloader": ["igl"], "application/vnd.immervision-ivp": ["ivp"], "application/vnd.immervision-ivu": ["ivu"], "application/vnd.insors.igm": ["igm"], "application/vnd.intercon.formnet": ["xpw", "xpx"], "application/vnd.intergeo": ["i2g"], "application/vnd.intu.qbo": ["qbo"], "application/vnd.intu.qfx": ["qfx"], "application/vnd.ipunplugged.rcprofile": ["rcprofile"], "application/vnd.irepository.package+xml": ["irp"], "application/vnd.is-xpr": ["xpr"], "application/vnd.isac.fcs": ["fcs"], "application/vnd.jam": ["jam"], "application/vnd.jcp.javame.midlet-rms": ["rms"], "application/vnd.jisp": ["jisp"], "application/vnd.joost.joda-archive": ["joda"], "application/vnd.kahootz": ["ktz", "ktr"], "application/vnd.kde.karbon": ["karbon"], "application/vnd.kde.kchart": ["chrt"], "application/vnd.kde.kformula": ["kfo"], "application/vnd.kde.kivio": ["flw"], "application/vnd.kde.kontour": ["kon"], "application/vnd.kde.kpresenter": ["kpr", "kpt"], "application/vnd.kde.kspread": ["ksp"], "application/vnd.kde.kword": ["kwd", "kwt"], "application/vnd.kenameaapp": ["htke"], "application/vnd.kidspiration": ["kia"], "application/vnd.kinar": ["kne", "knp"], "application/vnd.koan": ["skp", "skd", "skt", "skm"], "application/vnd.kodak-descriptor": ["sse"], "application/vnd.las.las+xml": ["lasxml"], "application/vnd.llamagraphics.life-balance.desktop": ["lbd"], "application/vnd.llamagraphics.life-balance.exchange+xml": ["lbe"], "application/vnd.lotus-1-2-3": ["123"], "application/vnd.lotus-approach": ["apr"], "application/vnd.lotus-freelance": ["pre"], "application/vnd.lotus-notes": ["nsf"], "application/vnd.lotus-organizer": ["org"], "application/vnd.lotus-screencam": ["scm"], "application/vnd.lotus-wordpro": ["lwp"], "application/vnd.macports.portpkg": ["portpkg"], "application/vnd.mapbox-vector-tile": ["mvt"], "application/vnd.mcd": ["mcd"], "application/vnd.medcalcdata": ["mc1"], "application/vnd.mediastation.cdkey": ["cdkey"], "application/vnd.mfer": ["mwf"], "application/vnd.mfmp": ["mfm"], "application/vnd.micrografx.flo": ["flo"], "application/vnd.micrografx.igx": ["igx"], "application/vnd.mif": ["mif"], "application/vnd.mobius.daf": ["daf"], "application/vnd.mobius.dis": ["dis"], "application/vnd.mobius.mbk": ["mbk"], "application/vnd.mobius.mqy": ["mqy"], "application/vnd.mobius.msl": ["msl"], "application/vnd.mobius.plc": ["plc"], "application/vnd.mobius.txf": ["txf"], "application/vnd.mophun.application": ["mpn"], "application/vnd.mophun.certificate": ["mpc"], "application/vnd.mozilla.xul+xml": ["xul"], "application/vnd.ms-artgalry": ["cil"], "application/vnd.ms-cab-compressed": ["cab"], "application/vnd.ms-excel": ["xls", "xlm", "xla", "xlc", "xlt", "xlw"], "application/vnd.ms-excel.addin.macroenabled.12": ["xlam"], "application/vnd.ms-excel.sheet.binary.macroenabled.12": ["xlsb"], "application/vnd.ms-excel.sheet.macroenabled.12": ["xlsm"], "application/vnd.ms-excel.template.macroenabled.12": ["xltm"], "application/vnd.ms-fontobject": ["eot"], "application/vnd.ms-htmlhelp": ["chm"], "application/vnd.ms-ims": ["ims"], "application/vnd.ms-lrm": ["lrm"], "application/vnd.ms-officetheme": ["thmx"], "application/vnd.ms-outlook": ["msg"], "application/vnd.ms-pki.seccat": ["cat"], "application/vnd.ms-pki.stl": ["*stl"], "application/vnd.ms-powerpoint": ["ppt", "pps", "pot"], "application/vnd.ms-powerpoint.addin.macroenabled.12": ["ppam"], "application/vnd.ms-powerpoint.presentation.macroenabled.12": ["pptm"], "application/vnd.ms-powerpoint.slide.macroenabled.12": ["sldm"], "application/vnd.ms-powerpoint.slideshow.macroenabled.12": ["ppsm"], "application/vnd.ms-powerpoint.template.macroenabled.12": ["potm"], "application/vnd.ms-project": ["mpp", "mpt"], "application/vnd.ms-word.document.macroenabled.12": ["docm"], "application/vnd.ms-word.template.macroenabled.12": ["dotm"], "application/vnd.ms-works": ["wps", "wks", "wcm", "wdb"], "application/vnd.ms-wpl": ["wpl"], "application/vnd.ms-xpsdocument": ["xps"], "application/vnd.mseq": ["mseq"], "application/vnd.musician": ["mus"], "application/vnd.muvee.style": ["msty"], "application/vnd.mynfc": ["taglet"], "application/vnd.neurolanguage.nlu": ["nlu"], "application/vnd.nitf": ["ntf", "nitf"], "application/vnd.noblenet-directory": ["nnd"], "application/vnd.noblenet-sealer": ["nns"], "application/vnd.noblenet-web": ["nnw"], "application/vnd.nokia.n-gage.ac+xml": ["*ac"], "application/vnd.nokia.n-gage.data": ["ngdat"], "application/vnd.nokia.n-gage.symbian.install": ["n-gage"], "application/vnd.nokia.radio-preset": ["rpst"], "application/vnd.nokia.radio-presets": ["rpss"], "application/vnd.novadigm.edm": ["edm"], "application/vnd.novadigm.edx": ["edx"], "application/vnd.novadigm.ext": ["ext"], "application/vnd.oasis.opendocument.chart": ["odc"], "application/vnd.oasis.opendocument.chart-template": ["otc"], "application/vnd.oasis.opendocument.database": ["odb"], "application/vnd.oasis.opendocument.formula": ["odf"], "application/vnd.oasis.opendocument.formula-template": ["odft"], "application/vnd.oasis.opendocument.graphics": ["odg"], "application/vnd.oasis.opendocument.graphics-template": ["otg"], "application/vnd.oasis.opendocument.image": ["odi"], "application/vnd.oasis.opendocument.image-template": ["oti"], "application/vnd.oasis.opendocument.presentation": ["odp"], "application/vnd.oasis.opendocument.presentation-template": ["otp"], "application/vnd.oasis.opendocument.spreadsheet": ["ods"], "application/vnd.oasis.opendocument.spreadsheet-template": ["ots"], "application/vnd.oasis.opendocument.text": ["odt"], "application/vnd.oasis.opendocument.text-master": ["odm"], "application/vnd.oasis.opendocument.text-template": ["ott"], "application/vnd.oasis.opendocument.text-web": ["oth"], "application/vnd.olpc-sugar": ["xo"], "application/vnd.oma.dd2+xml": ["dd2"], "application/vnd.openblox.game+xml": ["obgx"], "application/vnd.openofficeorg.extension": ["oxt"], "application/vnd.openstreetmap.data+xml": ["osm"], "application/vnd.openxmlformats-officedocument.presentationml.presentation": ["pptx"], "application/vnd.openxmlformats-officedocument.presentationml.slide": ["sldx"], "application/vnd.openxmlformats-officedocument.presentationml.slideshow": ["ppsx"], "application/vnd.openxmlformats-officedocument.presentationml.template": ["potx"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ["xlsx"], "application/vnd.openxmlformats-officedocument.spreadsheetml.template": ["xltx"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ["docx"], "application/vnd.openxmlformats-officedocument.wordprocessingml.template": ["dotx"], "application/vnd.osgeo.mapguide.package": ["mgp"], "application/vnd.osgi.dp": ["dp"], "application/vnd.osgi.subsystem": ["esa"], "application/vnd.palm": ["pdb", "pqa", "oprc"], "application/vnd.pawaafile": ["paw"], "application/vnd.pg.format": ["str"], "application/vnd.pg.osasli": ["ei6"], "application/vnd.picsel": ["efif"], "application/vnd.pmi.widget": ["wg"], "application/vnd.pocketlearn": ["plf"], "application/vnd.powerbuilder6": ["pbd"], "application/vnd.previewsystems.box": ["box"], "application/vnd.proteus.magazine": ["mgz"], "application/vnd.publishare-delta-tree": ["qps"], "application/vnd.pvi.ptid1": ["ptid"], "application/vnd.quark.quarkxpress": ["qxd", "qxt", "qwd", "qwt", "qxl", "qxb"], "application/vnd.rar": ["rar"], "application/vnd.realvnc.bed": ["bed"], "application/vnd.recordare.musicxml": ["mxl"], "application/vnd.recordare.musicxml+xml": ["musicxml"], "application/vnd.rig.cryptonote": ["cryptonote"], "application/vnd.rim.cod": ["cod"], "application/vnd.rn-realmedia": ["rm"], "application/vnd.rn-realmedia-vbr": ["rmvb"], "application/vnd.route66.link66+xml": ["link66"], "application/vnd.sailingtracker.track": ["st"], "application/vnd.seemail": ["see"], "application/vnd.sema": ["sema"], "application/vnd.semd": ["semd"], "application/vnd.semf": ["semf"], "application/vnd.shana.informed.formdata": ["ifm"], "application/vnd.shana.informed.formtemplate": ["itp"], "application/vnd.shana.informed.interchange": ["iif"], "application/vnd.shana.informed.package": ["ipk"], "application/vnd.simtech-mindmapper": ["twd", "twds"], "application/vnd.smaf": ["mmf"], "application/vnd.smart.teacher": ["teacher"], "application/vnd.software602.filler.form+xml": ["fo"], "application/vnd.solent.sdkm+xml": ["sdkm", "sdkd"], "application/vnd.spotfire.dxp": ["dxp"], "application/vnd.spotfire.sfs": ["sfs"], "application/vnd.stardivision.calc": ["sdc"], "application/vnd.stardivision.draw": ["sda"], "application/vnd.stardivision.impress": ["sdd"], "application/vnd.stardivision.math": ["smf"], "application/vnd.stardivision.writer": ["sdw", "vor"], "application/vnd.stardivision.writer-global": ["sgl"], "application/vnd.stepmania.package": ["smzip"], "application/vnd.stepmania.stepchart": ["sm"], "application/vnd.sun.wadl+xml": ["wadl"], "application/vnd.sun.xml.calc": ["sxc"], "application/vnd.sun.xml.calc.template": ["stc"], "application/vnd.sun.xml.draw": ["sxd"], "application/vnd.sun.xml.draw.template": ["std"], "application/vnd.sun.xml.impress": ["sxi"], "application/vnd.sun.xml.impress.template": ["sti"], "application/vnd.sun.xml.math": ["sxm"], "application/vnd.sun.xml.writer": ["sxw"], "application/vnd.sun.xml.writer.global": ["sxg"], "application/vnd.sun.xml.writer.template": ["stw"], "application/vnd.sus-calendar": ["sus", "susp"], "application/vnd.svd": ["svd"], "application/vnd.symbian.install": ["sis", "sisx"], "application/vnd.syncml+xml": ["xsm"], "application/vnd.syncml.dm+wbxml": ["bdm"], "application/vnd.syncml.dm+xml": ["xdm"], "application/vnd.syncml.dmddf+xml": ["ddf"], "application/vnd.tao.intent-module-archive": ["tao"], "application/vnd.tcpdump.pcap": ["pcap", "cap", "dmp"], "application/vnd.tmobile-livetv": ["tmo"], "application/vnd.trid.tpt": ["tpt"], "application/vnd.triscape.mxs": ["mxs"], "application/vnd.trueapp": ["tra"], "application/vnd.ufdl": ["ufd", "ufdl"], "application/vnd.uiq.theme": ["utz"], "application/vnd.umajin": ["umj"], "application/vnd.unity": ["unityweb"], "application/vnd.uoml+xml": ["uoml"], "application/vnd.vcx": ["vcx"], "application/vnd.visio": ["vsd", "vst", "vss", "vsw"], "application/vnd.visionary": ["vis"], "application/vnd.vsf": ["vsf"], "application/vnd.wap.wbxml": ["wbxml"], "application/vnd.wap.wmlc": ["wmlc"], "application/vnd.wap.wmlscriptc": ["wmlsc"], "application/vnd.webturbo": ["wtb"], "application/vnd.wolfram.player": ["nbp"], "application/vnd.wordperfect": ["wpd"], "application/vnd.wqd": ["wqd"], "application/vnd.wt.stf": ["stf"], "application/vnd.xara": ["xar"], "application/vnd.xfdl": ["xfdl"], "application/vnd.yamaha.hv-dic": ["hvd"], "application/vnd.yamaha.hv-script": ["hvs"], "application/vnd.yamaha.hv-voice": ["hvp"], "application/vnd.yamaha.openscoreformat": ["osf"], "application/vnd.yamaha.openscoreformat.osfpvg+xml": ["osfpvg"], "application/vnd.yamaha.smaf-audio": ["saf"], "application/vnd.yamaha.smaf-phrase": ["spf"], "application/vnd.yellowriver-custom-menu": ["cmp"], "application/vnd.zul": ["zir", "zirz"], "application/vnd.zzazz.deck+xml": ["zaz"], "application/x-7z-compressed": ["7z"], "application/x-abiword": ["abw"], "application/x-ace-compressed": ["ace"], "application/x-apple-diskimage": ["*dmg"], "application/x-arj": ["arj"], "application/x-authorware-bin": ["aab", "x32", "u32", "vox"], "application/x-authorware-map": ["aam"], "application/x-authorware-seg": ["aas"], "application/x-bcpio": ["bcpio"], "application/x-bdoc": ["*bdoc"], "application/x-bittorrent": ["torrent"], "application/x-blorb": ["blb", "blorb"], "application/x-bzip": ["bz"], "application/x-bzip2": ["bz2", "boz"], "application/x-cbr": ["cbr", "cba", "cbt", "cbz", "cb7"], "application/x-cdlink": ["vcd"], "application/x-cfs-compressed": ["cfs"], "application/x-chat": ["chat"], "application/x-chess-pgn": ["pgn"], "application/x-chrome-extension": ["crx"], "application/x-cocoa": ["cco"], "application/x-conference": ["nsc"], "application/x-cpio": ["cpio"], "application/x-csh": ["csh"], "application/x-debian-package": ["*deb", "udeb"], "application/x-dgc-compressed": ["dgc"], "application/x-director": ["dir", "dcr", "dxr", "cst", "cct", "cxt", "w3d", "fgd", "swa"], "application/x-doom": ["wad"], "application/x-dtbncx+xml": ["ncx"], "application/x-dtbook+xml": ["dtb"], "application/x-dtbresource+xml": ["res"], "application/x-dvi": ["dvi"], "application/x-envoy": ["evy"], "application/x-eva": ["eva"], "application/x-font-bdf": ["bdf"], "application/x-font-ghostscript": ["gsf"], "application/x-font-linux-psf": ["psf"], "application/x-font-pcf": ["pcf"], "application/x-font-snf": ["snf"], "application/x-font-type1": ["pfa", "pfb", "pfm", "afm"], "application/x-freearc": ["arc"], "application/x-futuresplash": ["spl"], "application/x-gca-compressed": ["gca"], "application/x-glulx": ["ulx"], "application/x-gnumeric": ["gnumeric"], "application/x-gramps-xml": ["gramps"], "application/x-gtar": ["gtar"], "application/x-hdf": ["hdf"], "application/x-httpd-php": ["php"], "application/x-install-instructions": ["install"], "application/x-iso9660-image": ["*iso"], "application/x-iwork-keynote-sffkey": ["*key"], "application/x-iwork-numbers-sffnumbers": ["*numbers"], "application/x-iwork-pages-sffpages": ["*pages"], "application/x-java-archive-diff": ["jardiff"], "application/x-java-jnlp-file": ["jnlp"], "application/x-keepass2": ["kdbx"], "application/x-latex": ["latex"], "application/x-lua-bytecode": ["luac"], "application/x-lzh-compressed": ["lzh", "lha"], "application/x-makeself": ["run"], "application/x-mie": ["mie"], "application/x-mobipocket-ebook": ["prc", "mobi"], "application/x-ms-application": ["application"], "application/x-ms-shortcut": ["lnk"], "application/x-ms-wmd": ["wmd"], "application/x-ms-wmz": ["wmz"], "application/x-ms-xbap": ["xbap"], "application/x-msaccess": ["mdb"], "application/x-msbinder": ["obd"], "application/x-mscardfile": ["crd"], "application/x-msclip": ["clp"], "application/x-msdos-program": ["*exe"], "application/x-msdownload": ["*exe", "*dll", "com", "bat", "*msi"], "application/x-msmediaview": ["mvb", "m13", "m14"], "application/x-msmetafile": ["*wmf", "*wmz", "*emf", "emz"], "application/x-msmoney": ["mny"], "application/x-mspublisher": ["pub"], "application/x-msschedule": ["scd"], "application/x-msterminal": ["trm"], "application/x-mswrite": ["wri"], "application/x-netcdf": ["nc", "cdf"], "application/x-ns-proxy-autoconfig": ["pac"], "application/x-nzb": ["nzb"], "application/x-perl": ["pl", "pm"], "application/x-pilot": ["*prc", "*pdb"], "application/x-pkcs12": ["p12", "pfx"], "application/x-pkcs7-certificates": ["p7b", "spc"], "application/x-pkcs7-certreqresp": ["p7r"], "application/x-rar-compressed": ["*rar"], "application/x-redhat-package-manager": ["rpm"], "application/x-research-info-systems": ["ris"], "application/x-sea": ["sea"], "application/x-sh": ["sh"], "application/x-shar": ["shar"], "application/x-shockwave-flash": ["swf"], "application/x-silverlight-app": ["xap"], "application/x-sql": ["sql"], "application/x-stuffit": ["sit"], "application/x-stuffitx": ["sitx"], "application/x-subrip": ["srt"], "application/x-sv4cpio": ["sv4cpio"], "application/x-sv4crc": ["sv4crc"], "application/x-t3vm-image": ["t3"], "application/x-tads": ["gam"], "application/x-tar": ["tar"], "application/x-tcl": ["tcl", "tk"], "application/x-tex": ["tex"], "application/x-tex-tfm": ["tfm"], "application/x-texinfo": ["texinfo", "texi"], "application/x-tgif": ["*obj"], "application/x-ustar": ["ustar"], "application/x-virtualbox-hdd": ["hdd"], "application/x-virtualbox-ova": ["ova"], "application/x-virtualbox-ovf": ["ovf"], "application/x-virtualbox-vbox": ["vbox"], "application/x-virtualbox-vbox-extpack": ["vbox-extpack"], "application/x-virtualbox-vdi": ["vdi"], "application/x-virtualbox-vhd": ["vhd"], "application/x-virtualbox-vmdk": ["vmdk"], "application/x-wais-source": ["src"], "application/x-web-app-manifest+json": ["webapp"], "application/x-x509-ca-cert": ["der", "crt", "pem"], "application/x-xfig": ["fig"], "application/x-xliff+xml": ["*xlf"], "application/x-xpinstall": ["xpi"], "application/x-xz": ["xz"], "application/x-zmachine": ["z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8"], "audio/vnd.dece.audio": ["uva", "uvva"], "audio/vnd.digital-winds": ["eol"], "audio/vnd.dra": ["dra"], "audio/vnd.dts": ["dts"], "audio/vnd.dts.hd": ["dtshd"], "audio/vnd.lucent.voice": ["lvp"], "audio/vnd.ms-playready.media.pya": ["pya"], "audio/vnd.nuera.ecelp4800": ["ecelp4800"], "audio/vnd.nuera.ecelp7470": ["ecelp7470"], "audio/vnd.nuera.ecelp9600": ["ecelp9600"], "audio/vnd.rip": ["rip"], "audio/x-aac": ["aac"], "audio/x-aiff": ["aif", "aiff", "aifc"], "audio/x-caf": ["caf"], "audio/x-flac": ["flac"], "audio/x-m4a": ["*m4a"], "audio/x-matroska": ["mka"], "audio/x-mpegurl": ["m3u"], "audio/x-ms-wax": ["wax"], "audio/x-ms-wma": ["wma"], "audio/x-pn-realaudio": ["ram", "ra"], "audio/x-pn-realaudio-plugin": ["rmp"], "audio/x-realaudio": ["*ra"], "audio/x-wav": ["*wav"], "chemical/x-cdx": ["cdx"], "chemical/x-cif": ["cif"], "chemical/x-cmdf": ["cmdf"], "chemical/x-cml": ["cml"], "chemical/x-csml": ["csml"], "chemical/x-xyz": ["xyz"], "image/prs.btif": ["btif"], "image/prs.pti": ["pti"], "image/vnd.adobe.photoshop": ["psd"], "image/vnd.airzip.accelerator.azv": ["azv"], "image/vnd.dece.graphic": ["uvi", "uvvi", "uvg", "uvvg"], "image/vnd.djvu": ["djvu", "djv"], "image/vnd.dvb.subtitle": ["*sub"], "image/vnd.dwg": ["dwg"], "image/vnd.dxf": ["dxf"], "image/vnd.fastbidsheet": ["fbs"], "image/vnd.fpx": ["fpx"], "image/vnd.fst": ["fst"], "image/vnd.fujixerox.edmics-mmr": ["mmr"], "image/vnd.fujixerox.edmics-rlc": ["rlc"], "image/vnd.microsoft.icon": ["ico"], "image/vnd.ms-dds": ["dds"], "image/vnd.ms-modi": ["mdi"], "image/vnd.ms-photo": ["wdp"], "image/vnd.net-fpx": ["npx"], "image/vnd.pco.b16": ["b16"], "image/vnd.tencent.tap": ["tap"], "image/vnd.valve.source.texture": ["vtf"], "image/vnd.wap.wbmp": ["wbmp"], "image/vnd.xiff": ["xif"], "image/vnd.zbrush.pcx": ["pcx"], "image/x-3ds": ["3ds"], "image/x-cmu-raster": ["ras"], "image/x-cmx": ["cmx"], "image/x-freehand": ["fh", "fhc", "fh4", "fh5", "fh7"], "image/x-icon": ["*ico"], "image/x-jng": ["jng"], "image/x-mrsid-image": ["sid"], "image/x-ms-bmp": ["*bmp"], "image/x-pcx": ["*pcx"], "image/x-pict": ["pic", "pct"], "image/x-portable-anymap": ["pnm"], "image/x-portable-bitmap": ["pbm"], "image/x-portable-graymap": ["pgm"], "image/x-portable-pixmap": ["ppm"], "image/x-rgb": ["rgb"], "image/x-tga": ["tga"], "image/x-xbitmap": ["xbm"], "image/x-xpixmap": ["xpm"], "image/x-xwindowdump": ["xwd"], "message/vnd.wfa.wsc": ["wsc"], "model/vnd.collada+xml": ["dae"], "model/vnd.dwf": ["dwf"], "model/vnd.gdl": ["gdl"], "model/vnd.gtw": ["gtw"], "model/vnd.mts": ["mts"], "model/vnd.opengex": ["ogex"], "model/vnd.parasolid.transmit.binary": ["x_b"], "model/vnd.parasolid.transmit.text": ["x_t"], "model/vnd.sap.vds": ["vds"], "model/vnd.usdz+zip": ["usdz"], "model/vnd.valve.source.compiled-map": ["bsp"], "model/vnd.vtu": ["vtu"], "text/prs.lines.tag": ["dsc"], "text/vnd.curl": ["curl"], "text/vnd.curl.dcurl": ["dcurl"], "text/vnd.curl.mcurl": ["mcurl"], "text/vnd.curl.scurl": ["scurl"], "text/vnd.dvb.subtitle": ["sub"], "text/vnd.fly": ["fly"], "text/vnd.fmi.flexstor": ["flx"], "text/vnd.graphviz": ["gv"], "text/vnd.in3d.3dml": ["3dml"], "text/vnd.in3d.spot": ["spot"], "text/vnd.sun.j2me.app-descriptor": ["jad"], "text/vnd.wap.wml": ["wml"], "text/vnd.wap.wmlscript": ["wmls"], "text/x-asm": ["s", "asm"], "text/x-c": ["c", "cc", "cxx", "cpp", "h", "hh", "dic"], "text/x-component": ["htc"], "text/x-fortran": ["f", "for", "f77", "f90"], "text/x-handlebars-template": ["hbs"], "text/x-java-source": ["java"], "text/x-lua": ["lua"], "text/x-markdown": ["mkd"], "text/x-nfo": ["nfo"], "text/x-opml": ["opml"], "text/x-org": ["*org"], "text/x-pascal": ["p", "pas"], "text/x-processing": ["pde"], "text/x-sass": ["sass"], "text/x-scss": ["scss"], "text/x-setext": ["etx"], "text/x-sfv": ["sfv"], "text/x-suse-ymp": ["ymp"], "text/x-uuencode": ["uu"], "text/x-vcalendar": ["vcs"], "text/x-vcard": ["vcf"], "video/vnd.dece.hd": ["uvh", "uvvh"], "video/vnd.dece.mobile": ["uvm", "uvvm"], "video/vnd.dece.pd": ["uvp", "uvvp"], "video/vnd.dece.sd": ["uvs", "uvvs"], "video/vnd.dece.video": ["uvv", "uvvv"], "video/vnd.dvb.file": ["dvb"], "video/vnd.fvt": ["fvt"], "video/vnd.mpegurl": ["mxu", "m4u"], "video/vnd.ms-playready.media.pyv": ["pyv"], "video/vnd.uvvu.mp4": ["uvu", "uvvu"], "video/vnd.vivo": ["viv"], "video/x-f4v": ["f4v"], "video/x-fli": ["fli"], "video/x-flv": ["flv"], "video/x-m4v": ["m4v"], "video/x-matroska": ["mkv", "mk3d", "mks"], "video/x-mng": ["mng"], "video/x-ms-asf": ["asf", "asx"], "video/x-ms-vob": ["vob"], "video/x-ms-wm": ["wm"], "video/x-ms-wmv": ["wmv"], "video/x-ms-wmx": ["wmx"], "video/x-ms-wvx": ["wvx"], "video/x-msvideo": ["avi"], "video/x-sgi-movie": ["movie"], "video/x-smv": ["smv"], "x-conference/x-cooltalk": ["ice"] };
+  }
+});
+
+// node_modules/mime/index.js
+var require_mime = __commonJS({
+  "node_modules/mime/index.js"(exports, module) {
+    "use strict";
+    var Mime = require_Mime();
+    module.exports = new Mime(require_standard(), require_other());
+  }
+});
+
+// node_modules/@cloudflare/kv-asset-handler/dist/types.js
+var require_types = __commonJS({
+  "node_modules/@cloudflare/kv-asset-handler/dist/types.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.InternalError = exports.NotFoundError = exports.MethodNotAllowedError = exports.KVError = void 0;
+    var KVError = class _KVError extends Error {
+      static {
+        __name(this, "KVError");
+      }
+      constructor(message, status = 500) {
+        super(message);
+        Object.setPrototypeOf(this, new.target.prototype);
+        this.name = _KVError.name;
+        this.status = status;
+      }
+      status;
+    };
+    exports.KVError = KVError;
+    var MethodNotAllowedError = class extends KVError {
+      static {
+        __name(this, "MethodNotAllowedError");
+      }
+      constructor(message = `Not a valid request method`, status = 405) {
+        super(message, status);
+      }
+    };
+    exports.MethodNotAllowedError = MethodNotAllowedError;
+    var NotFoundError = class extends KVError {
+      static {
+        __name(this, "NotFoundError");
+      }
+      constructor(message = `Not Found`, status = 404) {
+        super(message, status);
+      }
+    };
+    exports.NotFoundError = NotFoundError;
+    var InternalError = class extends KVError {
+      static {
+        __name(this, "InternalError");
+      }
+      constructor(message = `Internal Error in KV Asset Handler`, status = 500) {
+        super(message, status);
+      }
+    };
+    exports.InternalError = InternalError;
+  }
+});
+
+// node_modules/@cloudflare/kv-asset-handler/dist/index.js
+var require_dist = __commonJS({
+  "node_modules/@cloudflare/kv-asset-handler/dist/index.js"(exports) {
+    "use strict";
+    var __createBinding = exports && exports.__createBinding || (Object.create ? (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      var desc = Object.getOwnPropertyDescriptor(m, k);
+      if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+        desc = { enumerable: true, get: /* @__PURE__ */ __name(function() {
+          return m[k];
+        }, "get") };
+      }
+      Object.defineProperty(o, k2, desc);
+    }) : (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      o[k2] = m[k];
+    }));
+    var __setModuleDefault = exports && exports.__setModuleDefault || (Object.create ? (function(o, v) {
+      Object.defineProperty(o, "default", { enumerable: true, value: v });
+    }) : function(o, v) {
+      o["default"] = v;
+    });
+    var __importStar = exports && exports.__importStar || function(mod) {
+      if (mod && mod.__esModule) return mod;
+      var result = {};
+      if (mod != null) {
+        for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+      }
+      __setModuleDefault(result, mod);
+      return result;
+    };
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.InternalError = exports.NotFoundError = exports.MethodNotAllowedError = exports.serveSinglePageApp = exports.mapRequestToAsset = exports.getAssetFromKV = void 0;
+    var mime = __importStar(require_mime());
+    var types_1 = require_types();
+    Object.defineProperty(exports, "InternalError", { enumerable: true, get: /* @__PURE__ */ __name(function() {
+      return types_1.InternalError;
+    }, "get") });
+    Object.defineProperty(exports, "MethodNotAllowedError", { enumerable: true, get: /* @__PURE__ */ __name(function() {
+      return types_1.MethodNotAllowedError;
+    }, "get") });
+    Object.defineProperty(exports, "NotFoundError", { enumerable: true, get: /* @__PURE__ */ __name(function() {
+      return types_1.NotFoundError;
+    }, "get") });
+    var defaultCacheControl = {
+      browserTTL: null,
+      edgeTTL: 2 * 60 * 60 * 24,
+      // 2 days
+      bypassCache: false
+      // do not bypass Cloudflare's cache
+    };
+    var parseStringAsObject = /* @__PURE__ */ __name((maybeString) => typeof maybeString === "string" ? JSON.parse(maybeString) : maybeString, "parseStringAsObject");
+    var getAssetFromKVDefaultOptions = {
+      ASSET_NAMESPACE: typeof __STATIC_CONTENT !== "undefined" ? __STATIC_CONTENT : void 0,
+      ASSET_MANIFEST: typeof __STATIC_CONTENT_MANIFEST !== "undefined" ? parseStringAsObject(__STATIC_CONTENT_MANIFEST) : {},
+      cacheControl: defaultCacheControl,
+      defaultMimeType: "text/plain",
+      defaultDocument: "index.html",
+      pathIsEncoded: false,
+      defaultETag: "strong"
+    };
+    function assignOptions(options) {
+      return Object.assign({}, getAssetFromKVDefaultOptions, options);
+    }
+    __name(assignOptions, "assignOptions");
+    var mapRequestToAsset = /* @__PURE__ */ __name((request, options) => {
+      options = assignOptions(options);
+      const parsedUrl = new URL(request.url);
+      let pathname = parsedUrl.pathname;
+      if (pathname.endsWith("/")) {
+        pathname = pathname.concat(options.defaultDocument);
+      } else if (!mime.getType(pathname)) {
+        pathname = pathname.concat("/" + options.defaultDocument);
+      }
+      parsedUrl.pathname = pathname;
+      return new Request(parsedUrl.toString(), request);
+    }, "mapRequestToAsset");
+    exports.mapRequestToAsset = mapRequestToAsset;
+    function serveSinglePageApp(request, options) {
+      options = assignOptions(options);
+      request = mapRequestToAsset(request, options);
+      const parsedUrl = new URL(request.url);
+      if (parsedUrl.pathname.endsWith(".html")) {
+        return new Request(`${parsedUrl.origin}/${options.defaultDocument}`, request);
+      } else {
+        return request;
+      }
+    }
+    __name(serveSinglePageApp, "serveSinglePageApp");
+    exports.serveSinglePageApp = serveSinglePageApp;
+    var getAssetFromKV2 = /* @__PURE__ */ __name(async (event, options) => {
+      options = assignOptions(options);
+      const request = event.request;
+      const ASSET_NAMESPACE = options.ASSET_NAMESPACE;
+      const ASSET_MANIFEST = parseStringAsObject(options.ASSET_MANIFEST);
+      if (typeof ASSET_NAMESPACE === "undefined") {
+        throw new types_1.InternalError(`there is no KV namespace bound to the script`);
+      }
+      const rawPathKey = new URL(request.url).pathname.replace(/^\/+/, "");
+      let pathIsEncoded = options.pathIsEncoded;
+      let requestKey;
+      if (options.mapRequestToAsset) {
+        requestKey = options.mapRequestToAsset(request);
+      } else if (ASSET_MANIFEST[rawPathKey]) {
+        requestKey = request;
+      } else if (ASSET_MANIFEST[decodeURIComponent(rawPathKey)]) {
+        pathIsEncoded = true;
+        requestKey = request;
+      } else {
+        const mappedRequest = mapRequestToAsset(request);
+        const mappedRawPathKey = new URL(mappedRequest.url).pathname.replace(/^\/+/, "");
+        if (ASSET_MANIFEST[decodeURIComponent(mappedRawPathKey)]) {
+          pathIsEncoded = true;
+          requestKey = mappedRequest;
+        } else {
+          requestKey = mapRequestToAsset(request, options);
+        }
+      }
+      const SUPPORTED_METHODS = ["GET", "HEAD"];
+      if (!SUPPORTED_METHODS.includes(requestKey.method)) {
+        throw new types_1.MethodNotAllowedError(`${requestKey.method} is not a valid request method`);
+      }
+      const parsedUrl = new URL(requestKey.url);
+      const pathname = pathIsEncoded ? decodeURIComponent(parsedUrl.pathname) : parsedUrl.pathname;
+      let pathKey = pathname.replace(/^\/+/, "");
+      const cache = caches.default;
+      let mimeType = mime.getType(pathKey) || options.defaultMimeType;
+      if (mimeType.startsWith("text") || mimeType === "application/javascript") {
+        mimeType += "; charset=utf-8";
+      }
+      let shouldEdgeCache = false;
+      if (typeof ASSET_MANIFEST !== "undefined") {
+        if (ASSET_MANIFEST[pathKey]) {
+          pathKey = ASSET_MANIFEST[pathKey];
+          shouldEdgeCache = true;
+        }
+      }
+      const cacheKey = new Request(`${parsedUrl.origin}/${pathKey}`, request);
+      const evalCacheOpts = (() => {
+        switch (typeof options.cacheControl) {
+          case "function":
+            return options.cacheControl(request);
+          case "object":
+            return options.cacheControl;
+          default:
+            return defaultCacheControl;
+        }
+      })();
+      const formatETag = /* @__PURE__ */ __name((entityId = pathKey, validatorType = options.defaultETag) => {
+        if (!entityId) {
+          return "";
+        }
+        switch (validatorType) {
+          case "weak":
+            if (!entityId.startsWith("W/")) {
+              if (entityId.startsWith(`"`) && entityId.endsWith(`"`)) {
+                return `W/${entityId}`;
+              }
+              return `W/"${entityId}"`;
+            }
+            return entityId;
+          case "strong":
+            if (entityId.startsWith(`W/"`)) {
+              entityId = entityId.replace("W/", "");
+            }
+            if (!entityId.endsWith(`"`)) {
+              entityId = `"${entityId}"`;
+            }
+            return entityId;
+          default:
+            return "";
+        }
+      }, "formatETag");
+      options.cacheControl = Object.assign({}, defaultCacheControl, evalCacheOpts);
+      if (options.cacheControl.bypassCache || options.cacheControl.edgeTTL === null || request.method == "HEAD") {
+        shouldEdgeCache = false;
+      }
+      const shouldSetBrowserCache = typeof options.cacheControl.browserTTL === "number";
+      let response = null;
+      if (shouldEdgeCache) {
+        response = await cache.match(cacheKey);
+      }
+      if (response) {
+        if (response.status > 300 && response.status < 400) {
+          if (response.body && "cancel" in Object.getPrototypeOf(response.body)) {
+            response.body.cancel();
+          } else {
+          }
+          response = new Response(null, response);
+        } else {
+          const opts = {
+            headers: new Headers(response.headers),
+            status: 0,
+            statusText: ""
+          };
+          opts.headers.set("cf-cache-status", "HIT");
+          if (response.status) {
+            opts.status = response.status;
+            opts.statusText = response.statusText;
+          } else if (opts.headers.has("Content-Range")) {
+            opts.status = 206;
+            opts.statusText = "Partial Content";
+          } else {
+            opts.status = 200;
+            opts.statusText = "OK";
+          }
+          response = new Response(response.body, opts);
+        }
+      } else {
+        const body = await ASSET_NAMESPACE.get(pathKey, "arrayBuffer");
+        if (body === null) {
+          throw new types_1.NotFoundError(`could not find ${pathKey} in your content namespace`);
+        }
+        response = new Response(body);
+        if (shouldEdgeCache) {
+          response.headers.set("Accept-Ranges", "bytes");
+          response.headers.set("Content-Length", String(body.byteLength));
+          if (!response.headers.has("etag")) {
+            response.headers.set("etag", formatETag(pathKey));
+          }
+          response.headers.set("Cache-Control", `max-age=${options.cacheControl.edgeTTL}`);
+          event.waitUntil(cache.put(cacheKey, response.clone()));
+          response.headers.set("CF-Cache-Status", "MISS");
+        }
+      }
+      response.headers.set("Content-Type", mimeType);
+      if (response.status === 304) {
+        const etag = formatETag(response.headers.get("etag"));
+        const ifNoneMatch = cacheKey.headers.get("if-none-match");
+        const proxyCacheStatus = response.headers.get("CF-Cache-Status");
+        if (etag) {
+          if (ifNoneMatch && ifNoneMatch === etag && proxyCacheStatus === "MISS") {
+            response.headers.set("CF-Cache-Status", "EXPIRED");
+          } else {
+            response.headers.set("CF-Cache-Status", "REVALIDATED");
+          }
+          response.headers.set("etag", formatETag(etag, "weak"));
+        }
+      }
+      if (shouldSetBrowserCache) {
+        response.headers.set("Cache-Control", `max-age=${options.cacheControl.browserTTL}`);
+      } else {
+        response.headers.delete("Cache-Control");
+      }
+      return response;
+    }, "getAssetFromKV");
+    exports.getAssetFromKV = getAssetFromKV2;
+  }
+});
+
+// index.js
+var import_kv_asset_handler = __toESM(require_dist());
 import manifestJSON from "__STATIC_CONTENT_MANIFEST";
-
-const assetManifest = JSON.parse(manifestJSON);
-
-// ---------- password hashing (Web Crypto PBKDF2, no extra deps) ----------
-
-/**
- * Convert a binary buffer (ArrayBuffer or typed array) into a lowercase hex string.
- * Used to turn raw crypto output (hashes, salts, session tokens) into a
- * string that's safe to store in D1 and send over JSON.
- * @param {ArrayBuffer} buf - The raw bytes to encode.
- * @returns {string} Hex-encoded representation of the buffer.
- */
+var assetManifest = JSON.parse(manifestJSON);
 function bufToHex(buf) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-
-/**
- * Convert a hex string back into a raw binary buffer. The inverse of bufToHex.
- * Used to recover a previously-stored salt (saved as hex in D1) into the
- * ArrayBuffer form the Web Crypto API expects.
- * @param {string} hex - Hex-encoded byte string.
- * @returns {ArrayBuffer} The decoded raw bytes.
- */
+__name(bufToHex, "bufToHex");
 function hexToBuf(hex) {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
   return bytes.buffer;
 }
-
-/**
- * Hash a plaintext password with PBKDF2 (100,000 iterations, SHA-256).
- * If saltHex is omitted, a fresh random 16-byte salt is generated — use this
- * path when creating a new password. Pass an existing saltHex (read from the
- * users table) when re-deriving a hash to verify a login attempt, so the
- * same salt produces a comparable hash.
- * @param {string} password - The plaintext password to hash.
- * @param {string} [saltHex] - An existing hex-encoded salt to reuse, or omit to generate a new one.
- * @returns {Promise<{hash: string, salt: string}>} The hex-encoded derived hash and the salt used.
- */
+__name(hexToBuf, "hexToBuf");
 async function hashPassword(password, saltHex) {
   const enc = new TextEncoder();
   const salt = saltHex ? hexToBuf(saltHex) : crypto.getRandomValues(new Uint8Array(16)).buffer;
   const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations: 1e5, hash: "SHA-256" },
     keyMaterial,
     256
   );
   return { hash: bufToHex(bits), salt: bufToHex(salt) };
 }
-
-/**
- * Hash an article's title+content with SHA-256 for integrity polling.
- * Not a security/auth hash (no salt, no secret) — just a cheap fingerprint
- * so a reader's open tab can tell "did this article's published text
- * change" without re-downloading and diffing the full body every few
- * seconds. Title and content are joined with a separator unlikely to
- * appear naturally, so e.g. title:"AB" + content:"C" can't collide with
- * title:"A" + content:"BC".
- * @param {string} title
- * @param {string} content
- * @returns {Promise<string>} Hex-encoded SHA-256 hash.
- */
+__name(hashPassword, "hashPassword");
 async function hashArticleText(title, content) {
   const enc = new TextEncoder();
-  const bits = await crypto.subtle.digest("SHA-256", enc.encode(`${title}\u0000${content}`));
+  const bits = await crypto.subtle.digest("SHA-256", enc.encode(`${title}\0${content}`));
   return bufToHex(bits);
 }
-
-/**
- * Check a login attempt's plaintext password against a stored PBKDF2 hash.
- * Re-derives the hash using the stored salt, then compares byte-by-byte in
- * constant time (XOR-accumulate over the whole string) to avoid leaking
- * timing information that could help an attacker guess the password.
- * @param {string} password - The plaintext password supplied at login.
- * @param {string} storedHash - The hex-encoded hash stored in the users table.
- * @param {string} storedSaltHex - The hex-encoded salt stored alongside that hash.
- * @returns {Promise<boolean>} True if the password is correct.
- */
-
-// ---------- security headers ----------
-
-/**
-/**
- * Constant-time string comparison. Avoids leaking how many leading
- * characters of a secret matched via response-timing differences.
- * Callers must check length equality first (this assumes equal length).
- */
+__name(hashArticleText, "hashArticleText");
 function timingSafeEqualStr(a, b) {
   let mismatch = 0;
   for (let i = 0; i < a.length; i++) {
@@ -95,162 +445,127 @@ function timingSafeEqualStr(a, b) {
   }
   return mismatch === 0;
 }
-
-/**
- * Standard security headers added to every HTML/API response.
- * CSP stops injected scripts; the rest are defence-in-depth headers that
- * cost nothing but significantly raise the bar for common attack classes.
- */
+__name(timingSafeEqualStr, "timingSafeEqualStr");
 function securityHeaders(extraHeaders = {}) {
   return {
     // advertisecraft.chickenkiller.com is allowed so the third-party video ad
     // embed on article pages can load its script, fetch ad data, and render the
     // video (script/connect/img/media/frame).
-    "Content-Security-Policy":
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://advertisecraft.chickenkiller.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com https://advertisecraft.chickenkiller.com data:; connect-src 'self' https://advertisecraft.chickenkiller.com; media-src 'self' https://advertisecraft.chickenkiller.com blob: data:; frame-src https://advertisecraft.chickenkiller.com; font-src 'self'; frame-ancestors 'none';",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://advertisecraft.chickenkiller.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com https://advertisecraft.chickenkiller.com data:; connect-src 'self' https://advertisecraft.chickenkiller.com; media-src 'self' https://advertisecraft.chickenkiller.com blob: data:; frame-src https://advertisecraft.chickenkiller.com; font-src 'self'; frame-ancestors 'none';",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
-    ...extraHeaders,
+    ...extraHeaders
   };
 }
-
-/**
- * Wrap a JSON response with security headers.
- */
+__name(securityHeaders, "securityHeaders");
 function secureJson(data, init = {}) {
   const res = Response.json(data, init);
   const headers = new Headers(res.headers);
   for (const [k, v] of Object.entries(securityHeaders())) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });
 }
-
-
-// ================================================================
-// Resend email helper
-// Uses the Resend API (https://resend.com) — free tier, no smtp config.
-// Requires: RESEND_API_KEY secret  (npx wrangler secret put RESEND_API_KEY)
-//           RESEND_FROM_EMAIL env var in wrangler.toml, e.g. "ads@jaronitenews.com"
-// ================================================================
-// Returns a result object so callers (e.g. the manual "re-send notification"
-// admin action) can report what actually happened instead of failing silently:
-//   { ok: true }                      — delivered
-//   { ok: false, skipped: "reason" }  — not attempted (e.g. no API key / no address)
-//   { ok: false, error: "reason" }    — attempted but failed
+__name(secureJson, "secureJson");
 async function sendEmail(env, { to, subject, html }) {
   const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('RESEND_API_KEY not set — email skipped'); return { ok: false, skipped: 'RESEND_API_KEY not configured' }; }
-  if (!to) return { ok: false, skipped: 'no recipient email' };
-  const from = env.RESEND_FROM_EMAIL || 'Jaronite News <ads@jaronitenews.com>';
+  if (!apiKey) {
+    console.warn("RESEND_API_KEY not set \u2014 email skipped");
+    return { ok: false, skipped: "RESEND_API_KEY not configured" };
+  }
+  if (!to) return { ok: false, skipped: "no recipient email" };
+  const from = env.RESEND_FROM_EMAIL || "Jaronite News <ads@jaronitenews.com>";
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ from, to, subject, html }),
+      body: JSON.stringify({ from, to, subject, html })
     });
     if (!res.ok) {
       const err = await res.text();
-      console.error('Resend error:', res.status, err);
+      console.error("Resend error:", res.status, err);
       return { ok: false, error: `Resend API ${res.status}: ${err.slice(0, 200)}` };
     }
     return { ok: true };
   } catch (e) {
-    console.error('Resend fetch failed:', e);
+    console.error("Resend fetch failed:", e);
     return { ok: false, error: `network error: ${e.message || e}` };
   }
 }
-
-
-// ================================================================
-// Discord DM helper — sends a DM to a user by username via bot
-// Requires: DISCORD_BOT_TOKEN secret  (npx wrangler secret put DISCORD_BOT_TOKEN)
-// Flow: search for user by username → open DM channel → send message
-// Note: the bot must share a server with the recipient, or have
-//       the MESSAGE_CONTENT intent enabled in the Developer Portal.
-// ================================================================
-// Returns a result object (see sendEmail) so callers can surface the outcome:
-//   { ok: true } | { ok: false, skipped: "..." } | { ok: false, error: "..." }
+__name(sendEmail, "sendEmail");
 async function sendDiscordDm(env, discordUsername, message) {
   const token = env.DISCORD_BOT_TOKEN;
-  if (!token) { console.warn('DISCORD_BOT_TOKEN not set — Discord DM skipped'); return { ok: false, skipped: 'DISCORD_BOT_TOKEN not configured' }; }
-  if (!discordUsername) return { ok: false, skipped: 'no Discord username on file' };
-
+  if (!token) {
+    console.warn("DISCORD_BOT_TOKEN not set \u2014 Discord DM skipped");
+    return { ok: false, skipped: "DISCORD_BOT_TOKEN not configured" };
+  }
+  if (!discordUsername) return { ok: false, skipped: "no Discord username on file" };
   try {
-    // Strip any #discriminator suffix (legacy tags like user#1234)
-    const username = discordUsername.replace(/#\d{4}$/, '').trim();
-
-    // Search for the user via the bot's guild member search.
-    // We search the configured guild (server) for the username.
+    const username = discordUsername.replace(/#\d{4}$/, "").trim();
     const guildId = env.DISCORD_GUILD_ID;
-    if (!guildId) { console.warn('DISCORD_GUILD_ID not set — Discord DM skipped'); return { ok: false, skipped: 'DISCORD_GUILD_ID not configured' }; }
-
+    if (!guildId) {
+      console.warn("DISCORD_GUILD_ID not set \u2014 Discord DM skipped");
+      return { ok: false, skipped: "DISCORD_GUILD_ID not configured" };
+    }
     const searchRes = await fetch(
       `https://discord.com/api/v10/guilds/${guildId}/members/search?query=${encodeURIComponent(username)}&limit=5`,
       { headers: { Authorization: `Bot ${token}` } }
     );
     if (!searchRes.ok) {
       const t = await searchRes.text();
-      console.error('Discord member search failed:', searchRes.status, t);
+      console.error("Discord member search failed:", searchRes.status, t);
       return { ok: false, error: `member search ${searchRes.status}: ${t.slice(0, 200)}` };
     }
     const members = await searchRes.json();
-    // Find the closest match — prefer exact username match
-    const member = members.find(m =>
-      m.user.username.toLowerCase() === username.toLowerCase() ||
-      (m.nick && m.nick.toLowerCase() === username.toLowerCase())
+    const member = members.find(
+      (m) => m.user.username.toLowerCase() === username.toLowerCase() || m.nick && m.nick.toLowerCase() === username.toLowerCase()
     ) || members[0];
-
     if (!member) {
       console.warn(`Discord: could not find user "${username}" in guild`);
       return { ok: false, error: `user "${username}" not found in the server` };
     }
     const userId = member.user.id;
-
-    // Open a DM channel
-    const dmRes = await fetch('https://discord.com/api/v10/users/@me/channels', {
-      method: 'POST',
-      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient_id: userId }),
+    const dmRes = await fetch("https://discord.com/api/v10/users/@me/channels", {
+      method: "POST",
+      headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient_id: userId })
     });
     if (!dmRes.ok) {
       const t = await dmRes.text();
-      console.error('Discord DM channel open failed:', dmRes.status, t);
+      console.error("Discord DM channel open failed:", dmRes.status, t);
       return { ok: false, error: `open DM ${dmRes.status}: ${t.slice(0, 200)}` };
     }
     const dmChannel = await dmRes.json();
-
-    // Send the message
     const msgRes = await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: message }),
+      method: "POST",
+      headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ content: message })
     });
     if (!msgRes.ok) {
       const t = await msgRes.text();
-      console.error('Discord message send failed:', msgRes.status, t);
+      console.error("Discord message send failed:", msgRes.status, t);
       return { ok: false, error: `send message ${msgRes.status}: ${t.slice(0, 200)}` };
     }
     return { ok: true };
   } catch (e) {
-    console.error('Discord DM failed:', e);
+    console.error("Discord DM failed:", e);
     return { ok: false, error: `network error: ${e.message || e}` };
   }
 }
-
+__name(sendDiscordDm, "sendDiscordDm");
 function winDiscordMsg(bid, slotLabel) {
   const rate = Number(bid.bid_amount).toFixed(2);
-  return `🎉 **You won a Jaronite News ad slot!**
+  return `\u{1F389} **You won a Jaronite News ad slot!**
 
-Hi **${bid.advertiser_name}** — your bid of **${rate} ℐ/view** won the **${slotLabel}** slot for **${bid.target_date}**.
+Hi **${bid.advertiser_name}** \u2014 your bid of **${rate} \u2110/view** won the **${slotLabel}** slot for **${bid.target_date}**.
 
-**What happens next — please read:**
-• **You don't pay anything yet.**
-• Your ad runs on **${bid.target_date}**, billed by actual views at your **${rate} ℐ/view** rate.
-• After it finishes, we'll send you an **invoice with the exact amount** to pay.
+**What happens next \u2014 please read:**
+\u2022 **You don't pay anything yet.**
+\u2022 Your ad runs on **${bid.target_date}**, billed by actual views at your **${rate} \u2110/view** rate.
+\u2022 After it finishes, we'll send you an **invoice with the exact amount** to pay.
 
 **How to pay (only once you receive your invoice):**
 Run this in-game, replacing \`<amount>\` with the exact figure shown on your invoice:
@@ -260,53 +575,53 @@ Run this in-game, replacing \`<amount>\` with the exact figure shown on your inv
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo exactly as shown so we match your payment automatically. Please don't send payment before you get the invoice.
 
 Questions? Reply here or contact us on the DemocracyCraft Discord.
-— Jaronite News Inc.`;
+\u2014 Jaronite News Inc.`;
 }
-
+__name(winDiscordMsg, "winDiscordMsg");
 function confirmedDiscordMsg(bid, slotLabel, amount, stats = { views: 0, clicks: 0, ctr: 0, cost: 0 }) {
   const rate = Number(bid.bid_amount).toFixed(2);
-  return `✅ **Payment received — thank you!**
+  return `\u2705 **Payment received \u2014 thank you!**
 
-Hi **${bid.advertiser_name}** — we've received your payment of **${Number(amount).toFixed(2)} ℐ** for bid **#${bid.id}** (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.
+Hi **${bid.advertiser_name}** \u2014 we've received your payment of **${Number(amount).toFixed(2)} \u2110** for bid **#${bid.id}** (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.
 
-**📊 Performance report**
-• Views: **${stats.views}**
-• Clicks: **${stats.clicks}**
-• Click-through rate: **${Number(stats.ctr).toFixed(2)}%**
-• Final cost: **${Number(stats.cost).toFixed(2)} ℐ** (at ${rate} ℐ/view)
+**\u{1F4CA} Performance report**
+\u2022 Views: **${stats.views}**
+\u2022 Clicks: **${stats.clicks}**
+\u2022 Click-through rate: **${Number(stats.ctr).toFixed(2)}%**
+\u2022 Final cost: **${Number(stats.cost).toFixed(2)} \u2110** (at ${rate} \u2110/view)
 
-Thanks for advertising with Jaronite News — we'd love to have you back!
-— Jaronite News Inc.`;
+Thanks for advertising with Jaronite News \u2014 we'd love to have you back!
+\u2014 Jaronite News Inc.`;
 }
-
+__name(confirmedDiscordMsg, "confirmedDiscordMsg");
 function reminderDiscordMsg(bid, slotLabel, total) {
   const totalStr = Number(total).toFixed(2);
-  return `⏰ **Reminder: your Jaronite News invoice is unpaid**
+  return `\u23F0 **Reminder: your Jaronite News invoice is unpaid**
 
-Hi **${bid.advertiser_name}** — we haven't received payment for your ad in the **${slotLabel}** slot on **${bid.target_date}**.
+Hi **${bid.advertiser_name}** \u2014 we haven't received payment for your ad in the **${slotLabel}** slot on **${bid.target_date}**.
 
-• **Amount due: ${totalStr} ℐ**
-• Bid ID: #${bid.id}
+\u2022 **Amount due: ${totalStr} \u2110**
+\u2022 Bid ID: #${bid.id}
 
 **How to pay:**
 \`\`\`
 /pay-account business ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
-— Jaronite News Inc.`;
+\u2014 Jaronite News Inc.`;
 }
-
+__name(reminderDiscordMsg, "reminderDiscordMsg");
 function winEmailHtml(bid, slotLabel) {
   const rate = Number(bid.bid_amount).toFixed(2);
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#5b3fa0;">🎉 You won an ad slot on Jaronite News!</h2>
+  <h2 style="color:#5b3fa0;">\u{1F389} You won an ad slot on Jaronite News!</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>Your bid of <strong>${rate} ℐ/view</strong> won the
+  <p>Your bid of <strong>${rate} \u2110/view</strong> won the
      <strong>${slotLabel}</strong> slot for <strong>${bid.target_date}</strong>.</p>
   <h3 style="color:#5b3fa0;">What happens next</h3>
   <p><strong>You don't pay anything yet.</strong> Your ad runs on <strong>${bid.target_date}</strong> and is
-     billed by actual views at your rate of <strong>${rate} ℐ/view</strong>. After it finishes, we'll send you an
+     billed by actual views at your rate of <strong>${rate} \u2110/view</strong>. After it finishes, we'll send you an
      <strong>invoice with the exact amount</strong> to pay.</p>
   <h3 style="color:#5b3fa0;">How to pay (only once you receive your invoice)</h3>
   <p>Run this command in-game, replacing <code>&lt;amount&gt;</code> with the exact figure shown on your invoice:</p>
@@ -322,78 +637,25 @@ function winEmailHtml(bid, slotLabel) {
     <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
-    <tr><td style="padding:6px 0;color:#666;">Rate</td><td><strong>${Number(bid.bid_amount).toFixed(2)} ℐ/view</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Rate</td><td><strong>${Number(bid.bid_amount).toFixed(2)} \u2110/view</strong></td></tr>
   </table>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">
     Questions? Reply to this email or contact us on Discord.<br>
-    — Jaronite News Inc.
+    \u2014 Jaronite News Inc.
   </p>
 </div>`;
 }
-
-// ---- Self-serve bid confirmation (email + Discord double opt-in) ----
-
-function confirmEmailHtml(bid, slotLabel, link) {
-  return `
-<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#5b3fa0;">Confirm your Jaronite News ad bid</h2>
-  <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>We received your bid for the <strong>${slotLabel}</strong> slot on <strong>${bid.target_date}</strong>.
-     To activate it, please confirm this email address:</p>
-  <p style="text-align:center;margin:24px 0;">
-    <a href="${link}" style="background:#5b3fa0;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;display:inline-block;">Confirm my email</a>
-  </p>
-  <p style="color:#666;font-size:0.9em;">Or paste this link into your browser:<br><span style="word-break:break-all;">${link}</span></p>
-  <p style="color:#666;font-size:0.9em;">Your bid won't compete until <strong>both</strong> your email and your Discord account are confirmed.
-     If you didn't submit this bid, you can ignore this email.</p>
-  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
-</div>`;
-}
-
-function confirmDiscordMsg(bid, slotLabel, link) {
-  return `🔗 **Confirm your Jaronite News ad bid**
-
-Hi **${bid.advertiser_name}** — we received your bid for the **${slotLabel}** slot on **${bid.target_date}**.
-
-Click to confirm this Discord account is yours:
-${link}
-
-Your bid won't compete until **both** your email and your Discord account are confirmed. If you didn't submit this bid, you can ignore this message.
-— Jaronite News Inc.`;
-}
-
-// Minimal standalone HTML page returned when an advertiser clicks a
-// confirmation link, so they get clear feedback in the browser.
-function adConfirmPage(title, message, ok = true) {
-  const accent = ok ? '#5b3fa0' : '#b03a3a';
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} — Jaronite News</title></head>
-<body style="font-family:sans-serif;background:#12101c;color:#e0dff0;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;">
-  <div style="max-width:480px;padding:40px 32px;text-align:center;">
-    <h1 style="color:${accent};margin-bottom:12px;">${title}</h1>
-    <p style="color:#c0bfd8;line-height:1.5;">${message}</p>
-    <p style="margin-top:28px;"><a href="/advertise" style="color:#9b7fd0;">← Back to advertising</a></p>
-  </div>
-</body></html>`;
-  return new Response(html, {
-    status: ok ? 200 : 400,
-    headers: { 'Content-Type': 'text/html; charset=utf-8', ...securityHeaders() },
-  });
-}
-
-// Invoice = per-view rate (bid_amount) × actual views (ad_slots.impressions),
-// sent after the ad has run so the advertiser pays the exact final amount.
+__name(winEmailHtml, "winEmailHtml");
 function invoiceDiscordMsg(bid, slotLabel, views, total) {
   const rate = Number(bid.bid_amount).toFixed(2);
   const totalStr = Number(total).toFixed(2);
-  return `🧾 **Your Jaronite News ad invoice**
+  return `\u{1F9FE} **Your Jaronite News ad invoice**
 
-Hi **${bid.advertiser_name}** — your ad ran in the **${slotLabel}** slot on **${bid.target_date}**. Here's what you owe:
+Hi **${bid.advertiser_name}** \u2014 your ad ran in the **${slotLabel}** slot on **${bid.target_date}**. Here's what you owe:
 
-• Rate: **${rate} ℐ/view**
-• Views: **${views}**
-• **Total due: ${totalStr} ℐ**
+\u2022 Rate: **${rate} \u2110/view**
+\u2022 Views: **${views}**
+\u2022 **Total due: ${totalStr} \u2110**
 
 **How to pay:**
 Run this in-game exactly as shown:
@@ -403,22 +665,22 @@ Run this in-game exactly as shown:
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
 
 Thanks for advertising with us!
-— Jaronite News Inc.`;
+\u2014 Jaronite News Inc.`;
 }
-
+__name(invoiceDiscordMsg, "invoiceDiscordMsg");
 function invoiceEmailHtml(bid, slotLabel, views, total) {
   const rate = Number(bid.bid_amount).toFixed(2);
   const totalStr = Number(total).toFixed(2);
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#5b3fa0;">🧾 Your Jaronite News ad invoice</h2>
+  <h2 style="color:#5b3fa0;">\u{1F9FE} Your Jaronite News ad invoice</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
   <p>Your ad ran in the <strong>${slotLabel}</strong> slot on <strong>${bid.target_date}</strong>. Billing is
      per view, so here's your final amount based on the views it actually received.</p>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin:8px 0 16px;">
-    <tr><td style="padding:6px 0;color:#666;">Rate</td><td style="text-align:right;"><strong>${rate} ℐ/view</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Rate</td><td style="text-align:right;"><strong>${rate} \u2110/view</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Views</td><td style="text-align:right;"><strong>${views}</strong></td></tr>
-    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Total due</strong></td><td style="text-align:right;"><strong style="color:#5b3fa0;font-size:1.1em;">${totalStr} ℐ</strong></td></tr>
+    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Total due</strong></td><td style="text-align:right;"><strong style="color:#5b3fa0;font-size:1.1em;">${totalStr} \u2110</strong></td></tr>
   </table>
   <h3 style="color:#5b3fa0;">How to pay</h3>
   <p>Run this command in-game exactly as shown:</p>
@@ -430,47 +692,45 @@ function invoiceEmailHtml(bid, slotLabel, views, total) {
   </p>
   <p style="margin-top:24px;color:#888;font-size:0.85em;">
     Questions? Reply to this email or contact us on Discord.<br>
-    — Jaronite News Inc.
+    \u2014 Jaronite News Inc.
   </p>
 </div>`;
 }
-
-// Sent when a payment arrives but doesn't cover the full invoice — acknowledges
-// what was received and asks for the remaining balance.
+__name(invoiceEmailHtml, "invoiceEmailHtml");
 function underpaidDiscordMsg(bid, slotLabel, owed, paid, remaining) {
   const owedStr = Number(owed).toFixed(2);
   const paidStr = Number(paid).toFixed(2);
   const remainingStr = Number(remaining).toFixed(2);
-  return `⚠️ **Partial payment received — balance still due**
+  return `\u26A0\uFE0F **Partial payment received \u2014 balance still due**
 
-Hi **${bid.advertiser_name}** — thanks, we've received **${paidStr} ℐ** toward your ad in the **${slotLabel}** slot on **${bid.target_date}**.
+Hi **${bid.advertiser_name}** \u2014 thanks, we've received **${paidStr} \u2110** toward your ad in the **${slotLabel}** slot on **${bid.target_date}**.
 
-• Invoice total: **${owedStr} ℐ**
-• Paid so far: **${paidStr} ℐ**
-• **Remaining: ${remainingStr} ℐ**
+\u2022 Invoice total: **${owedStr} \u2110**
+\u2022 Paid so far: **${paidStr} \u2110**
+\u2022 **Remaining: ${remainingStr} \u2110**
 
 Please send the rest to settle your invoice:
 \`\`\`
 /pay-account business ${FIRM_PAY_NAME} ${remainingStr} bid:${bid.pay_ref || bid.id}
 \`\`\`
 Keep \`bid:${bid.pay_ref || bid.id}\` in the memo so we match your payment automatically.
-— Jaronite News Inc.`;
+\u2014 Jaronite News Inc.`;
 }
-
+__name(underpaidDiscordMsg, "underpaidDiscordMsg");
 function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
   const owedStr = Number(owed).toFixed(2);
   const paidStr = Number(paid).toFixed(2);
   const remainingStr = Number(remaining).toFixed(2);
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#e67e22;">⚠️ Partial payment received — balance due</h2>
+  <h2 style="color:#e67e22;">\u26A0\uFE0F Partial payment received \u2014 balance due</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>Thanks — we've received <strong>${paidStr} ℐ</strong> toward your ad in the <strong>${slotLabel}</strong>
+  <p>Thanks \u2014 we've received <strong>${paidStr} \u2110</strong> toward your ad in the <strong>${slotLabel}</strong>
      slot on <strong>${bid.target_date}</strong>, but that doesn't yet cover the full invoice.</p>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin:8px 0 16px;">
-    <tr><td style="padding:6px 0;color:#666;">Invoice total</td><td style="text-align:right;"><strong>${owedStr} ℐ</strong></td></tr>
-    <tr><td style="padding:6px 0;color:#666;">Paid so far</td><td style="text-align:right;"><strong>${paidStr} ℐ</strong></td></tr>
-    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Remaining</strong></td><td style="text-align:right;"><strong style="color:#e67e22;font-size:1.1em;">${remainingStr} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Invoice total</td><td style="text-align:right;"><strong>${owedStr} \u2110</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Paid so far</td><td style="text-align:right;"><strong>${paidStr} \u2110</strong></td></tr>
+    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Remaining</strong></td><td style="text-align:right;"><strong style="color:#e67e22;font-size:1.1em;">${remainingStr} \u2110</strong></td></tr>
   </table>
   <h3 style="color:#e67e22;">Pay the remaining balance</h3>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
@@ -479,37 +739,37 @@ function underpaidEmailHtml(bid, slotLabel, owed, paid, remaining) {
   <p style="color:#666;font-size:0.9em;">
     Keep <strong>bid:${bid.pay_ref || bid.id}</strong> in the memo/message field exactly as shown so we can match your payment automatically.
   </p>
-  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">\u2014 Jaronite News Inc.</p>
 </div>`;
 }
-
+__name(underpaidEmailHtml, "underpaidEmailHtml");
 function paymentConfirmedEmailHtml(bid, slotLabel, amount, stats = { views: 0, clicks: 0, ctr: 0, cost: 0 }) {
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#27ae60;">✅ Payment received — thank you!</h2>
+  <h2 style="color:#27ae60;">\u2705 Payment received \u2014 thank you!</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
-  <p>We've received your payment of <strong>${Number(amount).toFixed(2)} ℐ</strong> for bid <strong>#${bid.id}</strong>
+  <p>We've received your payment of <strong>${Number(amount).toFixed(2)} \u2110</strong> for bid <strong>#${bid.id}</strong>
      (${slotLabel}, ran ${bid.target_date}). Your invoice is now settled in full.</p>
-  <h3 style="color:#27ae60;">📊 Performance report</h3>
+  <h3 style="color:#27ae60;">\u{1F4CA} Performance report</h3>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;margin:8px 0 16px;">
     <tr><td style="padding:6px 0;color:#666;">Views</td><td style="text-align:right;"><strong>${stats.views}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Clicks</td><td style="text-align:right;"><strong>${stats.clicks}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Click-through rate</td><td style="text-align:right;"><strong>${Number(stats.ctr).toFixed(2)}%</strong></td></tr>
-    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Final cost</strong></td><td style="text-align:right;"><strong style="color:#27ae60;">${Number(stats.cost).toFixed(2)} ℐ</strong> <span style="color:#888;font-weight:normal;">(at ${Number(bid.bid_amount).toFixed(2)} ℐ/view)</span></td></tr>
+    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0;color:#222;"><strong>Final cost</strong></td><td style="text-align:right;"><strong style="color:#27ae60;">${Number(stats.cost).toFixed(2)} \u2110</strong> <span style="color:#888;font-weight:normal;">(at ${Number(bid.bid_amount).toFixed(2)} \u2110/view)</span></td></tr>
   </table>
-  <p>Thanks for advertising with Jaronite News — we'd love to have you back!</p>
-  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+  <p>Thanks for advertising with Jaronite News \u2014 we'd love to have you back!</p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">\u2014 Jaronite News Inc.</p>
 </div>`;
 }
-
+__name(paymentConfirmedEmailHtml, "paymentConfirmedEmailHtml");
 function reminderEmailHtml(bid, slotLabel, total) {
   const totalStr = Number(total).toFixed(2);
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222;">
-  <h2 style="color:#e67e22;">⏰ Reminder: your invoice is still unpaid</h2>
+  <h2 style="color:#e67e22;">\u23F0 Reminder: your invoice is still unpaid</h2>
   <p>Hi <strong>${bid.advertiser_name}</strong>,</p>
   <p>We haven't yet received payment for your ad in the <strong>${slotLabel}</strong> slot on
-     <strong>${bid.target_date}</strong>. Your outstanding balance is <strong>${totalStr} ℐ</strong>.</p>
+     <strong>${bid.target_date}</strong>. Your outstanding balance is <strong>${totalStr} \u2110</strong>.</p>
   <div style="background:#fff8f0;border-left:4px solid #e67e22;padding:12px 16px;border-radius:4px;font-family:monospace;font-size:1.05em;">
     /pay-account business ${FIRM_PAY_NAME} ${totalStr} bid:${bid.pay_ref || bid.id}
   </div>
@@ -520,125 +780,58 @@ function reminderEmailHtml(bid, slotLabel, total) {
     <tr><td style="padding:6px 0;color:#666;">Bid ID</td><td><strong>#${bid.id}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Slot</td><td><strong>${slotLabel}</strong></td></tr>
     <tr><td style="padding:6px 0;color:#666;">Date</td><td><strong>${bid.target_date}</strong></td></tr>
-    <tr><td style="padding:6px 0;color:#666;">Amount due</td><td><strong>${totalStr} ℐ</strong></td></tr>
+    <tr><td style="padding:6px 0;color:#666;">Amount due</td><td><strong>${totalStr} \u2110</strong></td></tr>
   </table>
-  <p style="margin-top:24px;color:#888;font-size:0.85em;">— Jaronite News Inc.</p>
+  <p style="margin-top:24px;color:#888;font-size:0.85em;">\u2014 Jaronite News Inc.</p>
 </div>`;
 }
-
-const SLOT_LABELS = { 1: 'Bottom Leaderboard (728×90)', 2: 'Left Skyscraper (160×600)', 3: 'Right Skyscraper (160×600)' };
-
-// In-game BUSINESS (firm) account advertisers send payment to, via
-// /pay-account business <name> <amount> bid:<ref>. Payments land in the firm
-// account, so the DC Economy webhook stays scoped to that firm. Change in one
-// place if the firm name changes.
-const FIRM_PAY_NAME = 'JaroniteNews';
-
-// Minimum accepted bid, in ℐ per view. Enforced server-side on every bid.
-const MIN_BID_PER_VIEW = 1;
-
-/**
- * Generate a long, unguessable payment reference for a bid's memo
- * (16 random bytes → 32 hex chars). Used as `bid:<pay_ref>` so a payer can't
- * target another advertiser's bid by guessing a sequential id.
- * @returns {string}
- */
+__name(reminderEmailHtml, "reminderEmailHtml");
+var SLOT_LABELS = { 1: "Bottom Leaderboard (728\xD790)", 2: "Left Skyscraper (160\xD7600)", 3: "Right Skyscraper (160\xD7600)" };
+var FIRM_PAY_NAME = "JaroniteNews";
+var MIN_BID_PER_VIEW = 1;
 function newPayRef() {
   return bufToHex(crypto.getRandomValues(new Uint8Array(16)).buffer);
 }
-
-/**
- * Compute what a winning advertiser owes: the per-view rate (bid_amount)
- * multiplied by the views the ad actually received (ad_slots.impressions for
- * the bid's won slot). Returns { views, total } with total rounded to 2 dp.
- * @param {object} env
- * @param {object} bid - an ad_bids row (needs id, bid_amount)
- * @returns {Promise<{views: number, total: number}>}
- */
+__name(newPayRef, "newPayRef");
 async function computeAmountOwed(env, bid) {
   const slot = await env.DB.prepare(
     `SELECT impressions FROM ad_slots WHERE bid_id = ? ORDER BY run_date DESC LIMIT 1`
   ).bind(bid.id).first();
-  const views = slot ? (slot.impressions || 0) : 0;
+  const views = slot ? slot.impressions || 0 : 0;
   const total = Math.round(Number(bid.bid_amount) * views * 100) / 100;
   return { views, total };
 }
-
-/**
- * Performance stats for a finished ad, for the post-run report on the receipt:
- * views (impressions), clicks, click-through rate (%), and final cost.
- * @param {object} env
- * @param {object} bid - ad_bids row (needs id, bid_amount)
- * @returns {Promise<{views:number, clicks:number, ctr:number, cost:number}>}
- */
+__name(computeAmountOwed, "computeAmountOwed");
 async function getAdStats(env, bid) {
   const slot = await env.DB.prepare(
     `SELECT impressions, clicks FROM ad_slots WHERE bid_id = ? ORDER BY run_date DESC LIMIT 1`
   ).bind(bid.id).first();
-  const views = slot ? (slot.impressions || 0) : 0;
-  const clicks = slot ? (slot.clicks || 0) : 0;
-  const ctr = views > 0 ? Math.round((clicks / views) * 10000) / 100 : 0;
+  const views = slot ? slot.impressions || 0 : 0;
+  const clicks = slot ? slot.clicks || 0 : 0;
+  const ctr = views > 0 ? Math.round(clicks / views * 1e4) / 100 : 0;
   const cost = Math.round(Number(bid.bid_amount) * views * 100) / 100;
   return { views, clicks, ctr, cost };
 }
-
-// An unpaid invoice becomes "late" this many days after it was sent.
-const LATE_AFTER_DAYS = 3;
-
-/**
- * Derive a single human-facing lifecycle stage for a bid/winner from the raw
- * status, payment_status, and dates. Kept derived (not stored) so it can never
- * drift out of sync with the underlying columns. Returns one of:
- *   pending | lost | won | awaiting_invoice | unpaid | late |
- *   underpaid | overpaid | paid
- * @param {object} bid - needs { status, payment_status, invoiced_at, target_date }
- * @returns {string}
- */
+__name(getAdStats, "getAdStats");
+var LATE_AFTER_DAYS = 3;
 function winnerStage(bid) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Once money has arrived, the payment outcome is the stage.
-  if (bid.payment_status === 'paid') return 'paid';
-  if (bid.payment_status === 'overpaid') return 'overpaid';
-  if (bid.payment_status === 'underpaid') return 'underpaid';
-
-  // Otherwise fall back to the bid lifecycle.
-  if (bid.status === 'pending') return 'pending';
-  if (bid.status === 'lost') return 'lost';
-
-  // status === 'won' and not yet paid.
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (bid.payment_status === "paid") return "paid";
+  if (bid.payment_status === "overpaid") return "overpaid";
+  if (bid.payment_status === "underpaid") return "underpaid";
+  if (bid.status === "pending") return "pending";
+  if (bid.status === "lost") return "lost";
   if (!bid.invoiced_at) {
-    // Won but no invoice yet: still scheduled to run, or just finished and
-    // waiting for the nightly invoice job.
-    return (bid.target_date >= today) ? 'won' : 'awaiting_invoice';
+    return bid.target_date >= today ? "won" : "awaiting_invoice";
   }
-
-  // Invoiced and still outstanding — "late" once past the grace window.
   const invoicedDay = String(bid.invoiced_at).slice(0, 10);
   const daysSince = Math.floor(
-    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${invoicedDay}T00:00:00Z`)) / 86400000
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${invoicedDay}T00:00:00Z`)) / 864e5
   );
-  return daysSince >= LATE_AFTER_DAYS ? 'late' : 'unpaid';
+  return daysSince >= LATE_AFTER_DAYS ? "late" : "unpaid";
 }
-
-// ---------- in-memory rate limiting ----------
-//
-// Simple token-bucket per key (IP-based for login; user-id-based for comments).
-// Workers are single-threaded, so no locking needed. The map is bounded by
-// keeping only the last-seen timestamp per key — entries expire naturally as
-// the map is pruned on each check. This is best-effort (resets on Worker
-// restart / new isolate), not a hard guarantee, but it's sufficient to slow
-// down brute-force and comment-spam attacks significantly.
-
-const rateLimitStore = new Map(); // key -> { count, windowStart }
-
-/**
- * Check whether a key has exceeded its rate limit.
- * @param {string} key        - Unique identifier (e.g. IP, user id).
- * @param {number} maxCalls   - Maximum calls allowed in the window.
- * @param {number} windowMs   - Window length in milliseconds.
- * @returns {boolean} true if the request should be blocked.
- */
+__name(winnerStage, "winnerStage");
+var rateLimitStore = /* @__PURE__ */ new Map();
 function isRateLimited(key, maxCalls, windowMs) {
   const now = Date.now();
   let entry = rateLimitStore.get(key);
@@ -651,54 +844,30 @@ function isRateLimited(key, maxCalls, windowMs) {
   if (entry.count > maxCalls) return true;
   return false;
 }
-
-// Prune stale entries periodically so the map doesn't grow unboundedly.
-// Called on each rate-limit check — O(n) but the map stays small in practice.
-function pruneRateLimitStore(maxAgeMs = 60_000) {
+__name(isRateLimited, "isRateLimited");
+function pruneRateLimitStore(maxAgeMs = 6e4) {
   const cutoff = Date.now() - maxAgeMs;
   for (const [key, entry] of rateLimitStore) {
     if (entry.windowStart < cutoff) rateLimitStore.delete(key);
   }
 }
-
-const VALID_CATEGORIES = new Set(["politics", "economy", "guides", "miscellaneous"]);
-const MAX_TITLE_LEN   = 300;
-const MAX_CONTENT_LEN = 100_000;
-const MAX_COMMENT_LEN = 2000;
-const MAX_IMAGE_BYTES = 800_000; // ~800 KB base64 data URL
-
-/**
- * Validate an image_url field: must be null/undefined, or a data URL
- * with a safe image MIME type and within the size cap.
- * @param {any} val
- * @returns {string|null} cleaned value or null
- */
+__name(pruneRateLimitStore, "pruneRateLimitStore");
+var VALID_CATEGORIES = /* @__PURE__ */ new Set(["politics", "economy", "guides", "miscellaneous"]);
+var MAX_TITLE_LEN = 300;
+var MAX_CONTENT_LEN = 1e5;
+var MAX_COMMENT_LEN = 2e3;
+var MAX_IMAGE_BYTES = 8e5;
 function validateImageUrl(val, maxLen = MAX_IMAGE_BYTES) {
   if (!val) return null;
   if (typeof val !== "string") return null;
   if (!val.startsWith("data:image/")) return null;
   const allowed = ["data:image/jpeg;base64,", "data:image/jpg;base64,", "data:image/png;base64,", "data:image/gif;base64,", "data:image/webp;base64,"];
-  if (!allowed.some(prefix => val.startsWith(prefix))) return null;
+  if (!allowed.some((prefix) => val.startsWith(prefix))) return null;
   if (val.length > maxLen) return null;
   return val;
 }
-
-// Advertisers upload an image file (capped at 800 KB raw in the form). Base64
-// encoding inflates that by ~4/3, so the stored data-URL string can reach
-// ~1.1 MB — this cap is sized to accept any file the form allows, so a valid
-// upload never passes the client check only to be rejected by the server.
-const MAX_AD_IMAGE_BYTES = 1_150_000;
-
-/**
- * Validate a public-facing http(s) URL submitted by an untrusted advertiser
- * (ad image URL or click-through destination). Rejects anything that isn't a
- * well-formed http/https URL — in particular javascript:, data:, vbscript:,
- * and file: schemes that could execute or exfiltrate when later rendered as
- * an <img src> or used as a redirect target.
- * @param {any} val
- * @param {number} maxLen
- * @returns {string|null} the normalised URL, or null if invalid
- */
+__name(validateImageUrl, "validateImageUrl");
+var MAX_AD_IMAGE_BYTES = 115e4;
 function validateHttpUrl(val, maxLen = 2048) {
   if (!val || typeof val !== "string") return null;
   const trimmed = val.trim();
@@ -707,15 +876,13 @@ function validateHttpUrl(val, maxLen = 2048) {
   try {
     parsed = new URL(trimmed);
   } catch {
-    return null; // not a parseable absolute URL
+    return null;
   }
-  // Only allow http/https. This blocks javascript:, data:, vbscript:, file:, etc.
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
-  // Require a real hostname (blocks http:/// and similar)
   if (!parsed.hostname) return null;
   return parsed.toString();
 }
-
+__name(validateHttpUrl, "validateHttpUrl");
 async function verifyPassword(password, storedHash, storedSaltHex) {
   const { hash } = await hashPassword(password, storedSaltHex);
   if (hash.length !== storedHash.length) return false;
@@ -723,198 +890,88 @@ async function verifyPassword(password, storedHash, storedSaltHex) {
   for (let i = 0; i < hash.length; i++) diff |= hash.charCodeAt(i) ^ storedHash.charCodeAt(i);
   return diff === 0;
 }
-
-/**
- * Generate a fresh, cryptographically random session token (32 random bytes,
- * hex-encoded to 64 characters). Issued on every successful login and stored
- * in the sessions table; the client sends it back as a Bearer token on every
- * subsequent authenticated request.
- * @returns {string} A new random hex session token.
- */
+__name(verifyPassword, "verifyPassword");
 function newSessionToken() {
   return bufToHex(crypto.getRandomValues(new Uint8Array(32)).buffer);
 }
-
-// ---------- session-based auth ----------
-
-/**
- * Resolve the currently authenticated user from a request's Bearer token.
- * Looks up the session, rejects it if missing/expired, then loads the
- * matching user and rejects if they're suspended. On success, also extends
- * the session's expiry by 20 minutes (sliding expiry) so active users don't
- * get logged out mid-session.
- * @param {object} env - Worker environment bindings (used for env.DB).
- * @param {Request} request - The incoming request, read for its Authorization header.
- * @returns {Promise<{id: number, username: string, role: string, status: string}|null>}
- *   The authenticated user record, or null if there's no valid session.
- */
+__name(newSessionToken, "newSessionToken");
 async function getSessionUser(env, request) {
   const authHeader = request.headers.get("Authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) return null;
-
   const session = await env.DB.prepare(
     "SELECT username, expires_at FROM sessions WHERE token = ?"
   ).bind(token).first();
   if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) return null;
-
+  if (new Date(session.expires_at) < /* @__PURE__ */ new Date()) return null;
   const user = await env.DB.prepare(
     "SELECT id, username, role, status FROM users WHERE username = ?"
   ).bind(session.username).first();
   if (!user || user.status !== "active") return null;
-
-  // Sliding expiry: every valid authenticated request pushes the session's
-  // expiry 20 minutes further out, so active users stay logged in and only
-  // truly idle sessions (20 min with no requests) expire.
-  const newExpiresAt = new Date(Date.now() + 1000 * 60 * 20).toISOString();
+  const newExpiresAt = new Date(Date.now() + 1e3 * 60 * 20).toISOString();
   await env.DB.prepare("UPDATE sessions SET expires_at = ? WHERE token = ?").bind(newExpiresAt, token).run();
-
   return user;
 }
-
-/**
- * Authenticate a request and require the user to hold the 'admin' role.
- * Thin wrapper around getSessionUser that adds a role check — use at the top
- * of any /api/admin/* route handler.
- * @param {object} env - Worker environment bindings.
- * @param {Request} request - The incoming request.
- * @returns {Promise<object|null>} The admin user record, or null if unauthenticated or not an admin.
- */
+__name(getSessionUser, "getSessionUser");
 async function requireAdmin(env, request) {
   const user = await getSessionUser(env, request);
   if (!user || user.role !== "admin") return null;
   return user;
 }
-
-/**
- * Authenticate a request and require the user to hold the 'editor' or
- * 'admin' role. Anything an editor can do, an admin can also do — use at
- * the top of any /api/editor/* route handler (and any route shared between
- * editors and admins).
- * @param {object} env - Worker environment bindings.
- * @param {Request} request - The incoming request.
- * @returns {Promise<object|null>} The user record, or null if unauthenticated or neither editor nor admin.
- */
+__name(requireAdmin, "requireAdmin");
 async function requireEditorOrAdmin(env, request) {
   const user = await getSessionUser(env, request);
-  if (!user || (user.role !== "editor" && user.role !== "admin")) return null;
+  if (!user || user.role !== "editor" && user.role !== "admin") return null;
   return user;
 }
-
-// ---------- Discord OAuth2 (public reader accounts) ----------
-//
-// Entirely separate identity system from staff `users`/`sessions` above.
-// Readers authenticate via Discord's OAuth2 authorization-code flow, never
-// supply or store a local password, and the resulting session only ever
-// grants access to reader-level actions (commenting, favoriting). It can
-// never satisfy requireAdmin/requireEditorOrAdmin/getSessionUser, since
-// those query the unrelated `sessions`/`users` tables.
-
-/**
- * Resolve the currently authenticated Discord reader from a request's
- * Bearer token, against the discord_sessions/discord_users tables. Mirrors
- * getSessionUser's shape and sliding-expiry behavior so the two auth
- * systems are easy to reason about side-by-side, but never cross-reads
- * the staff tables.
- * @param {object} env - Worker environment bindings (env.DB).
- * @param {Request} request - The incoming request, read for its Authorization header.
- * @returns {Promise<{id: number, discord_id: string, username: string, avatar_hash: string|null}|null>}
- */
+__name(requireEditorOrAdmin, "requireEditorOrAdmin");
 async function getDiscordSessionUser(env, request) {
   const authHeader = request.headers.get("Authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) return null;
-
   const session = await env.DB.prepare(
     "SELECT discord_user_id, expires_at FROM discord_sessions WHERE token = ?"
   ).bind(token).first();
   if (!session) return null;
-  if (new Date(session.expires_at) < new Date()) return null;
-
+  if (new Date(session.expires_at) < /* @__PURE__ */ new Date()) return null;
   const user = await env.DB.prepare(
     "SELECT id, discord_id, username, avatar_hash, status FROM discord_users WHERE id = ?"
   ).bind(session.discord_user_id).first();
   if (!user || user.status !== "active") return null;
-
-  // Reader sessions last longer than staff sessions (30 days vs 20 min) —
-  // readers expect to stay logged in across visits like any normal site,
-  // staff sessions are deliberately short for an internal admin tool.
-  const newExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+  const newExpiresAt = new Date(Date.now() + 1e3 * 60 * 60 * 24 * 30).toISOString();
   await env.DB.prepare("UPDATE discord_sessions SET expires_at = ? WHERE token = ?").bind(newExpiresAt, token).run();
-
   return user;
 }
-
-/**
- * Write one entry to the audit log (logs table). Called after nearly every
- * state-changing action across the app — logins, article lifecycle events,
- * and admin/user-management actions — so the Logs tab in the portal has a
- * complete trail of who did what and when.
- * @param {object} env - Worker environment bindings.
- * @param {string} username - The actor performing the action.
- * @param {string} action - A short machine-readable action code (e.g. "LOGIN", "APPROVE_ARTICLE").
- * @param {string} [details] - Human-readable detail shown in the admin Logs view.
- * @returns {Promise<void>}
- */
+__name(getDiscordSessionUser, "getDiscordSessionUser");
 async function log(env, username, action, details = "") {
   await env.DB.prepare("INSERT INTO logs (username, action, details) VALUES (?, ?, ?)").bind(username, action, details).run();
 }
-
-/**
- * Convert an article title into a URL-safe slug for use in /article/[id]-[slug].
- * Lowercases, strips non-alphanumeric characters (except hyphens), collapses
- * runs of hyphens, and trims leading/trailing hyphens. The article id is
- * always prepended by the caller so collisions between identically-titled
- * articles are impossible.
- * @param {string} title
- * @returns {string}
- */
+__name(log, "log");
 function slugify(title) {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/[\s-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80); // cap length so URLs stay readable
+  return title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/[\s-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
 }
-
-/**
- * Parse a User-Agent string into a coarse device type, browser, and OS
- * label for analytics grouping. Deliberately simple regex matching rather
- * than a full UA-parsing library — good enough to bucket views into
- * meaningful categories on a dashboard without adding a dependency. Order
- * of checks matters (e.g. Edge's UA also contains "Chrome", so Edge must
- * be checked first).
- * @param {string} ua - The raw User-Agent header string.
- * @returns {{deviceType: string, browser: string, os: string}}
- */
+__name(slugify, "slugify");
 function parseUserAgent(ua) {
   const s = ua || "";
-
   let deviceType = "desktop";
   if (/tablet|ipad/i.test(s)) deviceType = "tablet";
   else if (/mobile|android|iphone/i.test(s)) deviceType = "mobile";
-
   let browser = "Other";
   if (/edg\//i.test(s)) browser = "Edge";
   else if (/opr\/|opera/i.test(s)) browser = "Opera";
   else if (/chrome\//i.test(s)) browser = "Chrome";
   else if (/firefox\//i.test(s)) browser = "Firefox";
   else if (/safari\//i.test(s) && !/chrome/i.test(s)) browser = "Safari";
-
   let os = "Other";
   if (/windows/i.test(s)) os = "Windows";
   else if (/mac os|macintosh/i.test(s)) os = "macOS";
   else if (/android/i.test(s)) os = "Android";
   else if (/iphone|ipad|ios/i.test(s)) os = "iOS";
   else if (/linux/i.test(s)) os = "Linux";
-
   return { deviceType, browser, os };
 }
-
-export default {
+__name(parseUserAgent, "parseUserAgent");
+var index_default = {
   /**
    * Single entry point for the whole Worker. Every HTTP request — API calls
    * and static asset requests alike — comes through here. Routes are matched
@@ -989,60 +1046,37 @@ export default {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-
-    // Cloudflare sets CF-Connecting-IP on every request; fall back to a
-    // request-id derivative so rate limiting still works in local dev.
     const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
-
-    // API: Login
     if (url.pathname === "/api/login" && request.method === "POST") {
       pruneRateLimitStore();
-      // 10 attempts per IP per minute to slow brute-force without locking out legitimate users.
-      if (isRateLimited(`login:${clientIp}`, 10, 60_000)) {
-        return secureJson({ success: false, error: "Too many login attempts — try again in a minute." }, { status: 429 });
+      if (isRateLimited(`login:${clientIp}`, 10, 6e4)) {
+        return secureJson({ success: false, error: "Too many login attempts \u2014 try again in a minute." }, { status: 429 });
       }
-
       const { username, password } = await request.json();
       if (!username || !password) return secureJson({ success: false }, { status: 400 });
-
       const user = await env.DB.prepare(
         "SELECT * FROM users WHERE username = ?"
       ).bind(username).first();
-
-      const ok = user && user.status === "active" && (await verifyPassword(password, user.password, user.password_salt));
-
+      const ok = user && user.status === "active" && await verifyPassword(password, user.password, user.password_salt);
       if (ok) {
         const token = newSessionToken();
-        const expiresAt = new Date(Date.now() + 1000 * 60 * 20).toISOString(); // 20min sliding session
+        const expiresAt = new Date(Date.now() + 1e3 * 60 * 20).toISOString();
         await env.DB.prepare(
           "INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)"
         ).bind(token, user.username, expiresAt).run();
         await env.DB.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE username = ?").bind(user.username).run();
-
         await log(env, username, "LOGIN", "Logged into employee portal");
         return secureJson({ success: true, token, user: { username: user.username, role: user.role } });
       }
       await log(env, username, "FAILED_LOGIN", "Failed login attempt");
       return secureJson({ success: false });
     }
-
-    // API: Logout
     if (url.pathname === "/api/logout" && request.method === "POST") {
       const authHeader = request.headers.get("Authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
       if (token) await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(token).run();
       return secureJson({ success: true });
     }
-
-    // ============================================================
-    // DISCORD OAUTH2 (public reader login)
-    // ============================================================
-
-    // PUBLIC: Kick off Discord OAuth2 — redirect the browser to Discord's
-    // consent screen. `state` is a random value stored nowhere server-side;
-    // instead we echo it back via redirect and let the client verify it
-    // against what it generated before navigating here (CSRF protection
-    // without needing server-side state storage for an anonymous visitor).
     if (url.pathname === "/api/auth/discord/login" && request.method === "GET") {
       const state = url.searchParams.get("state") || "";
       const redirectUri = `${url.origin}/api/auth/discord/callback`;
@@ -1055,23 +1089,15 @@ export default {
       discordUrl.searchParams.set("prompt", "consent");
       return Response.redirect(discordUrl.toString(), 302);
     }
-
-    // PUBLIC: Discord redirects back here with ?code=...&state=.... Exchange
-    // the code for an access token, fetch the user's Discord identity,
-    // upsert a discord_users row, issue our own session token, and redirect
-    // back to the site with the token + state in the URL fragment (never
-    // the query string — fragments aren't sent to the server or logged).
     if (url.pathname === "/api/auth/discord/callback" && request.method === "GET") {
       pruneRateLimitStore();
-      if (isRateLimited(`discord_cb:${clientIp}`, 20, 60_000)) {
+      if (isRateLimited(`discord_cb:${clientIp}`, 20, 6e4)) {
         return Response.redirect(`${url.origin}/?discord_error=rate_limited`, 302);
       }
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state") || "";
       if (!code) return Response.redirect(`${url.origin}/?discord_error=missing_code`, 302);
-
       const redirectUri = `${url.origin}/api/auth/discord/callback`;
-
       let tokenData;
       try {
         const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
@@ -1082,32 +1108,28 @@ export default {
             client_secret: env.DISCORD_CLIENT_SECRET,
             grant_type: "authorization_code",
             code,
-            redirect_uri: redirectUri,
-          }).toString(),
+            redirect_uri: redirectUri
+          }).toString()
         });
         tokenData = await tokenRes.json();
         if (!tokenData.access_token) throw new Error("No access token in response");
       } catch (e) {
         return Response.redirect(`${url.origin}/?discord_error=token_exchange_failed`, 302);
       }
-
       let discordProfile;
       try {
         const profileRes = await fetch("https://discord.com/api/users/@me", {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
         });
         discordProfile = await profileRes.json();
         if (!discordProfile.id) throw new Error("No id in profile response");
       } catch (e) {
         return Response.redirect(`${url.origin}/?discord_error=profile_fetch_failed`, 302);
       }
-
       const displayName = discordProfile.global_name || discordProfile.username;
-
       const existing = await env.DB.prepare(
         "SELECT id FROM discord_users WHERE discord_id = ?"
       ).bind(discordProfile.id).first();
-
       let discordUserId;
       if (existing) {
         discordUserId = existing.id;
@@ -1120,124 +1142,86 @@ export default {
         ).bind(discordProfile.id, displayName, discordProfile.avatar || null).run();
         discordUserId = inserted.meta.last_row_id;
       }
-
       const banCheck = await env.DB.prepare("SELECT status FROM discord_users WHERE id = ?").bind(discordUserId).first();
       if (banCheck.status !== "active") {
         return Response.redirect(`${url.origin}/?discord_error=banned`, 302);
       }
-
       const sessionToken = newSessionToken();
-      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(); // 30-day reader session
+      const expiresAt = new Date(Date.now() + 1e3 * 60 * 60 * 24 * 30).toISOString();
       await env.DB.prepare(
         "INSERT INTO discord_sessions (token, discord_user_id, expires_at) VALUES (?, ?, ?)"
       ).bind(sessionToken, discordUserId, expiresAt).run();
-
       const redirectBack = new URL(url.origin + "/");
       redirectBack.hash = `discord_token=${sessionToken}&state=${encodeURIComponent(state)}`;
       return Response.redirect(redirectBack.toString(), 302);
     }
-
-    // PUBLIC (auth'd reader): who am I — used by the front end on page load
-    // to restore a logged-in reader's name/avatar from a stored token.
     if (url.pathname === "/api/auth/discord/me" && request.method === "GET") {
       const reader = await getDiscordSessionUser(env, request);
       if (!reader) return secureJson({ loggedIn: false });
       return secureJson({
         loggedIn: true,
         username: reader.username,
-        avatarUrl: reader.avatar_hash
-          ? `https://cdn.discordapp.com/avatars/${reader.discord_id}/${reader.avatar_hash}.png`
-          : null,
+        avatarUrl: reader.avatar_hash ? `https://cdn.discordapp.com/avatars/${reader.discord_id}/${reader.avatar_hash}.png` : null
       });
     }
-
-    // PUBLIC (auth'd reader): log out
     if (url.pathname === "/api/auth/discord/logout" && request.method === "POST") {
       const authHeader = request.headers.get("Authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
       if (token) await env.DB.prepare("DELETE FROM discord_sessions WHERE token = ?").bind(token).run();
       return secureJson({ success: true });
     }
-
-    // ============================================================
-    // COMMENTS
-    // ============================================================
-
-    // PUBLIC: list visible comments for an article, oldest first.
     if (url.pathname === "/api/comments" && request.method === "GET") {
       const articleId = url.searchParams.get("article_id");
       if (!articleId) return secureJson({ error: "Missing article_id" }, { status: 400 });
-
       const results = await env.DB.prepare(
         `SELECT comments.id, comments.content, comments.created_at, discord_users.username, discord_users.avatar_hash, discord_users.discord_id
          FROM comments JOIN discord_users ON comments.discord_user_id = discord_users.id
          WHERE comments.article_id = ? AND comments.status = 'visible'
          ORDER BY comments.created_at ASC`
       ).bind(articleId).all();
-
       const comments = results.results.map((c) => ({
         id: c.id,
         content: c.content,
         created_at: c.created_at,
         username: c.username,
-        avatarUrl: c.avatar_hash ? `https://cdn.discordapp.com/avatars/${c.discord_id}/${c.avatar_hash}.png` : null,
+        avatarUrl: c.avatar_hash ? `https://cdn.discordapp.com/avatars/${c.discord_id}/${c.avatar_hash}.png` : null
       }));
       return secureJson(comments);
     }
-
-    // AUTH'D READER: post a comment.
     if (url.pathname === "/api/comments" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
       if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
-      // 5 comments per Discord user per minute — prevents spam flooding.
       pruneRateLimitStore();
-      if (isRateLimited(`comment:${reader.id}`, 5, 60_000)) {
-        return secureJson({ error: "You're posting too fast — please wait a moment." }, { status: 429 });
+      if (isRateLimited(`comment:${reader.id}`, 5, 6e4)) {
+        return secureJson({ error: "You're posting too fast \u2014 please wait a moment." }, { status: 429 });
       }
-
       const { article_id, content } = await request.json();
       const trimmed = (content || "").trim();
       if (!trimmed) return secureJson({ error: "Comment cannot be empty" }, { status: 400 });
       if (trimmed.length > MAX_COMMENT_LEN) return secureJson({ error: `Comment is too long (${MAX_COMMENT_LEN} character max)` }, { status: 400 });
-
       const articleIdInt = parseInt(article_id, 10);
       if (!articleIdInt || isNaN(articleIdInt)) return secureJson({ error: "Invalid article" }, { status: 400 });
-
       const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ? AND status = 'published'").bind(articleIdInt).first();
       if (!article) return secureJson({ error: "Article not found" }, { status: 404 });
-
       await env.DB.prepare(
         "INSERT INTO comments (article_id, discord_user_id, content) VALUES (?, ?, ?)"
       ).bind(articleIdInt, reader.id, trimmed).run();
       return secureJson({ success: true });
     }
-
-    // AUTH'D READER: delete own comment (soft delete).
     if (url.pathname === "/api/comments/delete" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
       if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const { comment_id } = await request.json();
       const comment = await env.DB.prepare("SELECT discord_user_id FROM comments WHERE id = ?").bind(comment_id).first();
       if (!comment || comment.discord_user_id !== reader.id) {
         return secureJson({ error: "Not found or not yours" }, { status: 404 });
       }
-
       await env.DB.prepare("UPDATE comments SET status = 'removed' WHERE id = ?").bind(comment_id).run();
       return secureJson({ success: true });
     }
-
-    // ============================================================
-    // FAVORITES
-    // ============================================================
-
-    // AUTH'D READER: list own favorited articles (full article objects, for
-    // rendering the "My Favorites" menu without a second round of lookups).
     if (url.pathname === "/api/favorites" && request.method === "GET") {
       const reader = await getDiscordSessionUser(env, request);
       if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const results = await env.DB.prepare(
         `SELECT articles.id, articles.title, articles.category, articles.author,
                 COALESCE(articles.published_at, articles.created_at) AS created_at,
@@ -1248,19 +1232,13 @@ export default {
       ).bind(reader.id).all();
       return secureJson(results.results);
     }
-
-    // AUTH'D READER: toggle favorite status for an article (favorite if not
-    // already, unfavorite if already favorited). Returns the resulting state
-    // so the client can flip its heart icon without a separate GET.
     if (url.pathname === "/api/favorites/toggle" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
       if (!reader) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const { article_id } = await request.json();
       const existing = await env.DB.prepare(
         "SELECT id FROM favorites WHERE discord_user_id = ? AND article_id = ?"
       ).bind(reader.id, article_id).first();
-
       if (existing) {
         await env.DB.prepare("DELETE FROM favorites WHERE id = ?").bind(existing.id).run();
         return secureJson({ favorited: false });
@@ -1271,131 +1249,86 @@ export default {
         return secureJson({ favorited: true });
       }
     }
-
-    // PUBLIC (auth'd reader): which of a given set of article IDs has the
-    // caller favorited — used to paint hearts correctly on page load across
-    // a whole category grid in one call instead of one round-trip per card.
     if (url.pathname === "/api/favorites/check" && request.method === "POST") {
       const reader = await getDiscordSessionUser(env, request);
       if (!reader) return secureJson({ favorited: [] });
-
       const { article_ids } = await request.json();
       if (!Array.isArray(article_ids) || article_ids.length === 0) return secureJson({ favorited: [] });
-
       const placeholders = article_ids.map(() => "?").join(",");
       const results = await env.DB.prepare(
         `SELECT article_id FROM favorites WHERE discord_user_id = ? AND article_id IN (${placeholders})`
       ).bind(reader.id, ...article_ids).all();
       return secureJson({ favorited: results.results.map((r) => r.article_id) });
     }
-
-    // ============================================================
-    // ANALYTICS (view tracking, writer dashboard)
-    // ============================================================
-
-    // PUBLIC: record one article view. Called once when an article modal
-    // opens. device/browser/os are parsed server-side from the UA string
-    // (kept out of the client so the parsing logic lives in one place and
-    // can't be tampered with from devtools the way a client-computed label
-    // could be).
     if (url.pathname === "/api/analytics/view" && request.method === "POST") {
       const { article_id, visitor_id, referrer } = await request.json();
       if (!article_id || !visitor_id) return secureJson({ error: "Missing fields" }, { status: 400 });
-
       const article = await env.DB.prepare("SELECT id FROM articles WHERE id = ? AND status = 'published'").bind(article_id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
-
       const ua = request.headers.get("User-Agent") || "";
       const { deviceType, browser, os } = parseUserAgent(ua);
-
       let referrerDomain = null;
       if (referrer) {
-        try { referrerDomain = new URL(referrer).hostname; } catch (e) { referrerDomain = null; }
+        try {
+          referrerDomain = new URL(referrer).hostname;
+        } catch (e) {
+          referrerDomain = null;
+        }
       }
-
       const reader = await getDiscordSessionUser(env, request);
-
       const inserted = await env.DB.prepare(
         `INSERT INTO page_views (article_id, visitor_id, referrer, referrer_domain, user_agent, device_type, browser, os, is_discord_user)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(article_id, visitor_id, referrer || "", referrerDomain, ua, deviceType, browser, os, reader ? 1 : 0).run();
-
       return secureJson({ success: true, view_id: inserted.meta.last_row_id });
     }
-
-    // PUBLIC: heartbeat ping while an article stays open, updating read time
-    // and max scroll depth for the view row created by /api/analytics/view.
-    // Client sends this every ~10s while the modal is open and the tab is
-    // visible (paused on tab-blur) so read_seconds reflects actual attention,
-    // not just "tab was open in the background".
     if (url.pathname === "/api/analytics/ping" && request.method === "POST") {
       const { view_id, read_seconds, max_scroll_pct } = await request.json();
       const viewId = parseInt(view_id, 10);
       if (!viewId || isNaN(viewId)) return secureJson({ error: "Missing view_id" }, { status: 400 });
-
-      // This endpoint is unauthenticated, so treat the reported numbers as
-      // untrusted. Clamp them into sane ranges (scroll is a 0–100 percentage;
-      // read time can't realistically exceed a day) and use MAX(col, ?) so a
-      // value can only ever move upward — a stray or malicious ping can never
-      // lower a view's already-recorded read time or scroll depth.
       let secs = Math.floor(Number(read_seconds));
       let scroll = Math.floor(Number(max_scroll_pct));
       if (!Number.isFinite(secs) || secs < 0) secs = 0;
       if (secs > 86400) secs = 86400;
       if (!Number.isFinite(scroll) || scroll < 0) scroll = 0;
       if (scroll > 100) scroll = 100;
-
       await env.DB.prepare(
         "UPDATE page_views SET read_seconds = MAX(read_seconds, ?), max_scroll_pct = MAX(max_scroll_pct, ?) WHERE id = ?"
       ).bind(secs, scroll, viewId).run();
       return secureJson({ success: true });
     }
-
-    // AUTH'D (any staff): full analytics dashboard for one article. Writers
-    // may only request their own articles; editors/admins may request any.
-    // Returns a comprehensive bundle in one call (totals, a daily
-    // time series, referrer/device/browser/os breakdowns, and read-depth
-    // stats) so the dashboard renders from a single round trip.
     if (url.pathname === "/api/analytics/article" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const { article_id } = await request.json();
       const article = await env.DB.prepare("SELECT id, title, author FROM articles WHERE id = ?").bind(article_id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.author !== user.username && user.role !== "editor" && user.role !== "admin") {
         return secureJson({ error: "Unauthorized" }, { status: 403 });
       }
-
       const totals = await env.DB.prepare(
         `SELECT COUNT(*) as total_views, COUNT(DISTINCT visitor_id) as unique_visitors,
                 AVG(read_seconds) as avg_read_seconds, AVG(max_scroll_pct) as avg_scroll_pct,
                 SUM(is_discord_user) as discord_views
          FROM page_views WHERE article_id = ?`
       ).bind(article_id).first();
-
       const dailySeries = await env.DB.prepare(
         `SELECT DATE(created_at) as day, COUNT(*) as views, COUNT(DISTINCT visitor_id) as unique_visitors
          FROM page_views WHERE article_id = ? GROUP BY DATE(created_at) ORDER BY day ASC`
       ).bind(article_id).all();
-
       const referrers = await env.DB.prepare(
         `SELECT COALESCE(NULLIF(referrer_domain, ''), 'Direct / Unknown') as source, COUNT(*) as views
          FROM page_views WHERE article_id = ? GROUP BY source ORDER BY views DESC LIMIT 15`
       ).bind(article_id).all();
-
       const devices = await env.DB.prepare(
         `SELECT device_type, COUNT(*) as views FROM page_views WHERE article_id = ? GROUP BY device_type ORDER BY views DESC`
       ).bind(article_id).all();
-
       const browsers = await env.DB.prepare(
         `SELECT browser, COUNT(*) as views FROM page_views WHERE article_id = ? GROUP BY browser ORDER BY views DESC`
       ).bind(article_id).all();
-
       const osBreakdown = await env.DB.prepare(
         `SELECT os, COUNT(*) as views FROM page_views WHERE article_id = ? GROUP BY os ORDER BY views DESC`
       ).bind(article_id).all();
-
       const readDepthBuckets = await env.DB.prepare(
         `SELECT
            SUM(CASE WHEN max_scroll_pct < 25 THEN 1 ELSE 0 END) as bucket_0_25,
@@ -1404,7 +1337,6 @@ export default {
            SUM(CASE WHEN max_scroll_pct >= 75 THEN 1 ELSE 0 END) as bucket_75_100
          FROM page_views WHERE article_id = ?`
       ).bind(article_id).first();
-
       return secureJson({
         article: { id: article.id, title: article.title },
         totals: {
@@ -1412,67 +1344,46 @@ export default {
           unique_visitors: totals.unique_visitors || 0,
           avg_read_seconds: Math.round(totals.avg_read_seconds || 0),
           avg_scroll_pct: Math.round(totals.avg_scroll_pct || 0),
-          discord_views: totals.discord_views || 0,
+          discord_views: totals.discord_views || 0
         },
         daily_series: dailySeries.results,
         referrers: referrers.results,
         devices: devices.results,
         browsers: browsers.results,
         os: osBreakdown.results,
-        read_depth: readDepthBuckets,
+        read_depth: readDepthBuckets
       });
     }
-
-    // AUTH'D (any staff): summary analytics across ALL of the caller's
-    // articles (writers see only their own; editors/admins can pass
-    // target_username to inspect someone else's, or omit it for site-wide).
-    // Powers a "My Articles" overview table sorted by views.
     if (url.pathname === "/api/analytics/summary" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const body = await request.json().catch(() => ({}));
       let targetUsername = user.username;
       if (body.target_username && (user.role === "editor" || user.role === "admin")) {
-        targetUsername = body.target_username; // null/omitted handled by site-wide branch below
+        targetUsername = body.target_username;
       }
-
       const siteWide = (user.role === "editor" || user.role === "admin") && body.site_wide === true;
-
-      const query = siteWide
-        ? `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at,
+      const query = siteWide ? `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at,
                   COUNT(page_views.id) as total_views, COUNT(DISTINCT page_views.visitor_id) as unique_visitors,
                   AVG(page_views.read_seconds) as avg_read_seconds
            FROM articles LEFT JOIN page_views ON page_views.article_id = articles.id
            WHERE articles.status = 'published'
-           GROUP BY articles.id ORDER BY total_views DESC`
-        : `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at,
+           GROUP BY articles.id ORDER BY total_views DESC` : `SELECT articles.id, articles.title, articles.category, articles.author, articles.created_at,
                   COUNT(page_views.id) as total_views, COUNT(DISTINCT page_views.visitor_id) as unique_visitors,
                   AVG(page_views.read_seconds) as avg_read_seconds
            FROM articles LEFT JOIN page_views ON page_views.article_id = articles.id
            WHERE articles.status = 'published' AND articles.author = ?
            GROUP BY articles.id ORDER BY total_views DESC`;
-
-      const results = siteWide
-        ? await env.DB.prepare(query).all()
-        : await env.DB.prepare(query).bind(targetUsername).all();
-
+      const results = siteWide ? await env.DB.prepare(query).all() : await env.DB.prepare(query).bind(targetUsername).all();
       const rows = results.results.map((r) => ({
         ...r,
-        avg_read_seconds: Math.round(r.avg_read_seconds || 0),
+        avg_read_seconds: Math.round(r.avg_read_seconds || 0)
       }));
       return secureJson(rows);
     }
-
-    // API: Submit article (writers, editors, admins all submit through here)
-    // New articles always start as pending_review — nobody publishes directly
-    // through this route, regardless of role. Editors/admins who want to skip
-
-    // review use /api/articles/instapublish instead.
     if (url.pathname === "/api/articles" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const { title, category, content, image_url: imageUrlRaw } = await request.json();
       if (!title || !title.trim()) return secureJson({ error: "Title is required." }, { status: 400 });
       if (!content || !content.trim()) return secureJson({ error: "Content is required." }, { status: 400 });
@@ -1481,21 +1392,15 @@ export default {
       if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
       const imageUrl = validateImageUrl(imageUrlRaw);
       if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image (max ~600 KB, JPEG/PNG/WebP/GIF only)." }, { status: 400 });
-
       await env.DB.prepare(
         "INSERT INTO articles (title, category, content, author, status, image_url) VALUES (?, ?, ?, ?, 'pending_review', ?)"
       ).bind(title.trim(), category, content.trim(), user.username, imageUrl).run();
       await log(env, user.username, "POST_ARTICLE", `Submitted article "${title.trim()}" in category "${category}" for review`);
       return secureJson({ success: true });
     }
-
-    // EDITOR/ADMIN: publish an article immediately, skipping the review pipeline
-    // entirely (no pending_review/claimed row is ever created). Logged distinctly
-    // so it's clear in the audit trail that it bypassed review.
     if (url.pathname === "/api/articles/instapublish" && request.method === "POST") {
       const user = await requireEditorOrAdmin(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { title, category, content, image_url: imageUrlRaw } = await request.json();
       if (!title || !content || !category) {
         return secureJson({ error: "Title, category, and content are all required." }, { status: 400 });
@@ -1505,94 +1410,61 @@ export default {
       if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
       const imageUrl = validateImageUrl(imageUrlRaw);
       if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image (max ~600 KB, JPEG/PNG/WebP/GIF only)." }, { status: 400 });
-
       await env.DB.prepare(
         "INSERT INTO articles (title, category, content, author, status, image_url, published_at) VALUES (?, ?, ?, ?, 'published', ?, CURRENT_TIMESTAMP)"
       ).bind(title.trim(), category, content.trim(), user.username, imageUrl).run();
       await log(env, user.username, "INSTAPUBLISH_ARTICLE", `Published article "${title.trim()}" in category "${category}" directly, bypassing review`);
       return secureJson({ success: true });
     }
-
-    // API: Get published articles by category (public-facing pages)
     if (url.pathname === "/api/articles" && request.method === "GET") {
       const category = url.searchParams.get("category");
       if (!VALID_CATEGORIES.has(category)) return secureJson([], { status: 200 });
-
       const results = await env.DB.prepare(
         "SELECT * FROM articles WHERE category = ? AND status = 'published' ORDER BY COALESCE(published_at, created_at) DESC"
       ).bind(category).all();
-
-      // Attach a computed slug, and expose the PUBLISH date as created_at so the
-      // public pages display and sort by when it went live (not when it was
-      // first drafted). Older rows with no published_at fall back to created_at.
-      const articles = results.results.map(a => ({
+      const articles = results.results.map((a) => ({
         ...a,
         created_at: a.published_at || a.created_at,
-        slug: `${a.id}-${slugify(a.title)}`,
+        slug: `${a.id}-${slugify(a.title)}`
       }));
       return secureJson(articles);
     }
-
-    // PUBLIC: fetch ALL published articles across every category, newest first.
     if (url.pathname === "/api/articles/all" && request.method === "GET") {
       pruneRateLimitStore();
-      if (isRateLimited(`articles_all:${clientIp}`, 30, 60_000)) {
+      if (isRateLimited(`articles_all:${clientIp}`, 30, 6e4)) {
         return secureJson({ error: "Too many requests" }, { status: 429 });
       }
       const results = await env.DB.prepare(
         "SELECT * FROM articles WHERE status = 'published' ORDER BY COALESCE(published_at, created_at) DESC"
       ).all();
-      const articles = results.results.map(a => ({
+      const articles = results.results.map((a) => ({
         ...a,
-        created_at: a.published_at || a.created_at, // expose publish date as the display date
-        slug: `${a.id}-${slugify(a.title)}`,
+        created_at: a.published_at || a.created_at,
+        // expose publish date as the display date
+        slug: `${a.id}-${slugify(a.title)}`
       }));
       return secureJson(articles);
     }
-
-    // PUBLIC: homepage MOTD + featured articles (1 main + 3 secondary).
-    // Editors pick the slots via /api/editor/homepage; any unfilled slot falls
-    // back to the newest published articles so the section is never empty.
-    // Degrades gracefully before the DB migration runs (missing table/column
-    // simply yields the latest-articles fallback and a null MOTD).
     if (url.pathname === "/api/featured" && request.method === "GET") {
-      const motdRow = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'motd'")
-        .first().catch(() => null);
-
+      const motdRow = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'motd'").first().catch(() => null);
       let picks = [];
       try {
         const feat = await env.DB.prepare(
           "SELECT * FROM articles WHERE status = 'published' AND featured_rank IS NOT NULL ORDER BY featured_rank ASC LIMIT 4"
         ).all();
         picks = feat.results;
-      } catch { /* featured_rank column not migrated yet */ }
-
+      } catch {
+      }
       if (picks.length < 4) {
-        const ids = picks.map(a => a.id);
+        const ids = picks.map((a) => a.id);
         const fill = await env.DB.prepare(
           `SELECT * FROM articles WHERE status = 'published'${ids.length ? ` AND id NOT IN (${ids.map(() => "?").join(",")})` : ""} ORDER BY COALESCE(published_at, created_at) DESC LIMIT ?`
         ).bind(...ids, 4 - picks.length).all();
         picks = picks.concat(fill.results);
       }
-
-      // Article content is stored as HTML — strip tags and decode common
-      // entities so the excerpt reads as plain prose, not markup soup.
-      const toExcerpt = (html) => String(html || "")
-        .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/gi, " ")
-        .replace(/&amp;/gi, "&")
-        .replace(/&lt;/gi, "<")
-        .replace(/&gt;/gi, ">")
-        .replace(/&quot;/gi, '"')
-        .replace(/&#0?39;|&apos;|&rsquo;|&lsquo;/gi, "'")
-        .replace(/&[lr]dquo;/gi, '"')
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 220);
-      const shape = a => {
+      const toExcerpt = /* @__PURE__ */ __name((html) => String(html || "").replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#0?39;|&apos;|&rsquo;|&lsquo;/gi, "'").replace(/&[lr]dquo;/gi, '"').replace(/\s+/g, " ").trim().slice(0, 220), "toExcerpt");
+      const shape = /* @__PURE__ */ __name((a) => {
         let excerpt = toExcerpt(a.content);
-        // Writers often start the body with the headline itself — drop the echo.
         const t = String(a.title || "").trim();
         if (t && excerpt.toLowerCase().startsWith(t.toLowerCase())) {
           excerpt = excerpt.slice(t.length).replace(/^[\s—:·.-]+/, "").trim();
@@ -1605,164 +1477,105 @@ export default {
           image_url: a.image_url || null,
           created_at: a.published_at || a.created_at,
           excerpt,
-          slug: `${a.id}-${slugify(a.title)}`,
+          slug: `${a.id}-${slugify(a.title)}`
         };
-      };
+      }, "shape");
       return secureJson({
-        motd: (motdRow && motdRow.value) || null,
+        motd: motdRow && motdRow.value || null,
         main: picks[0] ? shape(picks[0]) : null,
-        others: picks.slice(1, 4).map(shape),
+        others: picks.slice(1, 4).map(shape)
       });
     }
-
-    // PUBLIC: fetch one published article by its id-slug for the /article/* page.
-    // The slug format is [id]-[title-slug] (e.g. "1-mayoral-election-results").
-    // We parse the numeric id from the front of the param, look up by id, then
-    // verify the article is published — the slug portion is cosmetic/readable
-    // but not used for the lookup (so renamed articles keep their old URLs
-    // working as long as the id prefix is still present).
     if (url.pathname.startsWith("/api/article/") && request.method === "GET") {
       const param = url.pathname.slice("/api/article/".length);
       const id = parseInt(param.split("-")[0], 10);
       if (!id || isNaN(id)) return secureJson({ error: "Not found" }, { status: 404 });
-
       const article = await env.DB.prepare(
         "SELECT * FROM articles WHERE id = ? AND status = 'published'"
       ).bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
-
       return secureJson({ ...article, created_at: article.published_at || article.created_at, slug: `${article.id}-${slugify(article.title)}` });
     }
-
-    // API: Lightweight integrity check for an open article (public, no auth).
-    // Returns a SHA-256 hash of the article's current title+content so a
-    // reader's open tab can detect — without re-downloading the full body —
-    // whether the published article changed (edited/censored/deleted) while
-    // they were reading it. Polled client-side every few seconds from the
-    // article modal; cheap enough on D1 to call frequently.
     if (url.pathname === "/api/article-hash" && request.method === "GET") {
       const id = url.searchParams.get("id");
       if (!id) return secureJson({ error: "Missing id" }, { status: 400 });
-
       const article = await env.DB.prepare(
         "SELECT title, content FROM articles WHERE id = ? AND status = 'published'"
       ).bind(id).first();
-
-      // Article was deleted, censored, or never existed — tell the client
-      // explicitly rather than letting a hash mismatch imply "edited".
       if (!article) return secureJson({ exists: false });
-
       const hash = await hashArticleText(article.title, article.content);
       return secureJson({ exists: true, hash });
     }
-
-    // ---------------- SHARED: article detail (powers the click-to-expand overlay) ----------------
-
-    // Any authenticated user: fetch one article's full detail. Writers may only
-    // view their own articles this way; editors/admins may view any article.
-    // This route itself grants no new permissions — every action button the
-    // frontend shows still re-validates against its own route exactly as before.
     if (url.pathname === "/api/article-detail" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
-
       const isPrivileged = user.role === "editor" || user.role === "admin";
       if (!isPrivileged && article.author !== user.username) {
         return secureJson({ error: "Unauthorized" }, { status: 403 });
       }
-
       return secureJson(article);
     }
-
-    // ---------------- WRITER: "My Articles" ----------------
-
-    // WRITER: list the logged-in user's own submissions + status.
-    // Read-only by design — editing only happens via /api/my-articles/resubmit
-    // on articles that are in the 'returned' state.
     if (url.pathname === "/api/my-articles" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const results = await env.DB.prepare(
         "SELECT id, title, category, content, status, claimed_by, review_notes, created_at, updated_at FROM articles WHERE author = ? ORDER BY updated_at DESC"
       ).bind(user.username).all();
       return secureJson(results.results);
     }
-
-    // WRITER: resubmit a 'returned' article with revised content.
-    // Goes straight back to 'claimed' under the SAME editor who returned it —
-    // it does not re-enter the open pending_review pool.
     if (url.pathname === "/api/my-articles/resubmit" && request.method === "POST") {
       const user = await getSessionUser(env, request);
       if (!user) return secureJson({ error: "Unauthorized" }, { status: 401 });
-
       const { id, title, content, image_url: imageUrlRaw, remove_image } = await request.json();
       const article = await env.DB.prepare(
         "SELECT * FROM articles WHERE id = ? AND author = ?"
       ).bind(id, user.username).first();
-
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.status !== "returned") {
         return secureJson({ error: "This article isn't awaiting revision." }, { status: 400 });
       }
-
       let imageUpdateSql = "";
-      let imageUpdateVal = undefined;
+      let imageUpdateVal = void 0;
       if (remove_image) {
         imageUpdateSql = ", image_url = NULL";
-      } else if (imageUrlRaw !== undefined) {
+      } else if (imageUrlRaw !== void 0) {
         const imageUrl = validateImageUrl(imageUrlRaw);
         if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image." }, { status: 400 });
         imageUpdateSql = ", image_url = ?";
         imageUpdateVal = imageUrl;
       }
-
       const resubSql = `UPDATE articles SET title = ?, content = ?${imageUpdateSql}, status = 'claimed', review_notes = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-      const resubBinds = imageUpdateVal !== undefined ? [title, content, imageUpdateVal, id] : [title, content, id];
+      const resubBinds = imageUpdateVal !== void 0 ? [title, content, imageUpdateVal, id] : [title, content, id];
       await env.DB.prepare(resubSql).bind(...resubBinds).run();
       await log(env, user.username, "RESUBMIT_ARTICLE", `Resubmitted article "${title}" (ID ${id}) to ${article.claimed_by} after revision`);
       return secureJson({ success: true });
     }
-
-    // ---------------- EDITOR (and admin): review queue ----------------
-
-    // EDITOR/ADMIN: pending_review queue (open pool, nothing claimed yet)
-    // EDITOR/ADMIN: current homepage settings + published articles to pick from.
     if (url.pathname === "/api/editor/homepage-get" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
-      const motdRow = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'motd'")
-        .first().catch(() => null);
+      const motdRow = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'motd'").first().catch(() => null);
       let featured = [];
       try {
         const cur = await env.DB.prepare(
           "SELECT id, title, featured_rank FROM articles WHERE featured_rank IS NOT NULL AND status = 'published' ORDER BY featured_rank ASC"
         ).all();
         featured = cur.results;
-      } catch { /* pre-migration */ }
+      } catch {
+      }
       const choices = await env.DB.prepare(
         "SELECT id, title, category FROM articles WHERE status = 'published' ORDER BY COALESCE(published_at, created_at) DESC LIMIT 100"
       ).all();
-      return secureJson({ motd: (motdRow && motdRow.value) || "", featured, choices: choices.results });
+      return secureJson({ motd: motdRow && motdRow.value || "", featured, choices: choices.results });
     }
-
-    // EDITOR/ADMIN: save the homepage MOTD and the four featured slots.
-    // Body: { motd: string, featured: [idOrNull, idOrNull, idOrNull, idOrNull] }
-    // (slot 1 = main story). Clears all ranks first, then applies the new ones,
-    // so un-featuring is just leaving a slot empty.
     if (url.pathname === "/api/editor/homepage" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const body = await request.json().catch(() => ({}));
       const motd = String(body.motd || "").trim().slice(0, 300);
       const featured = Array.isArray(body.featured) ? body.featured.slice(0, 4) : [];
-
       await env.DB.prepare(
         "INSERT INTO site_settings (key, value, updated_at) VALUES ('motd', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP"
       ).bind(motd).run();
@@ -1774,40 +1587,33 @@ export default {
         const r = await env.DB.prepare(
           "UPDATE articles SET featured_rank = ? WHERE id = ? AND status = 'published'"
         ).bind(i + 1, id).run();
-        if (r.meta && r.meta.changes > 0) applied.push(`#${id}→slot${i + 1}`);
+        if (r.meta && r.meta.changes > 0) applied.push(`#${id}\u2192slot${i + 1}`);
       }
-      await log(env, reviewer.username, "SET_HOMEPAGE",
-        `MOTD ${motd ? `set (\"${motd.slice(0, 60)}${motd.length > 60 ? "…" : ""}\")` : "cleared"}; featured: ${applied.join(", ") || "none"}`);
+      await log(
+        env,
+        reviewer.username,
+        "SET_HOMEPAGE",
+        `MOTD ${motd ? `set ("${motd.slice(0, 60)}${motd.length > 60 ? "\u2026" : ""}")` : "cleared"}; featured: ${applied.join(", ") || "none"}`
+      );
       return secureJson({ success: true });
     }
-
     if (url.pathname === "/api/editor/pending" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const results = await env.DB.prepare(
         "SELECT id, title, category, author, status, created_at FROM articles WHERE status = 'pending_review' ORDER BY created_at ASC"
       ).all();
       return secureJson(results.results);
     }
-
-    // EDITOR/ADMIN: claim a pending article. Once claimed, it disappears from
-    // other editors' pending queue, but admins still see it (with claimed_by shown).
     if (url.pathname === "/api/editor/claim" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.status !== "pending_review") {
         return secureJson({ error: "This article has already been claimed or is no longer pending." }, { status: 409 });
       }
-
-      // Atomic claim: the `AND status = 'pending_review'` guard means that if
-      // two editors race, only the first UPDATE matches a row — the second
-      // changes nothing. The SELECT above is just for a friendly early error;
-      // this conditional write is what actually prevents a double-claim.
       const claimRes = await env.DB.prepare(
         "UPDATE articles SET status = 'claimed', claimed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending_review'"
       ).bind(reviewer.username, id).run();
@@ -1817,79 +1623,50 @@ export default {
       await log(env, reviewer.username, "CLAIM_ARTICLE", `Claimed article "${article.title}" (ID ${id}) for review`);
       return secureJson({ success: true });
     }
-
-    // EDITOR/ADMIN: "My Review Box" — articles claimed by the logged-in reviewer
-    // (includes ones returned-and-not-yet-resubmitted, since they stay claimed).
     if (url.pathname === "/api/editor/my-claims" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const results = await env.DB.prepare(
         "SELECT id, title, category, author, content, status, review_notes, created_at, updated_at FROM articles WHERE claimed_by = ? AND status IN ('claimed', 'returned') ORDER BY updated_at DESC"
       ).bind(reviewer.username).all();
       return secureJson(results.results);
     }
-
-    // ADMIN-ONLY: full view of every claimed/in-progress article across all editors,
-    // each tagged with who has it ("under review by ___"). Editors only see their own
-    // claims via /api/editor/my-claims; this route is for admin oversight.
-    // Includes full content so the admin can act (approve/return/deny) without
-    // needing to claim it first.
     if (url.pathname === "/api/admin/all-claimed" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const results = await env.DB.prepare(
         "SELECT id, title, category, author, content, status, claimed_by, review_notes, created_at, updated_at FROM articles WHERE status IN ('claimed', 'returned') ORDER BY updated_at DESC"
       ).all();
       return secureJson(results.results);
     }
-
-    // ADMIN-ONLY: take over ("steal") any in-progress article, regardless of who
-    // currently has it claimed — or claim straight out of the open pending pool.
-    // Reassigns claimed_by to the admin. Logged as a distinct action so it's
-    // visible in the audit trail that it was taken from another reviewer.
     if (url.pathname === "/api/admin/steal-claim" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (!["pending_review", "claimed", "returned"].includes(article.status)) {
         return secureJson({ error: "This article isn't in a reviewable state." }, { status: 400 });
       }
-
-      const previousOwner = article.claimed_by; // null if it was still in the open pool
+      const previousOwner = article.claimed_by;
       const newStatus = article.status === "pending_review" ? "claimed" : article.status;
-
       await env.DB.prepare(
         "UPDATE articles SET status = ?, claimed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(newStatus, admin.username, id).run();
-
       await log(
         env,
         admin.username,
         "ADMIN_REASSIGN_CLAIM",
-        previousOwner
-          ? `Took over article "${article.title}" (ID ${id}) from ${previousOwner}`
-          : `Claimed article "${article.title}" (ID ${id}) directly from the pending pool`
+        previousOwner ? `Took over article "${article.title}" (ID ${id}) from ${previousOwner}` : `Claimed article "${article.title}" (ID ${id}) directly from the pending pool`
       );
       return secureJson({ success: true });
     }
-
-    // EDITOR/ADMIN: approve a claimed (or, for admins, returned) article -> published
     if (url.pathname === "/api/editor/approve" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
-
-      // Editors may only act on their own 'claimed' articles. Admins may also act
-      // directly on a 'returned' article (bypassing the writer's revision step)
-      // and on anyone's claim, not just their own.
       const adminCanAct = reviewer.role === "admin" && (article.status === "claimed" || article.status === "returned");
       const editorCanAct = reviewer.role !== "admin" && article.status === "claimed" && article.claimed_by === reviewer.username;
       if (!adminCanAct && !editorCanAct) {
@@ -1898,25 +1675,19 @@ export default {
         }
         return secureJson({ error: "This article is claimed by another editor." }, { status: 403 });
       }
-
       await env.DB.prepare(
         "UPDATE articles SET status = 'published', reviewed_by = ?, published_at = COALESCE(published_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(reviewer.username, id).run();
       await log(env, reviewer.username, "APPROVE_ARTICLE", `Approved and published article "${article.title}" (ID ${id}) by ${article.author}`);
       return secureJson({ success: true });
     }
-
-    // EDITOR/ADMIN: return a claimed article to the writer with instructions.
-    // Stays claimed by the same reviewer.
     if (url.pathname === "/api/editor/return" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id, notes } = await request.json();
       if (!notes || !notes.trim()) {
         return secureJson({ error: "Instructions are required when returning an article." }, { status: 400 });
       }
-
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
       if (article.status !== "claimed") {
@@ -1925,26 +1696,18 @@ export default {
       if (reviewer.role !== "admin" && article.claimed_by !== reviewer.username) {
         return secureJson({ error: "This article is claimed by another editor." }, { status: 403 });
       }
-
-      // Admins keep the existing claimed_by as-is unless they've already stolen the
-      // claim via /api/admin/steal-claim; returning doesn't itself reassign ownership.
       await env.DB.prepare(
         "UPDATE articles SET status = 'returned', review_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(notes, id).run();
       await log(env, reviewer.username, "RETURN_ARTICLE", `Returned article "${article.title}" (ID ${id}) to ${article.author} with revision notes`);
       return secureJson({ success: true });
     }
-
-    // EDITOR/ADMIN: deny a claimed (or, for admins, returned) article. Permanent —
-    // kept in DB, writer can see why.
     if (url.pathname === "/api/editor/deny" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
       if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id, notes } = await request.json();
       const article = await env.DB.prepare("SELECT * FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
-
       const adminCanAct = reviewer.role === "admin" && (article.status === "claimed" || article.status === "returned");
       const editorCanAct = reviewer.role !== "admin" && article.status === "claimed" && article.claimed_by === reviewer.username;
       if (!adminCanAct && !editorCanAct) {
@@ -1953,67 +1716,49 @@ export default {
         }
         return secureJson({ error: "This article is claimed by another editor." }, { status: 403 });
       }
-
       await env.DB.prepare(
         "UPDATE articles SET status = 'denied', review_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(notes || null, id).run();
       await log(env, reviewer.username, "DENY_ARTICLE", `Denied article "${article.title}" (ID ${id}) by ${article.author}`);
       return secureJson({ success: true });
     }
-
-    // ---------------- ADMIN: published-article moderation (unchanged) ----------------
-
-    // ADMIN: Get all articles (any status)
     if (url.pathname === "/api/admin/articles" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { filter } = await request.json();
       let query = "SELECT * FROM articles ORDER BY created_at DESC";
       if (filter === "censored") query = "SELECT * FROM articles WHERE status = 'censored' ORDER BY created_at DESC";
       if (filter === "published") query = "SELECT * FROM articles WHERE status = 'published' ORDER BY created_at DESC";
-
       const results = await env.DB.prepare(query).all();
       return secureJson(results.results);
     }
-
-    // ADMIN: Edit article
     if (url.pathname === "/api/admin/edit" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id, title, content, image_url: imageUrlRaw, remove_image } = await request.json();
       if (!title || !title.trim()) return secureJson({ error: "Title is required." }, { status: 400 });
       if (!content || !content.trim()) return secureJson({ error: "Content is required." }, { status: 400 });
       if (title.trim().length > MAX_TITLE_LEN) return secureJson({ error: `Title must be under ${MAX_TITLE_LEN} characters.` }, { status: 400 });
       if (content.trim().length > MAX_CONTENT_LEN) return secureJson({ error: `Content must be under ${MAX_CONTENT_LEN} characters.` }, { status: 400 });
-
-      // image_url: pass a new data URL to replace, pass remove_image:true to clear, omit both to leave as-is
       let imageUpdateSql = "";
-      let imageUpdateVal = undefined;
+      let imageUpdateVal = void 0;
       if (remove_image) {
         imageUpdateSql = ", image_url = NULL";
-      } else if (imageUrlRaw !== undefined) {
+      } else if (imageUrlRaw !== void 0) {
         const imageUrl = validateImageUrl(imageUrlRaw);
         if (imageUrlRaw && !imageUrl) return secureJson({ error: "Invalid or oversized image." }, { status: 400 });
         imageUpdateSql = ", image_url = ?";
         imageUpdateVal = imageUrl;
       }
-
       const sql = `UPDATE articles SET title = ?, content = ?${imageUpdateSql}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-      const binds = imageUpdateVal !== undefined
-        ? [title.trim(), content.trim(), imageUpdateVal, id]
-        : [title.trim(), content.trim(), id];
+      const binds = imageUpdateVal !== void 0 ? [title.trim(), content.trim(), imageUpdateVal, id] : [title.trim(), content.trim(), id];
       await env.DB.prepare(sql).bind(...binds).run();
-      await log(env, admin.username, "EDIT_ARTICLE", `Edited article ID ${id} — new title: "${title.trim()}"`);
+      await log(env, admin.username, "EDIT_ARTICLE", `Edited article ID ${id} \u2014 new title: "${title.trim()}"`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Censor/uncensor a PUBLISHED article (post-publish takedown — separate from the review pipeline)
     if (url.pathname === "/api/admin/censor" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT status FROM articles WHERE id = ?").bind(id).first();
       if (!article) return secureJson({ error: "Not found" }, { status: 404 });
@@ -2022,84 +1767,60 @@ export default {
       await log(env, admin.username, newStatus === "censored" ? "CENSOR_ARTICLE" : "UNCENSOR_ARTICLE", `Article ID ${id} set to ${newStatus}`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Delete article
     if (url.pathname === "/api/admin/delete" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { id } = await request.json();
       const article = await env.DB.prepare("SELECT title FROM articles WHERE id = ?").bind(id).first();
-      // Delete child rows first to satisfy foreign-key constraints
-      // (comments, favorites, page_views all REFERENCE articles(id))
       await env.DB.prepare("DELETE FROM comments WHERE article_id = ?").bind(id).run();
       await env.DB.prepare("DELETE FROM favorites WHERE article_id = ?").bind(id).run();
       await env.DB.prepare("DELETE FROM page_views WHERE article_id = ?").bind(id).run();
       await env.DB.prepare("DELETE FROM articles WHERE id = ?").bind(id).run();
-      await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${id} — "${article?.title}"`);
+      await log(env, admin.username, "DELETE_ARTICLE", `Deleted article ID ${id} \u2014 "${article?.title}"`);
       return secureJson({ success: true });
     }
-
-    // ---------------- ADMIN: user management (unchanged) ----------------
-
-    // ADMIN: Get all users
     if (url.pathname === "/api/admin/users" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const results = await env.DB.prepare(
         "SELECT id, username, role, status, created_at, last_login_at FROM users ORDER BY role ASC"
       ).all();
       return secureJson(results.results);
     }
-
-    // ADMIN: Get single user's full (non-credential) profile
     if (url.pathname === "/api/admin/user-detail" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { targetId } = await request.json();
       const target = await env.DB.prepare(
         "SELECT id, username, role, status, created_at, last_login_at FROM users WHERE id = ?"
       ).bind(targetId).first();
       if (!target) return secureJson({ error: "Not found" }, { status: 404 });
-
       const articleCount = await env.DB.prepare(
         "SELECT COUNT(*) as count FROM articles WHERE author = ?"
       ).bind(target.username).first();
-
       return secureJson({ ...target, article_count: articleCount.count });
     }
-
-    // ADMIN: Get a single user's complete action history
     if (url.pathname === "/api/admin/user-history" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { targetId } = await request.json();
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       if (!target) return secureJson({ error: "Not found" }, { status: 404 });
-
       const results = await env.DB.prepare(
         "SELECT id, action, details, created_at FROM logs WHERE username = ? ORDER BY created_at DESC LIMIT 500"
       ).bind(target.username).all();
       return secureJson(results.results);
     }
-
-    // ADMIN: Create user
     if (url.pathname === "/api/admin/create-user" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { newUsername, newPassword, role } = await request.json();
       if (!newUsername || !newUsername.trim()) return secureJson({ error: "Username is required." }, { status: 400 });
       if (!newPassword || newPassword.length < 8) return secureJson({ error: "Password must be at least 8 characters." }, { status: 400 });
       if (!["writer", "editor", "admin"].includes(role)) return secureJson({ error: "Invalid role." }, { status: 400 });
       if (newUsername.trim().length > 64) return secureJson({ error: "Username too long." }, { status: 400 });
-
       const existing = await env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(newUsername.trim()).first();
       if (existing) return secureJson({ error: "Username already exists" });
-
       const { hash, salt } = await hashPassword(newPassword);
       await env.DB.prepare(
         "INSERT INTO users (username, password, password_salt, role, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
@@ -2107,31 +1828,23 @@ export default {
       await log(env, admin.username, "CREATE_USER", `Created user "${newUsername.trim()}" with role "${role}"`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Change user role (writer | editor | admin)
     if (url.pathname === "/api/admin/change-role" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { targetId, role } = await request.json();
       if (!["writer", "editor", "admin"].includes(role)) {
         return secureJson({ error: "Invalid role" }, { status: 400 });
       }
-
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       await env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, targetId).run();
       await log(env, admin.username, "CHANGE_ROLE", `Changed role of "${target?.username}" to "${role}"`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Suspend / reactivate user
     if (url.pathname === "/api/admin/set-status" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { targetId, status } = await request.json();
       if (!["active", "suspended"].includes(status)) return secureJson({ error: "Invalid status" }, { status: 400 });
-
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       await env.DB.prepare("UPDATE users SET status = ? WHERE id = ?").bind(status, targetId).run();
       if (status === "suspended" && target) {
@@ -2140,28 +1853,21 @@ export default {
       await log(env, admin.username, "SET_USER_STATUS", `Set status of "${target?.username}" to "${status}"`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Reset a user's password (admin sets a new one; old one is never shown)
     if (url.pathname === "/api/admin/reset-password" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { targetId, newPassword } = await request.json();
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       if (!target) return secureJson({ error: "Not found" }, { status: 404 });
-
       const { hash, salt } = await hashPassword(newPassword);
       await env.DB.prepare("UPDATE users SET password = ?, password_salt = ? WHERE id = ?").bind(hash, salt, targetId).run();
       await env.DB.prepare("DELETE FROM sessions WHERE username = ?").bind(target.username).run();
       await log(env, admin.username, "RESET_PASSWORD", `Reset password for "${target.username}"`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Delete user
     if (url.pathname === "/api/admin/delete-user" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const { targetId } = await request.json();
       const target = await env.DB.prepare("SELECT username FROM users WHERE id = ?").bind(targetId).first();
       await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(targetId).run();
@@ -2169,145 +1875,87 @@ export default {
       await log(env, admin.username, "DELETE_USER", `Deleted user "${target?.username}"`);
       return secureJson({ success: true });
     }
-
-    // ADMIN: Get logs (global)
     if (url.pathname === "/api/admin/logs" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
       if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
-
       const results = await env.DB.prepare("SELECT * FROM logs ORDER BY created_at DESC LIMIT 500").all();
       return secureJson(results.results);
     }
-
-    // Serve static files
-    //
-    // ================================================================
-    // AD SYSTEM — Step 1 routes
-    // ================================================================
-
-    // ================================================================
-    // PAYMENT MODULE — DC Economy webhook-based payment verification
-    // ================================================================
-    //
-    // Flow:
-    //   1. Cron awards winner → sets payment_status = 'awaiting_payment'
-    //   2. Staff notifies advertiser (Discord) with their bid ID & amount
-    //   3. Advertiser pays your firm account in-game with memo = "bid:<id>"
-    //   4. DC Economy POSTs to POST /api/ads/webhook/payment
-    //   5. Worker verifies HMAC, parses memo, matches bid, marks paid
-    //
-    // Setup (one-time):
-    //   a. In Minecraft: /treasuryapi business issue <YourFirmName>  → copy token
-    //   b. Set Cloudflare secret:
-    //        npx wrangler secret put DC_WEBHOOK_SECRET
-    //      (paste the HMAC signing secret from economy.democracycraft.net/me/webhooks)
-    //   c. On economy.democracycraft.net/me/webhooks, add endpoint:
-    //        https://jaronitenews.com/api/ads/webhook/payment
-    //      Scope it to your firm account so you only receive inbound transfers.
-
-    // Verify the HMAC-SHA256 signature DC Economy attaches to every webhook.
-    // Must run against the raw request body bytes, not re-serialised JSON.
     async function verifyDcWebhookSignature(rawBody, signatureHeader, secret) {
-      if (!signatureHeader || !signatureHeader.startsWith('sha256=')) return false;
-      const expected = signatureHeader.slice(7); // strip 'sha256='
+      if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+      const expected = signatureHeader.slice(7);
       const key = await crypto.subtle.importKey(
-        'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        "raw",
+        new TextEncoder().encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
       );
-      const sig = await crypto.subtle.sign('HMAC', key, rawBody);
-      const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
-      // Constant-time comparison
+      const sig = await crypto.subtle.sign("HMAC", key, rawBody);
+      const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
       if (hex.length !== expected.length) return false;
       let diff = 0;
       for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ expected.charCodeAt(i);
       return diff === 0;
     }
-
-    // Parse the memo field from a DC Economy transaction.
-    // Advertisers pay with memo = "bid:<pay_ref>" (a long random token), e.g.
-    // "bid:9f2c...". Returns the token string, or null if the memo doesn't
-    // match. (Legacy memos were "bid:<numeric id>", which still match here and
-    // are handled by the numeric fallback at lookup time.)
+    __name(verifyDcWebhookSignature, "verifyDcWebhookSignature");
     function parseBidIdFromMemo(memo) {
-      if (!memo || typeof memo !== 'string') return null;
-      // Find the bid token ANYWHERE in the text. We don't anchor because the
-      // economy wraps the memo in its own text ("Payment from X to business
-      // Y: <memo>"). The colon is OPTIONAL because DC strips ':' from memos —
-      // a payer types "bid:abc" but it arrives as "bidabc".
+      if (!memo || typeof memo !== "string") return null;
       const m = memo.match(/bid:?\s*([A-Za-z0-9]+)/i);
       return m ? m[1] : null;
     }
-    // ----------------------------------------------------------------
-
-    // GET /api/ads/discord/login  — public
-    // Start the advertiser Discord verification: redirect to Discord's OAuth
-    // consent screen (identify scope only). On return we check server
-    // membership with the bot. `state` is echoed back for CSRF protection.
-    //
-    // Uses the single Jaronite News Discord app (DISCORD_CLIENT_ID) — the same
-    // app as the DM bot, which is a member of the guild. Reader login and
-    // advertiser verification both run on this one app.
-    if (url.pathname === '/api/ads/discord/login' && request.method === 'GET') {
-      const state = url.searchParams.get('state') || '';
+    __name(parseBidIdFromMemo, "parseBidIdFromMemo");
+    if (url.pathname === "/api/ads/discord/login" && request.method === "GET") {
+      const state = url.searchParams.get("state") || "";
       const redirectUri = `${url.origin}/api/ads/discord/callback`;
-      const discordUrl = new URL('https://discord.com/oauth2/authorize');
-      discordUrl.searchParams.set('client_id', env.DISCORD_CLIENT_ID);
-      discordUrl.searchParams.set('redirect_uri', redirectUri);
-      discordUrl.searchParams.set('response_type', 'code');
-      discordUrl.searchParams.set('scope', 'identify');
-      discordUrl.searchParams.set('state', state);
-      discordUrl.searchParams.set('prompt', 'consent');
+      const discordUrl = new URL("https://discord.com/oauth2/authorize");
+      discordUrl.searchParams.set("client_id", env.DISCORD_CLIENT_ID);
+      discordUrl.searchParams.set("redirect_uri", redirectUri);
+      discordUrl.searchParams.set("response_type", "code");
+      discordUrl.searchParams.set("scope", "identify");
+      discordUrl.searchParams.set("state", state);
+      discordUrl.searchParams.set("prompt", "consent");
       return Response.redirect(discordUrl.toString(), 302);
     }
-
-    // GET /api/ads/discord/callback  — public
-    // Discord redirects here with ?code=. Exchange it, fetch the user's
-    // identity, then check (via the bot) whether they're a member of our
-    // guild. If they are, mint a short-lived verification token and bounce
-    // back to /advertise with it. If not, bounce back asking them to join.
-    if (url.pathname === '/api/ads/discord/callback' && request.method === 'GET') {
+    if (url.pathname === "/api/ads/discord/callback" && request.method === "GET") {
       pruneRateLimitStore();
-      if (isRateLimited(`ads_oauth:${clientIp}`, 20, 60_000)) {
+      if (isRateLimited(`ads_oauth:${clientIp}`, 20, 6e4)) {
         return Response.redirect(`${url.origin}/advertise#ad_error=rate_limited`, 302);
       }
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state') || '';
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state") || "";
       const st = `&state=${encodeURIComponent(state)}`;
       if (!code) return Response.redirect(`${url.origin}/advertise#ad_error=missing_code${st}`, 302);
       const redirectUri = `${url.origin}/api/ads/discord/callback`;
-
       let tokenData;
       try {
-        const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             client_id: env.DISCORD_CLIENT_ID,
             client_secret: env.DISCORD_CLIENT_SECRET,
-            grant_type: 'authorization_code',
+            grant_type: "authorization_code",
             code,
-            redirect_uri: redirectUri,
-          }).toString(),
+            redirect_uri: redirectUri
+          }).toString()
         });
         tokenData = await tokenRes.json();
-        if (!tokenData.access_token) throw new Error('no access token');
+        if (!tokenData.access_token) throw new Error("no access token");
       } catch (e) {
         return Response.redirect(`${url.origin}/advertise#ad_error=token_exchange${st}`, 302);
       }
-
       let profile;
       try {
-        const pRes = await fetch('https://discord.com/api/users/@me', {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        const pRes = await fetch("https://discord.com/api/users/@me", {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
         });
         profile = await pRes.json();
-        if (!profile.id) throw new Error('no id');
+        if (!profile.id) throw new Error("no id");
       } catch (e) {
         return Response.redirect(`${url.origin}/advertise#ad_error=profile${st}`, 302);
       }
       const displayName = profile.global_name || profile.username;
-
-      // Membership check via the bot: GET the member by id in our guild.
-      // 200 = member, 404 = not a member.
       const guildId = env.DISCORD_GUILD_ID;
       const botToken = env.DISCORD_BOT_TOKEN;
       if (!guildId || !botToken) {
@@ -2316,7 +1964,7 @@ export default {
       let isMember = false;
       try {
         const mRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${profile.id}`, {
-          headers: { Authorization: `Bot ${botToken}` },
+          headers: { Authorization: `Bot ${botToken}` }
         });
         isMember = mRes.ok;
       } catch (e) {
@@ -2325,27 +1973,21 @@ export default {
       if (!isMember) {
         return Response.redirect(`${url.origin}/advertise#ad_join=1${st}`, 302);
       }
-
-      // Member confirmed — mint a short-lived verification token.
       const vToken = newSessionToken();
-      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1e3).toISOString();
       await env.DB.prepare(
         `INSERT INTO ad_verifications (token, discord_id, discord_username, expires_at) VALUES (?, ?, ?, ?)`
       ).bind(vToken, profile.id, displayName, expiresAt).run();
-
       const frag = `ad_verify=${vToken}&u=${encodeURIComponent(displayName)}${st}`;
       return Response.redirect(`${url.origin}/advertise#${frag}`, 302);
     }
-
-    // GET /api/ads/bids?date=YYYY-MM-DD&slot=1  — public
-    // Returns top 3 current bids for a given date+slot so advertisers can
-    // see what they need to beat. Advertiser names are shown, contacts hidden.
-    if (url.pathname === '/api/ads/bids' && request.method === 'GET') {
-      const date = url.searchParams.get('date');
-      const slot = parseInt(url.searchParams.get('slot') || '1');
-      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || ![1,2,3].includes(slot)) {
-        return new Response(JSON.stringify({ error: 'Invalid date or slot' }), {
-          status: 400, headers: { 'Content-Type': 'application/json' }
+    if (url.pathname === "/api/ads/bids" && request.method === "GET") {
+      const date = url.searchParams.get("date");
+      const slot = parseInt(url.searchParams.get("slot") || "1");
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || ![1, 2, 3].includes(slot)) {
+        return new Response(JSON.stringify({ error: "Invalid date or slot" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
         });
       }
       const rows = await env.DB.prepare(
@@ -2357,138 +1999,97 @@ export default {
          LIMIT 3`
       ).bind(date, slot).all();
       return new Response(JSON.stringify(rows.results || []), {
-        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+        headers: { "Content-Type": "application/json", ...securityHeaders() }
       });
     }
-
-    // POST /api/ads/bid  — public, no auth required
-    // Body: { advertiser_name, email?, image_url, dest_url, bid_amount, target_date, slot_number, verify_token }
-    // Public self-serve bidding: the bidder must first verify their Discord
-    // account AND server membership via /api/ads/discord/login, which yields a
-    // verify_token. Email is optional (for notifications). The Discord handle
-    // (and contact) come from the verified identity, never client input.
-    if (url.pathname === '/api/ads/bid' && request.method === 'POST') {
-      // Rate limit: this endpoint is unauthenticated and feeds the auto-award
-      // cron, so cap submissions per IP to stop flooding / bid-stuffing.
+    if (url.pathname === "/api/ads/bid" && request.method === "POST") {
       pruneRateLimitStore();
-      if (isRateLimited(`bid:${clientIp}`, 5, 60_000)) {
-        return secureJson({ error: "Too many bid submissions — please wait a minute and try again." }, { status: 429 });
+      if (isRateLimited(`bid:${clientIp}`, 5, 6e4)) {
+        return secureJson({ error: "Too many bid submissions \u2014 please wait a minute and try again." }, { status: 429 });
       }
-
       let body;
-      try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
-      const { advertiser_name, email, image_url, dest_url, bid_amount, target_date, slot_number, verify_token } = body;
-
-      if (!advertiser_name || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
-        return secureJson({ error: 'Missing required fields' }, { status: 400 });
+      try {
+        body = await request.json();
+      } catch {
+        return new Response("Bad JSON", { status: 400 });
       }
-
-      // --- Discord verification (required): resolve the verified identity from
-      //     the token minted by the OAuth + server-membership check. ---
+      const { advertiser_name, email, image_url, dest_url, bid_amount, target_date, slot_number, verify_token } = body;
+      if (!advertiser_name || !image_url || !dest_url || !bid_amount || !target_date || !slot_number) {
+        return secureJson({ error: "Missing required fields" }, { status: 400 });
+      }
       if (!verify_token) {
-        return secureJson({ error: 'Please verify your Discord account before bidding.' }, { status: 400 });
+        return secureJson({ error: "Please verify your Discord account before bidding." }, { status: 400 });
       }
       const verification = await env.DB.prepare(
         `SELECT discord_id, discord_username, expires_at FROM ad_verifications WHERE token = ?`
       ).bind(String(verify_token)).first();
-      if (!verification || new Date(verification.expires_at) < new Date()) {
-        return secureJson({ error: 'Your Discord verification has expired — please reconnect Discord and try again.' }, { status: 400 });
+      if (!verification || new Date(verification.expires_at) < /* @__PURE__ */ new Date()) {
+        return secureJson({ error: "Your Discord verification has expired \u2014 please reconnect Discord and try again." }, { status: 400 });
       }
       const dsc = String(verification.discord_username).slice(0, 100);
-      const con = dsc; // contact = the verified Discord handle (no separate field)
-
-      // --- Email is optional now; validate only if provided. ---
-      const eml = email ? String(email).trim() : '';
+      const con = dsc;
+      const eml = email ? String(email).trim() : "";
       const adv = String(advertiser_name).trim();
-      if (adv.length < 1 || adv.length > 100) return secureJson({ error: 'advertiser_name must be 1–100 characters' }, { status: 400 });
+      if (adv.length < 1 || adv.length > 100) return secureJson({ error: "advertiser_name must be 1\u2013100 characters" }, { status: 400 });
       if (eml) {
-        if (eml.length > 254) return secureJson({ error: 'email is too long' }, { status: 400 });
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: 'email is not a valid address' }, { status: 400 });
+        if (eml.length > 254) return secureJson({ error: "email is too long" }, { status: 400 });
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(eml)) return secureJson({ error: "email is not a valid address" }, { status: 400 });
       }
-
-      // --- Image: must be an uploaded image as a data: URL (allowlisted MIME
-      //     types only — no SVG, so no embedded script). The advertise form
-      //     submits exactly this via FileReader.readAsDataURL. ---
       const cleanImageUrl = validateImageUrl(image_url, MAX_AD_IMAGE_BYTES);
-      if (!cleanImageUrl) return secureJson({ error: 'image_url must be an uploaded PNG, JPEG, GIF, or WebP image (max 800 KB)' }, { status: 400 });
-      // --- Destination: the click-through link, a real external http(s) URL.
-      //     Blocks javascript:/data:/vbscript:/file: so the redirect target is safe. ---
+      if (!cleanImageUrl) return secureJson({ error: "image_url must be an uploaded PNG, JPEG, GIF, or WebP image (max 800 KB)" }, { status: 400 });
       const cleanDestUrl = validateHttpUrl(dest_url);
-      if (!cleanDestUrl) return secureJson({ error: 'dest_url must be a valid http(s) URL' }, { status: 400 });
-
-      // --- Slot ---
-      // Slot 1 (bottom leaderboard) is retired — only the two skyscrapers are sold.
+      if (!cleanDestUrl) return secureJson({ error: "dest_url must be a valid http(s) URL" }, { status: 400 });
       if (![2, 3].includes(Number(slot_number))) {
-        return secureJson({ error: 'slot_number must be 2 or 3' }, { status: 400 });
+        return secureJson({ error: "slot_number must be 2 or 3" }, { status: 400 });
       }
-
-      // --- Date: strict YYYY-MM-DD, real date, must be in the future ---
-      if (typeof target_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(target_date)) {
-        return secureJson({ error: 'target_date must be in YYYY-MM-DD format' }, { status: 400 });
+      if (typeof target_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(target_date)) {
+        return secureJson({ error: "target_date must be in YYYY-MM-DD format" }, { status: 400 });
       }
-      const parsedDate = new Date(`${target_date}T00:00:00Z`);
+      const parsedDate = /* @__PURE__ */ new Date(`${target_date}T00:00:00Z`);
       if (isNaN(parsedDate.getTime()) || target_date !== parsedDate.toISOString().slice(0, 10)) {
-        return secureJson({ error: 'target_date is not a real calendar date' }, { status: 400 });
+        return secureJson({ error: "target_date is not a real calendar date" }, { status: 400 });
       }
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       if (target_date <= todayStr) {
-        return secureJson({ error: 'target_date must be a future date' }, { status: 400 });
+        return secureJson({ error: "target_date must be a future date" }, { status: 400 });
       }
-
-      // --- Amount: finite, at least the minimum, within a sane ceiling ---
       const amt = Number(bid_amount);
       if (!Number.isFinite(amt) || amt <= 0) {
-        return secureJson({ error: 'bid_amount must be a positive number' }, { status: 400 });
+        return secureJson({ error: "bid_amount must be a positive number" }, { status: 400 });
       }
       if (amt < MIN_BID_PER_VIEW) {
-        return secureJson({ error: `bid_amount must be at least ${MIN_BID_PER_VIEW.toFixed(2)} ℐ per view` }, { status: 400 });
+        return secureJson({ error: `bid_amount must be at least ${MIN_BID_PER_VIEW.toFixed(2)} \u2110 per view` }, { status: 400 });
       }
-      if (amt > 1_000_000) {
-        return secureJson({ error: 'bid_amount exceeds the maximum allowed' }, { status: 400 });
+      if (amt > 1e6) {
+        return secureJson({ error: "bid_amount exceeds the maximum allowed" }, { status: 400 });
       }
-
-      // Insert the bid already verified (Discord OAuth + membership happened
-      // before submission), so it competes immediately. Contact is the verified
-      // Discord handle; email may be null. Each bid gets a long random pay_ref
-      // used in its payment memo.
       const payRef = newPayRef();
       const inserted = await env.DB.prepare(
         `INSERT INTO ad_bids (advertiser_name, contact, email, discord_username, image_url, dest_url, bid_amount, target_date, slot_number, pay_ref, discord_verified_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       ).bind(adv, con, eml || null, dsc, cleanImageUrl, cleanDestUrl, amt, target_date, Number(slot_number), payRef).run();
-
       return secureJson({
         ok: true,
         bid_id: inserted.meta.last_row_id,
         verified_as: dsc,
-        message: `Bid received and verified as ${dsc}! It now competes for its slot — highest ℐ/view bid wins.`,
+        message: `Bid received and verified as ${dsc}! It now competes for its slot \u2014 highest \u2110/view bid wins.`
       });
     }
-
-    // GET /api/ads/current
-    // Returns the 3 active ad slots for today. Article pages call this on load
-    // instead of using hardcoded AD_IMAGE_URL constants.
-    // Counts at most one impression per visitor per slot per day (billing is
-    // impression-based, so a page refresh must not re-bill the advertiser).
-    if (url.pathname === '/api/ads/current' && request.method === 'GET') {
-      // Cap raw request volume per IP as a first line of defence against a
-      // cookie-less client trying to flood impressions.
+    if (url.pathname === "/api/ads/current" && request.method === "GET") {
       pruneRateLimitStore();
-      if (isRateLimited(`ads_current:${clientIp}`, 30, 60_000)) {
-        return new Response(JSON.stringify({ error: 'Too many requests' }), {
-          status: 429, headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+      if (isRateLimited(`ads_current:${clientIp}`, 30, 6e4)) {
+        return new Response(JSON.stringify({ error: "Too many requests" }), {
+          status: 429,
+          headers: { "Content-Type": "application/json", ...securityHeaders() }
         });
       }
-      const today = new Date().toISOString().slice(0, 10);
+      const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       const rows = await env.DB.prepare(
         `SELECT id, slot_number, image_url, dest_url, advertiser_name
          FROM ad_slots WHERE run_date = ? ORDER BY slot_number`
       ).bind(today).all();
-      const visitorId = request.headers.get('Cookie')?.match(/jni_vid=([^;]+)/)?.[1] || null;
-      for (const row of (rows.results || [])) {
-        // De-duplicate per visitor per slot per day. Without a visitor cookie
-        // we can't identify a single viewer, so the per-IP rate limit above is
-        // the only guard for that (rarer) case.
+      const visitorId = request.headers.get("Cookie")?.match(/jni_vid=([^;]+)/)?.[1] || null;
+      for (const row of rows.results || []) {
         if (visitorId) {
           const seen = await env.DB.prepare(
             `SELECT 1 FROM ad_events
@@ -2505,29 +2106,22 @@ export default {
         ).bind(row.id).run();
       }
       return new Response(JSON.stringify(rows.results || []), {
-        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+        headers: { "Content-Type": "application/json", ...securityHeaders() }
       });
     }
-
-    // GET /api/ads/click/:slotId
-    // Records the click (at most one per visitor per slot per day) then
-    // redirects to the ad's destination URL.
-    if (url.pathname.startsWith('/api/ads/click/') && request.method === 'GET') {
+    if (url.pathname.startsWith("/api/ads/click/") && request.method === "GET") {
       pruneRateLimitStore();
-      if (isRateLimited(`ads_click:${clientIp}`, 20, 60_000)) {
-        return new Response('Too many requests', { status: 429 });
+      if (isRateLimited(`ads_click:${clientIp}`, 20, 6e4)) {
+        return new Response("Too many requests", { status: 429 });
       }
-      const slotId = parseInt(url.pathname.slice('/api/ads/click/'.length));
-      if (!slotId) return new Response('Bad request', { status: 400 });
+      const slotId = parseInt(url.pathname.slice("/api/ads/click/".length));
+      if (!slotId) return new Response("Bad request", { status: 400 });
       const row = await env.DB.prepare(
         `SELECT dest_url FROM ad_slots WHERE id = ?`
       ).bind(slotId).first();
-      if (!row) return new Response('Ad not found', { status: 404 });
-      const today = new Date().toISOString().slice(0, 10);
-      const visitorId = request.headers.get('Cookie')?.match(/jni_vid=([^;]+)/)?.[1] || null;
-      // Only bill one click per visitor per slot per day; repeated clicks
-      // (or a refresh of the redirect URL) shouldn't inflate the advertiser's
-      // charge. The redirect itself always happens regardless.
+      if (!row) return new Response("Ad not found", { status: 404 });
+      const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      const visitorId = request.headers.get("Cookie")?.match(/jni_vid=([^;]+)/)?.[1] || null;
       let alreadyClicked = false;
       if (visitorId) {
         const seen = await env.DB.prepare(
@@ -2545,27 +2139,22 @@ export default {
           `UPDATE ad_slots SET clicks = clicks + 1 WHERE id = ?`
         ).bind(slotId).run();
       }
-      // Re-validate the stored URL before redirecting. New bids are validated
-      // on submission, but this guards legacy rows and defends against an
-      // open-redirect if a bad URL ever reached the table by another path.
       const safeDest = validateHttpUrl(row.dest_url);
-      if (!safeDest) return new Response('This ad has an invalid destination.', { status: 400 });
+      if (!safeDest) return new Response("This ad has an invalid destination.", { status: 400 });
       return Response.redirect(safeDest, 302);
     }
-
-    // POST /api/ads/report  — editor/admin only
-    // Auth via the standard Authorization: Bearer <token> header (same as the
-    // rest of the API and what the portal client already sends), never a token
-    // in the request body.
-    // Body: { from_date?, to_date? }
-    if (url.pathname === '/api/ads/report' && request.method === 'POST') {
+    if (url.pathname === "/api/ads/report" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return secureJson({ error: 'Unauthorized' }, { status: 403 });
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
       let body;
-      try { body = await request.json(); } catch { return new Response('Bad JSON', { status: 400 }); }
+      try {
+        body = await request.json();
+      } catch {
+        return new Response("Bad JSON", { status: 400 });
+      }
       const { from_date, to_date } = body;
-      const from = from_date || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const to   = to_date   || new Date().toISOString().slice(0, 10);
+      const from = from_date || new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const to = to_date || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       const rows = await env.DB.prepare(
         `SELECT s.id, s.slot_number, s.run_date, s.advertiser_name, s.contact,
                 s.bid_amount, s.impressions, s.clicks,
@@ -2575,74 +2164,47 @@ export default {
          ORDER BY s.run_date DESC, s.slot_number`
       ).bind(from, to).all();
       return new Response(JSON.stringify(rows.results || []), {
-        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+        headers: { "Content-Type": "application/json", ...securityHeaders() }
       });
     }
-
-    // ================================================================
-    // POST /api/ads/webhook/payment  — DC Economy webhook receiver
-    // ================================================================
-    // Called by DC Economy server when money arrives in the JNI firm account.
-    // Verifies the HMAC signature, deduplicates by deliveryId, parses the
-    // memo to find the matching bid, and marks it paid (or flags over/underpay).
-    if (url.pathname === '/api/ads/webhook/payment' && request.method === 'POST') {
+    if (url.pathname === "/api/ads/webhook/payment" && request.method === "POST") {
       const secret = env.DC_WEBHOOK_SECRET;
       if (!secret) {
-        // Secret not configured — log and return 200 so DC doesn't retry forever
-        console.error('DC_WEBHOOK_SECRET not set — webhook ignored');
-        return new Response('ok', { status: 200 });
+        console.error("DC_WEBHOOK_SECRET not set \u2014 webhook ignored");
+        return new Response("ok", { status: 200 });
       }
-
-      // Read raw bytes for signature verification
       const rawBody = await request.arrayBuffer();
-      const sigHeader = request.headers.get('X-Treasury-Signature') || '';
-      const deliveryId = request.headers.get('X-Treasury-Delivery-Id') || String(Date.now());
-
-      // Verify signature
+      const sigHeader = request.headers.get("X-Treasury-Signature") || "";
+      const deliveryId = request.headers.get("X-Treasury-Delivery-Id") || String(Date.now());
       const valid = await verifyDcWebhookSignature(rawBody, sigHeader, secret);
       if (!valid) {
-        console.warn('DC webhook: invalid signature, rejecting');
-        return new Response('Forbidden', { status: 403 });
+        console.warn("DC webhook: invalid signature, rejecting");
+        return new Response("Forbidden", { status: 403 });
       }
-
-      // Deduplicate: if we've already processed this deliveryId, return 200 silently
       const alreadyProcessed = await env.DB.prepare(
         `SELECT id FROM webhook_deliveries WHERE delivery_id = ?`
       ).bind(deliveryId).first();
       if (alreadyProcessed) {
-        return new Response('ok', { status: 200 }); // idempotent replay
+        return new Response("ok", { status: 200 });
       }
-
-      // Parse payload
       let payload;
-      try { payload = JSON.parse(new TextDecoder().decode(rawBody)); }
-      catch { return new Response('Bad JSON', { status: 400 }); }
-
+      try {
+        payload = JSON.parse(new TextDecoder().decode(rawBody));
+      } catch {
+        return new Response("Bad JSON", { status: 400 });
+      }
       const txn = payload.transaction;
-      if (!txn) return new Response('ok', { status: 200 }); // not a transaction event
-
-      // Only care about incoming money (positive amount)
+      if (!txn) return new Response("ok", { status: 200 });
       const amount = parseFloat(txn.amount);
-      if (!amount || amount <= 0) return new Response('ok', { status: 200 });
-
-      // Record delivery for deduplication regardless of outcome
+      if (!amount || amount <= 0) return new Response("ok", { status: 200 });
       await env.DB.prepare(
         `INSERT OR IGNORE INTO webhook_deliveries (delivery_id, txn_id) VALUES (?, ?)`
-      ).bind(deliveryId, String(txn.txnId || '')).run();
-
-      // Parse the payment token (bid:<pay_ref>) from anywhere in the payload.
-      // Different economy commands put the memo in different fields, so rather
-      // than guess we scan the whole serialized payload for the token.
+      ).bind(deliveryId, String(txn.txnId || "")).run();
       const payToken = parseBidIdFromMemo(JSON.stringify(payload));
       if (!payToken) {
-        // No bid token found anywhere — log the FULL payload so we can see what
-        // the economy actually sent (view with `wrangler tail`).
-        console.log(`DC webhook: no bid token in payload — ${JSON.stringify(payload)}`);
-        return new Response('ok', { status: 200 });
+        console.log(`DC webhook: no bid token in payload \u2014 ${JSON.stringify(payload)}`);
+        return new Response("ok", { status: 200 });
       }
-
-      // Look up the bid by its pay_ref. Fall back to the numeric id for any
-      // legacy memos issued before pay_ref existed.
       let bid = await env.DB.prepare(
         `SELECT * FROM ad_bids WHERE pay_ref = ?`
       ).bind(payToken).first();
@@ -2651,41 +2213,25 @@ export default {
           `SELECT * FROM ad_bids WHERE id = ?`
         ).bind(parseInt(payToken, 10)).first();
       }
-
       if (!bid) {
         console.warn(`DC webhook: no bid matches memo token "${payToken}"`);
-        return new Response('ok', { status: 200 });
+        return new Response("ok", { status: 200 });
       }
-
-      // Determine what's owed: the invoiced total (rate × views) if the
-      // invoice has already been generated, otherwise compute it live from the
-      // ad's current view count. Billing is per-view, so we match the payment
-      // against rate × views — NOT the raw per-view bid_amount.
-      let amountOwed = (bid.amount_owed != null) ? Number(bid.amount_owed) : null;
+      let amountOwed = bid.amount_owed != null ? Number(bid.amount_owed) : null;
       if (amountOwed == null) {
         const owed = await computeAmountOwed(env, bid);
         amountOwed = owed.total;
       }
-
-      // Accumulate payments. Partial payers can top up over several transfers,
-      // so we add this payment to whatever they've already sent rather than
-      // overwriting — that's what lets an 'underpaid' bid become 'paid' once
-      // the balance is covered.
-      const tolerance = 0.01; // float rounding tolerance
+      const tolerance = 0.01;
       const prevPaid = Number(bid.payment_amount_received) || 0;
       const totalPaid = Math.round((prevPaid + amount) * 100) / 100;
       const remaining = Math.round((amountOwed - totalPaid) * 100) / 100;
-
-      // Determine payment status against the CUMULATIVE amount paid.
-      // Overpayment is intentionally treated as fully settled — we keep the
-      // surplus (no refund logic).
       let paymentStatus;
       if (totalPaid + tolerance >= amountOwed) {
-        paymentStatus = (totalPaid - amountOwed > tolerance) ? 'overpaid' : 'paid';
+        paymentStatus = totalPaid - amountOwed > tolerance ? "overpaid" : "paid";
       } else {
-        paymentStatus = 'underpaid';
+        paymentStatus = "underpaid";
       }
-
       await env.DB.prepare(
         `UPDATE ad_bids
          SET payment_status = ?,
@@ -2694,69 +2240,47 @@ export default {
              payment_received_at = datetime('now')
          WHERE id = ?`
       ).bind(paymentStatus, String(txn.txnId || txn.postingId || deliveryId), totalPaid, bid.id).run();
-
       console.log(`DC webhook: bid ${bid.id} marked ${paymentStatus} (owed ${amountOwed}, paid ${totalPaid} this txn ${amount})`);
-
       const slotLabelPay = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
-      if (paymentStatus === 'paid' || paymentStatus === 'overpaid') {
-        // Fully settled (we keep any overpayment) — send the receipt + report.
+      if (paymentStatus === "paid" || paymentStatus === "overpaid") {
         const stats = await getAdStats(env, bid);
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
-            subject: `✅ Payment confirmed — Jaronite News ad #${bid.id}`,
-            html: paymentConfirmedEmailHtml(bid, slotLabelPay, totalPaid, stats),
+            subject: `\u2705 Payment confirmed \u2014 Jaronite News ad #${bid.id}`,
+            html: paymentConfirmedEmailHtml(bid, slotLabelPay, totalPaid, stats)
           });
         }
         if (bid.discord_username) {
           await sendDiscordDm(env, bid.discord_username, confirmedDiscordMsg(bid, slotLabelPay, totalPaid, stats));
         }
       } else {
-        // Underpaid — acknowledge what we got and tell them the remaining balance.
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
-            subject: `⚠️ Partial payment received — balance due on ad #${bid.id}`,
-            html: underpaidEmailHtml(bid, slotLabelPay, amountOwed, totalPaid, remaining),
+            subject: `\u26A0\uFE0F Partial payment received \u2014 balance due on ad #${bid.id}`,
+            html: underpaidEmailHtml(bid, slotLabelPay, amountOwed, totalPaid, remaining)
           });
         }
         if (bid.discord_username) {
           await sendDiscordDm(env, bid.discord_username, underpaidDiscordMsg(bid, slotLabelPay, amountOwed, totalPaid, remaining));
         }
       }
-
-      return new Response('ok', { status: 200 });
+      return new Response("ok", { status: 200 });
     }
-
-    // ================================================================
-    // GET /api/ads/payment-status  — editor/admin (or bot) only
-    // Returns payment status for all won bids, optionally filtered by date range.
-    // Auth: either an X-Bot-Key header (machine-to-machine) or a normal staff
-    // session via the Authorization: Bearer <token> header. Tokens/keys are
-    // header-only on purpose — query strings can be written to request logs in
-    // plaintext (observability.logs is enabled), so secrets must never travel
-    // in the URL.
-    // Query params: from_date, to_date
-    // ================================================================
-    if (url.pathname === '/api/ads/payment-status' && request.method === 'GET') {
-      // Auth path 1: a permanent bot API key (machine-to-machine, no expiry).
-      // Set via: npx wrangler secret put BOT_API_KEY
+    if (url.pathname === "/api/ads/payment-status" && request.method === "GET") {
       const botKey = env.BOT_API_KEY;
-      const presentedKey = request.headers.get('X-Bot-Key');
-      const isBot = botKey && presentedKey &&
-        presentedKey.length === botKey.length &&
-        timingSafeEqualStr(presentedKey, botKey);
-
-      // Auth path 2: a normal staff session (editor/admin), via Bearer header.
+      const presentedKey = request.headers.get("X-Bot-Key");
+      const isBot = botKey && presentedKey && presentedKey.length === botKey.length && timingSafeEqualStr(presentedKey, botKey);
       const reviewer = isBot ? null : await requireEditorOrAdmin(env, request);
-
       if (!isBot && !reviewer) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 403, headers: { 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" }
         });
       }
-      const from = url.searchParams.get('from_date') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const to   = url.searchParams.get('to_date')   || new Date().toISOString().slice(0, 10);
+      const from = url.searchParams.get("from_date") || new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const to = url.searchParams.get("to_date") || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       const rows = await env.DB.prepare(
         `SELECT b.id, b.advertiser_name, b.contact, b.bid_amount,
                 b.target_date, b.slot_number, b.status AS bid_status,
@@ -2768,279 +2292,230 @@ export default {
          WHERE b.status = 'won' AND b.target_date BETWEEN ? AND ?
          ORDER BY b.target_date DESC, b.slot_number`
       ).bind(from, to).all();
-      // Attach a single derived lifecycle stage per winner for display.
-      const withStage = (rows.results || []).map(r => ({
+      const withStage = (rows.results || []).map((r) => ({
         ...r,
         stage: winnerStage({
           status: r.bid_status,
           payment_status: r.payment_status,
           invoiced_at: r.invoiced_at,
-          target_date: r.target_date,
-        }),
+          target_date: r.target_date
+        })
       }));
       return new Response(JSON.stringify(withStage), {
-        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+        headers: { "Content-Type": "application/json", ...securityHeaders() }
       });
     }
-
-    // ================================================================
-    // POST /api/ads/resend-notification  — editor/admin only
-    // Manually re-send the right message for where the bid is in its
-    // lifecycle: the "you won" notice (won/awaiting invoice), the invoice
-    // (unpaid/late), a balance-due notice (underpaid), or the payment receipt
-    // (paid/overpaid). Reports per-channel results so staff can see exactly
-    // what happened.
-    // ================================================================
-    if (url.pathname === '/api/ads/resend-notification' && request.method === 'POST') {
+    if (url.pathname === "/api/ads/resend-notification" && request.method === "POST") {
       const reviewer = await requireEditorOrAdmin(env, request);
-      if (!reviewer) return secureJson({ error: 'Unauthorized' }, { status: 403 });
-
+      if (!reviewer) return secureJson({ error: "Unauthorized" }, { status: 403 });
       const { bid_id } = await request.json();
       const bidId = parseInt(bid_id, 10);
-      if (!bidId || isNaN(bidId)) return secureJson({ error: 'Invalid bid_id' }, { status: 400 });
-
+      if (!bidId || isNaN(bidId)) return secureJson({ error: "Invalid bid_id" }, { status: 400 });
       const bid = await env.DB.prepare(`SELECT * FROM ad_bids WHERE id = ?`).bind(bidId).first();
-      if (!bid) return secureJson({ error: 'Bid not found' }, { status: 404 });
-      if (bid.status !== 'won') {
-        return secureJson({ error: 'Only won bids can be notified.' }, { status: 400 });
+      if (!bid) return secureJson({ error: "Bid not found" }, { status: 404 });
+      if (bid.status !== "won") {
+        return secureJson({ error: "Only won bids can be notified." }, { status: 400 });
       }
-
       const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
       const stage = winnerStage({
         status: bid.status,
         payment_status: bid.payment_status,
         invoiced_at: bid.invoiced_at,
-        target_date: bid.target_date,
+        target_date: bid.target_date
       });
-
-      // Choose the message that matches the bid's current stage.
       let kind, subject, emailHtml, discordMsg;
-      if (stage === 'paid' || stage === 'overpaid') {
-        kind = 'receipt';
+      if (stage === "paid" || stage === "overpaid") {
+        kind = "receipt";
         const paidAmt = Number(bid.payment_amount_received) || 0;
         const stats = await getAdStats(env, bid);
-        subject = `✅ Payment confirmed — Jaronite News ad #${bid.id}`;
+        subject = `\u2705 Payment confirmed \u2014 Jaronite News ad #${bid.id}`;
         emailHtml = paymentConfirmedEmailHtml(bid, slotLabel, paidAmt, stats);
         discordMsg = confirmedDiscordMsg(bid, slotLabel, paidAmt, stats);
-      } else if (stage === 'underpaid') {
-        kind = 'balance due';
-        const owed = (bid.amount_owed != null) ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
+      } else if (stage === "underpaid") {
+        kind = "balance due";
+        const owed = bid.amount_owed != null ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
         const paid = Number(bid.payment_amount_received) || 0;
         const remaining = Math.round((owed - paid) * 100) / 100;
-        subject = `⚠️ Partial payment received — balance due on ad #${bid.id}`;
+        subject = `\u26A0\uFE0F Partial payment received \u2014 balance due on ad #${bid.id}`;
         emailHtml = underpaidEmailHtml(bid, slotLabel, owed, paid, remaining);
         discordMsg = underpaidDiscordMsg(bid, slotLabel, owed, paid, remaining);
-      } else if (stage === 'unpaid' || stage === 'late') {
-        kind = 'invoice';
+      } else if (stage === "unpaid" || stage === "late") {
+        kind = "invoice";
         const { views, total } = await computeAmountOwed(env, bid);
-        subject = `🧾 Your Jaronite News ad invoice — ${total.toFixed(2)} ℐ (#${bid.id})`;
+        subject = `\u{1F9FE} Your Jaronite News ad invoice \u2014 ${total.toFixed(2)} \u2110 (#${bid.id})`;
         emailHtml = invoiceEmailHtml(bid, slotLabel, views, total);
         discordMsg = invoiceDiscordMsg(bid, slotLabel, views, total);
       } else {
-        // won / awaiting_invoice → the original "you won" notice.
-        kind = 'win notice';
-        subject = `🎉 You won a Jaronite News ad slot for ${bid.target_date}!`;
+        kind = "win notice";
+        subject = `\u{1F389} You won a Jaronite News ad slot for ${bid.target_date}!`;
         emailHtml = winEmailHtml(bid, slotLabel);
         discordMsg = winDiscordMsg(bid, slotLabel);
       }
-
-      const emailRes = bid.email
-        ? await sendEmail(env, { to: bid.email, subject, html: emailHtml })
-        : { ok: false, skipped: 'no email on file' };
-      const discordRes = bid.discord_username
-        ? await sendDiscordDm(env, bid.discord_username, discordMsg)
-        : { ok: false, skipped: 'no Discord username on file' };
-
+      const emailRes = bid.email ? await sendEmail(env, { to: bid.email, subject, html: emailHtml }) : { ok: false, skipped: "no email on file" };
+      const discordRes = bid.discord_username ? await sendDiscordDm(env, bid.discord_username, discordMsg) : { ok: false, skipped: "no Discord username on file" };
       const sentOk = emailRes.ok || discordRes.ok;
-      // Only the "you won" notice updates notified_at — that column specifically
-      // tracks whether the winner was told they won.
-      const notified = sentOk && kind === 'win notice';
+      const notified = sentOk && kind === "win notice";
       if (notified) {
         await env.DB.prepare(`UPDATE ad_bids SET notified_at = datetime('now') WHERE id = ?`).bind(bidId).run();
       }
-      await log(env, reviewer.username, 'RESEND_AD_NOTIFICATION',
-        `Re-sent ${kind} for bid #${bidId} (${bid.advertiser_name}) — email: ${emailRes.ok ? 'sent' : (emailRes.skipped || emailRes.error)}; discord: ${discordRes.ok ? 'sent' : (discordRes.skipped || discordRes.error)}`);
-
+      await log(
+        env,
+        reviewer.username,
+        "RESEND_AD_NOTIFICATION",
+        `Re-sent ${kind} for bid #${bidId} (${bid.advertiser_name}) \u2014 email: ${emailRes.ok ? "sent" : emailRes.skipped || emailRes.error}; discord: ${discordRes.ok ? "sent" : discordRes.skipped || discordRes.error}`
+      );
       return secureJson({ success: true, kind, sent: sentOk, notified, email: emailRes, discord: discordRes });
     }
-
-    // ================================================================
-    // POST /api/ads/adjust-payment  — ADMIN only
-    // Manually record an off-platform payment or correct a bid's payment state.
-    // actions:
-    //   'mark_paid'       → settle the invoice in full (paid)
-    //   'record_payment'  → add `amount` to what's been received, recompute status
-    //   'reset'           → clear payments back to awaiting_payment
-    // Does NOT email/DM the advertiser — use the stage-aware Re-send button if
-    // you want to send a receipt/balance notice after adjusting.
-    // ================================================================
-    if (url.pathname === '/api/ads/adjust-payment' && request.method === 'POST') {
+    if (url.pathname === "/api/ads/adjust-payment" && request.method === "POST") {
       const admin = await requireAdmin(env, request);
-      if (!admin) return secureJson({ error: 'Unauthorized' }, { status: 403 });
-
+      if (!admin) return secureJson({ error: "Unauthorized" }, { status: 403 });
       const body = await request.json().catch(() => ({}));
       const bidId = parseInt(body.bid_id, 10);
       const action = body.action;
-      if (!bidId || isNaN(bidId)) return secureJson({ error: 'Invalid bid_id' }, { status: 400 });
-
+      if (!bidId || isNaN(bidId)) return secureJson({ error: "Invalid bid_id" }, { status: 400 });
       const bid = await env.DB.prepare(`SELECT * FROM ad_bids WHERE id = ?`).bind(bidId).first();
-      if (!bid) return secureJson({ error: 'Bid not found' }, { status: 404 });
-      if (bid.status !== 'won') return secureJson({ error: 'Only won bids have payments.' }, { status: 400 });
-
+      if (!bid) return secureJson({ error: "Bid not found" }, { status: 404 });
+      if (bid.status !== "won") return secureJson({ error: "Only won bids have payments." }, { status: 400 });
       const tolerance = 0.01;
-      const amountOwed = (bid.amount_owed != null) ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
+      const amountOwed = bid.amount_owed != null ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
       const prevPaid = Number(bid.payment_amount_received) || 0;
-
-      if (action === 'reset') {
+      if (action === "reset") {
         await env.DB.prepare(
           `UPDATE ad_bids SET payment_status = 'awaiting_payment', payment_amount_received = NULL,
                               payment_received_at = NULL, payment_txn_id = NULL WHERE id = ?`
         ).bind(bidId).run();
-        await log(env, admin.username, 'ADJUST_AD_PAYMENT', `Reset payment for bid #${bidId} (${bid.advertiser_name})`);
-        return secureJson({ success: true, payment_status: 'awaiting_payment', amount_owed: amountOwed, paid: 0, remaining: amountOwed });
+        await log(env, admin.username, "ADJUST_AD_PAYMENT", `Reset payment for bid #${bidId} (${bid.advertiser_name})`);
+        return secureJson({ success: true, payment_status: "awaiting_payment", amount_owed: amountOwed, paid: 0, remaining: amountOwed });
       }
-
       let newPaid;
-      if (action === 'mark_paid') {
+      if (action === "mark_paid") {
         newPaid = amountOwed;
-      } else if (action === 'record_payment') {
+      } else if (action === "record_payment") {
         const amt = Number(body.amount);
-        if (!Number.isFinite(amt) || amt <= 0) return secureJson({ error: 'amount must be a positive number' }, { status: 400 });
+        if (!Number.isFinite(amt) || amt <= 0) return secureJson({ error: "amount must be a positive number" }, { status: 400 });
         newPaid = Math.round((prevPaid + amt) * 100) / 100;
       } else {
-        return secureJson({ error: 'Unknown action' }, { status: 400 });
+        return secureJson({ error: "Unknown action" }, { status: 400 });
       }
-
       let paymentStatus;
       if (newPaid + tolerance >= amountOwed) {
-        paymentStatus = (newPaid - amountOwed > tolerance) ? 'overpaid' : 'paid';
+        paymentStatus = newPaid - amountOwed > tolerance ? "overpaid" : "paid";
       } else {
-        paymentStatus = 'underpaid';
+        paymentStatus = "underpaid";
       }
-
       await env.DB.prepare(
         `UPDATE ad_bids SET payment_status = ?, payment_amount_received = ?,
                             payment_received_at = datetime('now'), payment_txn_id = ? WHERE id = ?`
       ).bind(paymentStatus, newPaid, `manual:${admin.username}`, bidId).run();
-
-      await log(env, admin.username, 'ADJUST_AD_PAYMENT',
-        `${action} on bid #${bidId} (${bid.advertiser_name}) — owed ${amountOwed.toFixed(2)}, now paid ${newPaid.toFixed(2)}, status ${paymentStatus}`);
-
+      await log(
+        env,
+        admin.username,
+        "ADJUST_AD_PAYMENT",
+        `${action} on bid #${bidId} (${bid.advertiser_name}) \u2014 owed ${amountOwed.toFixed(2)}, now paid ${newPaid.toFixed(2)}, status ${paymentStatus}`
+      );
       return secureJson({
         success: true,
         payment_status: paymentStatus,
         amount_owed: amountOwed,
         paid: newPaid,
-        remaining: Math.round((amountOwed - newPaid) * 100) / 100,
+        remaining: Math.round((amountOwed - newPaid) * 100) / 100
       });
     }
-
-    // /advertise → advertise.html (public bid form)
-    if (url.pathname === '/advertise') {
-      const advUrl = new URL('/advertise.html', url.origin);
+    if (url.pathname === "/advertise") {
+      const advUrl = new URL("/advertise.html", url.origin);
       try {
-        const advAsset = await getAssetFromKV(
-          { request: new Request(advUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
+        const advAsset = await (0, import_kv_asset_handler.getAssetFromKV)(
+          { request: new Request(advUrl.toString(), request), waitUntil(p) {
+            return ctx.waitUntil(p);
+          } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
         const advH = new Headers(advAsset.headers);
         for (const [k, v] of Object.entries(securityHeaders())) advH.set(k, v);
         return new Response(advAsset.body, { status: advAsset.status, headers: advH });
       } catch (e) {
-        return new Response('Not found', { status: 404 });
+        return new Response("Not found", { status: 404 });
       }
     }
-
-    // Clean-URL support: getAssetFromKV matches the exact pathname in the KV
-    // manifest, so "/portal" would 404 even though "/portal.html" exists.
-    // If the requested path has no file extension (and isn't the root "/"),
-    // try appending ".html" first. This lets every page be reached at its
-    // clean URL (/portal, /politics, /economy, ...) while old links that
-    // still include ".html" keep working too, since we fall back to the
-    // original request if the rewritten one doesn't resolve.
-    //
-    // /article/* is a special case: these are dynamic article pages with no
-    // corresponding static file per article. They all share a single
-    // article.html shell that reads the id-slug from the URL client-side and
-    // fetches the article data from /api/article/:idslug.
-    // /articles -> articles.html (All Articles page)
     if (url.pathname === "/articles") {
       const articlesUrl = new URL("/articles.html", url.origin);
       try {
-        const ar = await getAssetFromKV(
-          { request: new Request(articlesUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
+        const ar = await (0, import_kv_asset_handler.getAssetFromKV)(
+          { request: new Request(articlesUrl.toString(), request), waitUntil(p) {
+            return ctx.waitUntil(p);
+          } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
-        const arH = new Headers(ar.headers); for (const [k,v] of Object.entries(securityHeaders())) arH.set(k,v);
+        const arH = new Headers(ar.headers);
+        for (const [k, v] of Object.entries(securityHeaders())) arH.set(k, v);
         return new Response(ar.body, { status: ar.status, headers: arH });
       } catch (e) {
         return new Response("Not found", { status: 404 });
       }
     }
-
-    // /favorites -> favorites.html (dedicated Favorites page for logged-in readers)
     if (url.pathname === "/favorites") {
       const favUrl = new URL("/favorites.html", url.origin);
       try {
-        const fv = await getAssetFromKV(
-          { request: new Request(favUrl.toString(), request), waitUntil(p) { return ctx.waitUntil(p); } },
+        const fv = await (0, import_kv_asset_handler.getAssetFromKV)(
+          { request: new Request(favUrl.toString(), request), waitUntil(p) {
+            return ctx.waitUntil(p);
+          } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
-        const fvH = new Headers(fv.headers); for (const [k,v] of Object.entries(securityHeaders())) fvH.set(k,v);
+        const fvH = new Headers(fv.headers);
+        for (const [k, v] of Object.entries(securityHeaders())) fvH.set(k, v);
         return new Response(fv.body, { status: fv.status, headers: fvH });
       } catch (e) {
         return new Response("Not found", { status: 404 });
       }
     }
-
     if (url.pathname.startsWith("/article/")) {
       const articleUrl = new URL("/article.html", url.origin);
       const articleRequest = new Request(articleUrl.toString(), request);
       try {
-        const ar2 = await getAssetFromKV(
-          { request: articleRequest, waitUntil(promise) { return ctx.waitUntil(promise); } },
+        const ar2 = await (0, import_kv_asset_handler.getAssetFromKV)(
+          { request: articleRequest, waitUntil(promise) {
+            return ctx.waitUntil(promise);
+          } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
-        const ar2H = new Headers(ar2.headers); for (const [k,v] of Object.entries(securityHeaders())) ar2H.set(k,v);
+        const ar2H = new Headers(ar2.headers);
+        for (const [k, v] of Object.entries(securityHeaders())) ar2H.set(k, v);
         return new Response(ar2.body, { status: ar2.status, headers: ar2H });
       } catch (e) {
         return new Response("Article page not found", { status: 404 });
       }
     }
-
-    // Any /api/* path that didn't match a real route above gets a clean JSON 404
-    // rather than falling through into the static-asset handler.
-    if (url.pathname.startsWith('/api/')) {
-      return new Response(JSON.stringify({ error: 'Not found' }), {
+    if (url.pathname.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json', ...securityHeaders() }
+        headers: { "Content-Type": "application/json", ...securityHeaders() }
       });
     }
-
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(url.pathname);
     if (!hasExtension && url.pathname !== "/") {
       try {
         const htmlUrl = new URL(url.pathname.replace(/\/$/, "") + ".html", url.origin);
         const htmlRequest = new Request(htmlUrl.toString(), request);
-        const htmlAsset = await getAssetFromKV(
-          { request: htmlRequest, waitUntil(promise) { return ctx.waitUntil(promise); } },
+        const htmlAsset = await (0, import_kv_asset_handler.getAssetFromKV)(
+          { request: htmlRequest, waitUntil(promise) {
+            return ctx.waitUntil(promise);
+          } },
           { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
         );
-        const htmlH = new Headers(htmlAsset.headers); for (const [k,v] of Object.entries(securityHeaders())) htmlH.set(k,v);
+        const htmlH = new Headers(htmlAsset.headers);
+        for (const [k, v] of Object.entries(securityHeaders())) htmlH.set(k, v);
         return new Response(htmlAsset.body, { status: htmlAsset.status, headers: htmlH });
       } catch (e) {
-        // No matching .html file — fall through to the normal lookup below
-        // (covers extensionless static assets, if any, and produces the
-        // standard 404 if nothing matches either way).
       }
     }
-
     try {
-      const assetResponse = await getAssetFromKV(
-        { request, waitUntil(promise) { return ctx.waitUntil(promise); } },
+      const assetResponse = await (0, import_kv_asset_handler.getAssetFromKV)(
+        { request, waitUntil(promise) {
+          return ctx.waitUntil(promise);
+        } },
         { ASSET_NAMESPACE: env.__STATIC_CONTENT, ASSET_MANIFEST: assetManifest }
       );
-      // Inject security headers on every served HTML/JS/CSS asset.
       const newHeaders = new Headers(assetResponse.headers);
       for (const [k, v] of Object.entries(securityHeaders())) newHeaders.set(k, v);
       return new Response(assetResponse.body, { status: assetResponse.status, headers: newHeaders });
@@ -3048,33 +2523,19 @@ export default {
       return new Response("404 Not Found", { status: 404 });
     }
   },
-
   // ================================================================
   // CRON — Ad system automation
   // Runs at 8 PM UTC (award bids) and midnight UTC (safety check).
   // ================================================================
   async scheduled(event, env, ctx) {
-    // Decide which job to run from the cron pattern Cloudflare passes in
-    // (event.cron) rather than the wall clock. This is Cloudflare's documented
-    // pattern, can't drift if a trigger fires a minute late, and lets you
-    // simulate either job locally at any time:
-    //   curl ".../cdn-cgi/handler/scheduled?cron=0+20+*+*+*"   → award
-    //   curl ".../cdn-cgi/handler/scheduled?cron=0+0+*+*+*"    → cleanup + reminders
-    // Fallback: if event.cron is missing/unrecognised, fall back to the UTC
-    // hour so production behaviour is unchanged even without a cron value.
     const cron = event && event.cron ? event.cron : "";
-    const hour = new Date().getUTCHours();
-    const runAward   = cron === "0 20 * * *" || (!cron && hour === 20);
-    const runCleanup = cron === "0 0 * * *"  || (!cron && hour === 0);
-
-    // ---- Award tomorrow's bids (8 PM UTC trigger: "0 20 * * *") ----
+    const hour = (/* @__PURE__ */ new Date()).getUTCHours();
+    const runAward = cron === "0 20 * * *" || !cron && hour === 20;
+    const runCleanup = cron === "0 0 * * *" || !cron && hour === 0;
     if (runAward) {
-      const tomorrow = new Date();
+      const tomorrow = /* @__PURE__ */ new Date();
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
       const targetDate = tomorrow.toISOString().slice(0, 10);
-
-      // For each of the 3 slots, find the highest bid for tomorrow.
-      // Ties broken by earliest submission (lowest id).
       for (let slot = 1; slot <= 3; slot++) {
         const winner = await env.DB.prepare(
           `SELECT * FROM ad_bids
@@ -3082,10 +2543,7 @@ export default {
              AND discord_verified_at IS NOT NULL
            ORDER BY bid_amount DESC, id ASC LIMIT 1`
         ).bind(targetDate, slot).first();
-
         if (!winner) continue;
-
-        // Insert into ad_slots (or update if already exists from a re-run)
         await env.DB.prepare(
           `INSERT INTO ad_slots (slot_number, run_date, bid_id, advertiser_name, contact, image_url, dest_url, bid_amount)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -3097,23 +2555,17 @@ export default {
              dest_url = excluded.dest_url,
              bid_amount = excluded.bid_amount`
         ).bind(slot, targetDate, winner.id, winner.advertiser_name, winner.contact, winner.image_url, winner.dest_url, winner.bid_amount).run();
-
-        // Mark winner and set payment_status to awaiting_payment
         await env.DB.prepare(
           `UPDATE ad_bids SET status = 'won', payment_status = 'awaiting_payment' WHERE id = ?`
         ).bind(winner.id).run();
-
-        // Send win notifications (email + Discord DM). Record notified_at if
-        // at least one channel succeeded, so the portal can show who still
-        // needs a manual re-send.
         const slotLabelWin = SLOT_LABELS[slot] || `Slot ${slot}`;
         let emailRes = { ok: false };
         let discordRes = { ok: false };
         if (winner.email) {
           emailRes = await sendEmail(env, {
             to: winner.email,
-            subject: `🎉 You won a Jaronite News ad slot for ${targetDate}!`,
-            html: winEmailHtml(winner, slotLabelWin),
+            subject: `\u{1F389} You won a Jaronite News ad slot for ${targetDate}!`,
+            html: winEmailHtml(winner, slotLabelWin)
           });
         }
         if (winner.discord_username) {
@@ -3122,78 +2574,55 @@ export default {
         if (emailRes.ok || discordRes.ok) {
           await env.DB.prepare(`UPDATE ad_bids SET notified_at = datetime('now') WHERE id = ?`).bind(winner.id).run();
         }
-
-        // Mark all other pending bids for this slot/date as lost
         await env.DB.prepare(
           `UPDATE ad_bids SET status = 'lost'
            WHERE target_date = ? AND slot_number = ? AND status = 'pending' AND id != ?`
         ).bind(targetDate, slot, winner.id).run();
       }
     }
-
-    // ---- Midnight UTC (trigger "0 0 * * *"): expire stale bids, invoice
-    //      finished ads, and remind on unpaid invoices. ----
     if (runCleanup) {
-      const today = new Date().toISOString().slice(0, 10);
-
-      // 1) Any still-'pending' bid whose date has passed never won — mark lost.
+      const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       await env.DB.prepare(
         `UPDATE ad_bids SET status = 'lost'
          WHERE target_date <= ? AND status = 'pending'`
       ).bind(today).run();
-
-      // 1b) Prune expired advertiser Discord-verification tokens.
       await env.DB.prepare(`DELETE FROM ad_verifications WHERE expires_at < datetime('now')`).run();
-
-      // 2) Invoice ads that have finished running. Billing is per-view, so we
-      //    wait until after the run date (target_date < today), compute
-      //    rate × views, store it as amount_owed, and send the invoice exactly
-      //    once (guarded by invoiced_at IS NULL).
       const toInvoice = await env.DB.prepare(
         `SELECT * FROM ad_bids
          WHERE status = 'won' AND payment_status = 'awaiting_payment'
            AND invoiced_at IS NULL AND target_date < ?`
       ).bind(today).all();
-
-      for (const bid of (toInvoice.results || [])) {
+      for (const bid of toInvoice.results || []) {
         const { views, total } = await computeAmountOwed(env, bid);
         await env.DB.prepare(
           `UPDATE ad_bids SET amount_owed = ?, invoiced_at = datetime('now') WHERE id = ?`
         ).bind(total, bid.id).run();
-
         const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
-            subject: `🧾 Your Jaronite News ad invoice — ${total.toFixed(2)} ℐ (#${bid.id})`,
-            html: invoiceEmailHtml(bid, slotLabel, views, total),
+            subject: `\u{1F9FE} Your Jaronite News ad invoice \u2014 ${total.toFixed(2)} \u2110 (#${bid.id})`,
+            html: invoiceEmailHtml(bid, slotLabel, views, total)
           });
         }
         if (bid.discord_username) {
           await sendDiscordDm(env, bid.discord_username, invoiceDiscordMsg(bid, slotLabel, views, total));
         }
       }
-
-      // 3) Remind on invoices that were sent on a PRIOR day and are still
-      //    unpaid. The date(invoiced_at) < today guard means a freshly-invoiced
-      //    bid from step 2 doesn't also get a reminder in the same run.
       const unpaid = await env.DB.prepare(
         `SELECT * FROM ad_bids
          WHERE status = 'won'
            AND invoiced_at IS NOT NULL AND date(invoiced_at) < ?
            AND payment_status IN ('awaiting_payment', 'underpaid')`
       ).bind(today).all();
-
-      for (const bid of (unpaid.results || [])) {
-        const total = (bid.amount_owed != null)
-          ? Number(bid.amount_owed)
-          : (await computeAmountOwed(env, bid)).total;
+      for (const bid of unpaid.results || []) {
+        const total = bid.amount_owed != null ? Number(bid.amount_owed) : (await computeAmountOwed(env, bid)).total;
         const slotLabel = SLOT_LABELS[bid.slot_number] || `Slot ${bid.slot_number}`;
         if (bid.email) {
           await sendEmail(env, {
             to: bid.email,
-            subject: `⏰ Reminder: invoice unpaid for your Jaronite News ad #${bid.id}`,
-            html: reminderEmailHtml(bid, slotLabel, total),
+            subject: `\u23F0 Reminder: invoice unpaid for your Jaronite News ad #${bid.id}`,
+            html: reminderEmailHtml(bid, slotLabel, total)
           });
         }
         if (bid.discord_username) {
@@ -3201,5 +2630,9 @@ export default {
         }
       }
     }
-  },
+  }
 };
+export {
+  index_default as default
+};
+//# sourceMappingURL=index.js.map

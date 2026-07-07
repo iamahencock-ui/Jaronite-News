@@ -670,6 +670,26 @@
       <div id="my-claims-list">Loading...</div>
     </div>
 
+    <!-- EDITOR (and admin): HOMEPAGE — MOTD + featured stories -->
+    <div class="card" id="homepage-section" style="display:none;">
+      <h2>Homepage</h2>
+      <p style="color:#666; font-size:0.85rem; margin-top:-8px;">Message of the day and the featured stories shown at the top of the homepage (1 main + 3 secondary). Empty slots auto-fill with the newest articles.</p>
+
+      <h3 style="color:#c9a84c; margin-bottom:8px;">Message of the day</h3>
+      <input type="text" id="motd-input" maxlength="300" placeholder="e.g. Election night live coverage starts 7PM — join the Discord!"
+             style="width:100%; padding:9px 12px; border:1px solid #333; border-radius:7px; background:#1a1a1a; color:#f0f0f0; font-size:0.9rem; outline:none; margin-bottom:18px;">
+
+      <h3 style="color:#c9a84c; margin-bottom:8px;">Featured stories</h3>
+      <div id="featured-pickers" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; margin-bottom:16px;">
+        <div><label style="font-size:0.78rem; color:#aaa;">Main story</label><select id="feat-slot-1" style="width:100%; padding:8px; border:1px solid #333; border-radius:7px; background:#1a1a1a; color:#f0f0f0; font-size:0.85rem;"></select></div>
+        <div><label style="font-size:0.78rem; color:#aaa;">Story 2</label><select id="feat-slot-2" style="width:100%; padding:8px; border:1px solid #333; border-radius:7px; background:#1a1a1a; color:#f0f0f0; font-size:0.85rem;"></select></div>
+        <div><label style="font-size:0.78rem; color:#aaa;">Story 3</label><select id="feat-slot-3" style="width:100%; padding:8px; border:1px solid #333; border-radius:7px; background:#1a1a1a; color:#f0f0f0; font-size:0.85rem;"></select></div>
+        <div><label style="font-size:0.78rem; color:#aaa;">Story 4</label><select id="feat-slot-4" style="width:100%; padding:8px; border:1px solid #333; border-radius:7px; background:#1a1a1a; color:#f0f0f0; font-size:0.85rem;"></select></div>
+      </div>
+      <button onclick="saveHomepageSettings()" style="padding:8px 20px; border-radius:7px; background:var(--mid-purple,#7c5cbf); color:#fff; border:none; cursor:pointer; font-size:0.9rem;">Save homepage</button>
+      <span id="homepage-msg" style="margin-left:12px; font-size:0.85rem;"></span>
+    </div>
+
     <!-- ADMIN SECTION -->
     <div class="card" id="admin-section" style="display:none;">
       <h2>Admin Controls</h2>
@@ -951,6 +971,9 @@
       document.getElementById('editor-section').style.display = 'block';
       loadPendingQueue();
       loadMyClaims();
+
+      document.getElementById('homepage-section').style.display = 'block';
+      loadHomepageSettings();
 
       // Editors and admins can skip the review pipeline entirely.
       document.getElementById('instapublish-btn').style.display = 'block';
@@ -1289,6 +1312,48 @@
   }
 
   // ---------- EDITOR/ADMIN: Pending Review queue ----------
+
+  // ---------- EDITOR/ADMIN: Homepage (MOTD + featured) ----------
+
+  async function loadHomepageSettings() {
+    const res = await fetch('/api/editor/homepage-get', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({})
+    });
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('motd-input').value = d.motd || '';
+    const byRank = {};
+    (d.featured || []).forEach(f => { byRank[f.featured_rank] = f.id; });
+    for (let slot = 1; slot <= 4; slot++) {
+      const sel = document.getElementById('feat-slot-' + slot);
+      sel.innerHTML = '<option value="">— auto (newest) —</option>' +
+        (d.choices || []).map(c =>
+          `<option value="${c.id}" ${byRank[slot] === c.id ? 'selected' : ''}>[${escapeHtml(c.category)}] ${escapeHtml(c.title)}</option>`
+        ).join('');
+    }
+  }
+
+  async function saveHomepageSettings() {
+    const msg = document.getElementById('homepage-msg');
+    const featured = [1, 2, 3, 4].map(s => document.getElementById('feat-slot-' + s).value || null);
+    // Warn on duplicate picks (same article in two slots).
+    const picked = featured.filter(Boolean);
+    if (new Set(picked).size !== picked.length) {
+      msg.textContent = 'Same article picked in two slots — each slot needs a different story.';
+      msg.style.color = '#e74c3c';
+      return;
+    }
+    const res = await fetch('/api/editor/homepage', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ motd: document.getElementById('motd-input').value, featured })
+    });
+    const d = await res.json().catch(() => ({}));
+    msg.textContent = d.success ? 'Saved — homepage updated.' : (d.error || 'Save failed.');
+    msg.style.color = d.success ? '#2ecc71' : '#e74c3c';
+  }
 
   async function loadPendingQueue() {
     const res = await fetch('/api/editor/pending', {
